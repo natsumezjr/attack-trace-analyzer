@@ -5,7 +5,7 @@
 > **核心约定**：
 > - ECS 版本固定为 **v9.2.0**（统一写 `ecs.version=9.2.0`）
 > - 所有自定义字段统一放入 **`custom.*`** 命名空间（避免污染 ECS 标准字段）
-> - 标记约定：`✅` = 必填；`⭐` = 建议；`⭕` = 可选
+> - 标记约定：`✅` = 必填；`⭐` = 建议；`⭕` = 可填
 >
 > **覆盖范围**：公共字段 + 三类数据源（主机日志/主机行为/网络流量）+ 检测告警（ATT&CK 映射），满足时间对齐、会话重建、关联/溯源的最小字段需求。
 >
@@ -74,8 +74,7 @@
 - 跨索引关联：在 OpenSearch 中作为文档主键
 
 **生成策略**：
-- 推荐 1：`uuidv4()`（标准 UUID v4）
-- 推荐 2：`sha1(source + raw_unique_key + @timestamp)`（只要稳定且不撞即可）
+- `sha1(agent.name + raw_unique_key + @timestamp)`（稳定幂等，支持重复拉取去重与证据引用）
 - 约束：全局唯一，长度不超过 64 字符
 
 **示例**：`evt-1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e`
@@ -85,8 +84,7 @@
 **用途**：跨源"最强关联键"，用于将主机日志、主机行为、网络流量关联到同一主机。
 
 **生成策略**：
-- 优先：使用环境提供的稳定主机 UUID（如云厂商的 instance-id）
-- 备选：`sha1(host.name)`（注意：更换主机名会导致漂移）
+- `sha1(host.name)`（要求主机名稳定；用于跨源关联）
 
 **约束**：同一主机在不同数据源中 `host.id` 必须一致。
 
@@ -97,8 +95,7 @@
 **用途**：同一主机内对"同一进程实例"的稳定标识，用于串进程树/行为链。
 
 **生成策略**：
-- 推荐：`sha1(host.id + pid + process.start_time + process.executable)`
-- 备选：使用传感器自带的 entity_id（如 Falco 的 `proc.id`）
+- `sha1(host.id + pid + process.start_time + process.executable)`
 
 **约束**：
 - 同一主机内，同一进程实例的所有行为事件必须使用相同的 `process.entity_id`
@@ -111,7 +108,7 @@
 **用途**：认证会话标识，用于登录会话重建（追踪用户从登录到注销的完整时间线）。
 
 **生成策略**：
-- 推荐：`sha1(host.id + user.name + source.ip + floor(@timestamp / Δt))`
+- `sha1(host.id + user.name + source.ip + floor(@timestamp / Δt))`
 - Δt 可取 5–10 分钟，保证同一会话内的所有事件使用相同的 `session.id`
 
 **约束**：
@@ -291,7 +288,7 @@
 | `event.action` | `keyword` | ✅ | 动作类型 | `registry_set_value`, `registry_delete_value` |
 | `registry.path` | `keyword` | ✅ | 注册表路径 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
 | `registry.value` | `keyword` | ⭐ | 键名 | `evil.exe`, `backdoor` |
-| `registry.data.strings` | `keyword[]` | ⭕ | 值内容（可选） | `["C:\Temp\evil.exe"]` |
+| `registry.data.strings` | `keyword[]` | ⭕ | 值内容（如有则填） | `["C:\Temp\evil.exe"]` |
 
 **约束**：
 - `registry.path` 使用简短注册表根键（`HKCU`, `HKLM`, ...）
@@ -379,7 +376,7 @@
 | `event.action` | `keyword` | ✅ | 动作类型 | `process_injection`, `reflective_load` |
 | `process.entity_id` | `keyword` | ✅ | 发起进程（注入源） | `p-src-f1e2d3c4b5a6` |
 | `custom.target.process.entity_id` | `keyword` | ⭐ | 被注入进程（注入目标） | `p-dst-a1b2c3d4e5f6` |
-| `dll.path` | `keyword` | ⭕ | DLL 注入场景可填（可选） | `C:\Temp\evil.dll` |
+| `dll.path` | `keyword` | ⭕ | DLL 注入场景（如有则填） | `C:\Temp\evil.dll` |
 | `custom.memory.region_start` | `long` | ⭐ | 注入内存起始地址 | `140737488347136` |
 | `custom.memory.region_size` | `long` | ⭐ | 注入内存大小（字节） | `4096` |
 | `custom.memory.protection` | `keyword` | ⭐ | 内存保护属性 | `RWX`, `RX` |
@@ -476,7 +473,7 @@
 | `url.full` | `wildcard` | ✅ | 完整 URL | `http://example.com/path?query=value` |
 | `url.domain` | `keyword` | ⭐ | 域名 | `example.com` |
 | `http.response.status_code` | `long` | ⭐ | HTTP 状态码 | `200`, `404`, `500` |
-| `user_agent.original` | `text` | ⭕ | User-Agent（可选） | `curl/7.88.1` |
+| `user_agent.original` | `text` | ⭕ | User-Agent（如有则填） | `curl/7.88.1` |
 | `event.action` | `keyword` | ✅ | 动作类型 | `http_request`, `http_covert_channel_suspected` |
 
 **约束**：
@@ -500,7 +497,7 @@
 | `icmp.type` | `long` | ✅ | ICMP type | `8` (Echo Request), `0` (Echo Reply) |
 | `icmp.code` | `long` | ✅ | ICMP code | `0` |
 | `event.action` | `keyword` | ✅ | 动作类型 | `icmp_echo`, `icmp_tunnel_suspected` |
-| `custom.icmp.payload_size` | `long` | ⭕ | 载荷大小（隧道特征，可选） | `1400` |
+| `custom.icmp.payload_size` | `long` | ⭕ | 载荷大小（隧道特征，如有则填） | `1400` |
 
 **约束**：
 - `icmp.type` + `icmp.code` 组合唯一标识 ICMP 消息类型
@@ -528,7 +525,7 @@
 | `event.severity` | `long` | ✅ | 严重程度（0-100） | `70` (高危), `30` (低危) |
 | `rule.id` | `keyword` | ✅ | 规则唯一 ID | `R-DNS-001`, `T1055-001` |
 | `rule.name` | `keyword` | ✅ | 规则名称（人类可读） | `DNS Tunnel Suspected` |
-| `rule.ruleset` | `keyword` | ⭐ | 规则集/引擎 | `suricata`, `falco`, `opensearch-security` |
+| `rule.ruleset` | `keyword` | ⭐ | 规则集/引擎 | `suricata`, `falco`, `opensearch-security`, `yara` |
 | `risk.score` | `float` | ⭐ | 风险分（0-100，可与 `event.severity` 映射） | `80.5` |
 | `tags` | `keyword[]` | ⭐ | 标签（建议包含 ATT&CK） | `["attack.t1055", "attack.ta0005"]` |
 | `threat.framework` | `keyword` | ✅ | 固定为 `MITRE ATT&CK` | `MITRE ATT&CK` |
@@ -555,6 +552,8 @@
 | `custom.finding.providers` | `keyword[]` | ✅ | 告警来源（检测引擎） | `["suricata"]`, `["falco", "security-analytics"]` |
 | `custom.finding.fingerprint` | `keyword` | ⭐ | 融合指纹（raw→canonical 去重） | `fp-a1b2c3d4e5f6a7b8` |
 | `custom.evidence.event_ids` | `keyword[]` | ⭐ | 证据事件列表（指向 Telemetry 的 `event.id`） | `["evt-123", "evt-456"]` |
+| `custom.yara.rule_names` | `keyword[]` | ⭐ | YARA 命中规则名列表（指纹证据） | `["APT29_Dropper", "WebShell_Generic"]` |
+| `custom.fingerprint.labels` | `keyword[]` | ⭐ | 指纹标签（家族/工具/特征） | `["APT29", "COZYBEAR"]` |
 
 **字段详解**：
 

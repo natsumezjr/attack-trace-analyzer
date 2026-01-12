@@ -37,8 +37,9 @@ Step 4️⃣ 分析层
    → 告警融合：raw → canonical
    → 时间窗关联：聚合相关事件
    → 实体关系抽取：提取节点和边
-   → 攻击链重建：识别攻击路径
-   → APT 相似度匹配：输出候选组织
+   → 攻击链重建：基于 Neo4j GDS 的加权最短路输出关键路径
+   → APT 相似度匹配：基于离线 ATT&CK CTI（Intrusion Set ↔ Technique）+ TF-IDF 向量 + GDS 余弦相似度输出 Top-3
+   → 攻击者指纹：YARA 规则匹配结果进入溯源报告
    ⬇️
 
 Step 5️⃣ 图谱层
@@ -132,8 +133,8 @@ npm run dev
 | 中心机后端 | Next.js | API、注册表、轮询器 |
 | 存储 | OpenSearch | 3个索引（events/raw-findings/canonical-findings） |
 | 检测 | Security Analytics + Sigma | Store-first 检测 |
-| 分析 | Python | 告警融合、攻击链重建、APT 匹配 |
-| 图谱 | Neo4j | 实体关系图、路径推理 |
+| 分析 | Python + Neo4j GDS + YARA + 离线 ATT&CK CTI | 告警融合、攻击链重建、APT 相似度、攻击者指纹 |
+| 图谱 | Neo4j + GDS | 实体关系图、加权最短路、相似度检索 |
 | 展示 | Next.js + React | UI、报告导出 |
 
 ---
