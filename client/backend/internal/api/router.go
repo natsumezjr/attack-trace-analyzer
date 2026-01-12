@@ -4,14 +4,25 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/config"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/state"
+	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/storage"
 )
 
-func NewRouter(cfg config.Config, st *state.Manager) http.Handler {
+type pullRequest struct {
+	Cursor string `json:"cursor"`
+	Limit  int    `json:"limit"`
+	Want   struct {
+		EventKinds []string `json:"event_kinds,omitempty"`
+		Datasets   []string `json:"datasets,omitempty"`
+	} `json:"want,omitempty"`
+}
+
+func NewRouter(cfg config.Config, st *state.Manager, store *storage.Store) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
@@ -30,21 +41,47 @@ func NewRouter(cfg config.Config, st *state.Manager) http.Handler {
 			}
 		}
 
-		var req map[string]any
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
+		if store == nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "storage not initialized")
+			return
+		}
+
+		var req pullRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid json body")
 			return
 		}
 
-		cursor, _ := req["cursor"].(string)
+		if req.Cursor == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "cursor is required")
+			return
+		}
+		if req.Limit <= 0 {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "limit must be > 0")
+			return
+		}
+		if req.Limit > 2000 {
+			req.Limit = 2000
+		}
+		if _, err := strconv.ParseInt(req.Cursor, 10, 64); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "cursor must be a decimal integer string")
+			return
+		}
+
+		res, err := store.Pull(r.Context(), req.Cursor, req.Limit, storage.Want{
+			EventKinds: req.Want.EventKinds,
+			Datasets:   req.Want.Datasets,
+		})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			return
+		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":      "ok",
-			"items":       []any{},
-			"next_cursor": cursor,
-			"has_more":    false,
+			"items":       res.Items,
+			"next_cursor": res.NextCursor,
+			"has_more":    res.HasMore,
 			"server_time": time.Now().UTC().Format(time.RFC3339Nano),
 		})
 	})

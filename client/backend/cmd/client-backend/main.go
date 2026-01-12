@@ -13,6 +13,7 @@ import (
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/config"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/registry"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/state"
+	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/storage"
 )
 
 func main() {
@@ -41,9 +42,16 @@ func main() {
 		go registry.RunRegisterLoop(ctx, cfg, st)
 	}
 
+	store, err := storage.Open(cfg.SQLitePath)
+	if err != nil {
+		slog.Error("sqlite open error", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = store.Close() }()
+
 	server := &http.Server{
 		Addr:              cfg.BindAddr,
-		Handler:           api.NewRouter(cfg, st),
+		Handler:           api.NewRouter(cfg, st, store),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
