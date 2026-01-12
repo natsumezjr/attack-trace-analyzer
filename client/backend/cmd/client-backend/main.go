@@ -11,6 +11,7 @@ import (
 
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/api"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/config"
+	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/ingest"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/registry"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/state"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/storage"
@@ -48,6 +49,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = store.Close() }()
+
+	ingestor := ingest.New(cfg, store)
+	ingestor.Start(ctx)
 
 	server := &http.Server{
 		Addr:              cfg.BindAddr,

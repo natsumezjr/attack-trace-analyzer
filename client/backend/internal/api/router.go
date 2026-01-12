@@ -73,7 +73,13 @@ func NewRouter(cfg config.Config, st *state.Manager, store *storage.Store) http.
 			Datasets:   req.Want.Datasets,
 		})
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			status := http.StatusInternalServerError
+			code := "INTERNAL_ERROR"
+			if isClientPullError(err) {
+				status = http.StatusBadRequest
+				code = "BAD_REQUEST"
+			}
+			writeError(w, status, code, err.Error())
 			return
 		}
 
@@ -132,4 +138,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func isClientPullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "invalid cursor") ||
+		strings.Contains(msg, "limit must") ||
+		strings.Contains(msg, "cursor must")
 }
