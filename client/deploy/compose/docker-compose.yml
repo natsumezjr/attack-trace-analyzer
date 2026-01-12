@@ -1,0 +1,75 @@
+name: ata-client
+
+services:
+  # --- Suricata: network flow + IDS alerts (EVE JSON) ---
+  suricata:
+    # Image docs (community-maintained by an OISF member):
+    # - https://github.com/jasonish/docker-suricata
+    image: jasonish/suricata:8.0.1
+    container_name: ata-suricata
+    restart: unless-stopped
+    network_mode: host
+    # Follow Suricata container recommendations: allow capturing packets and adjusting niceness.
+    # - https://docs.suricata.io/en/suricata-8.0.1/security.html#containers
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    command:
+      - -i
+      - ${SURICATA_INTERFACE:-eth0}
+      - -l
+      - /var/log/suricata
+      # Load extra rules in addition to those configured in suricata.yaml.
+      # - https://docs.suricata.io/en/suricata-8.0.1/command-line-options.html
+      - -s
+      - /var/lib/suricata/rules/local.rules
+    volumes:
+      - ./data/suricata:/var/log/suricata
+      - ./suricata/rules/local.rules:/var/lib/suricata/rules/local.rules:ro
+
+  # --- Falco: host behavior alerts (JSON) ---
+  falco:
+    # Official docs:
+    # - https://falco.org/docs/setup/container/
+    image: falcosecurity/falco:0.42.0
+    container_name: ata-falco
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    volumes:
+      # Align with Falco's official docker instructions (Modern eBPF, fully-privileged).
+      - /sys/kernel/tracing:/sys/kernel/tracing:ro
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - ./falco/falco.yaml:/etc/falco/falco.yaml:ro
+      - ./data/falco:/var/log/falco
+
+  # --- Client Backend (Go + SQLite): ECS normalize + buffer + register + /health + /pull ---
+  #
+  # This service is intentionally left as a placeholder for now (you asked to not write Go code yet).
+  # When you start implementing, you can:
+  # - add `build: ../../backend` (or the actual path),
+  # - or set `image: ...` if you publish a dev image.
+  #
+  # client-backend:
+  #   image: ghcr.io/your-org/ata-client-backend:dev
+  #   container_name: ata-client-backend
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   environment:
+  #     - CLIENT_ID=${CLIENT_ID}
+  #     - HOST_ID=${HOST_ID}
+  #     - HOST_NAME=${HOST_NAME}
+  #     - CENTER_BASE_URL=${CENTER_BASE_URL}
+  #     - CLIENT_LISTEN_URL=${CLIENT_LISTEN_URL}
+  #     - CLIENT_BIND_ADDR=${CLIENT_BIND_ADDR:-0.0.0.0:18080}
+  #     - WAZUH_ALERTS_JSON=${WAZUH_ALERTS_JSON:-/var/ossec/logs/alerts/alerts.json}
+  #     - SURICATA_EVE_JSON=/var/log/suricata/eve.json
+  #     - FALCO_EVENTS_JSON=/var/log/falco/events.json
+  #   volumes:
+  #     - ./data/client:/var/lib/ata
+  #     - ${WAZUH_ALERTS_JSON:-/var/ossec/logs/alerts/alerts.json}:/var/lib/wazuh/alerts.json:ro
+  #     - ./data/suricata:/var/log/suricata:ro
+  #     - ./data/falco:/var/log/falco:ro

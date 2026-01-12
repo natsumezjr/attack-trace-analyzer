@@ -1,0 +1,25 @@
+# Falco config template
+#
+# Goal for this project:
+# - Produce *JSON* alerts
+# - Write to a file path that can be mounted into client-backend later
+#
+# Reference:
+# - Falco docs: JSON output and file_output options.
+
+# Keep stdout on for quick debugging (`docker logs ata-falco`)
+stdout_output:
+  enabled: true
+
+# Output JSON (instead of plain text)
+json_output: true
+
+# Optional: include the `output` field inside JSON
+json_include_output_property: true
+
+# Also write to a file for easy consumption by client-backend
+file_output:
+  enabled: true
+  filename: /var/log/falco/events.json
+  keep_alive: false
+
