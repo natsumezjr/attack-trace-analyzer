@@ -25,7 +25,7 @@ class NodeType(str, Enum):
 
 class RelType(str, Enum):
     # 主机/网络
-    COMMUNICATES_WITH = "COMMUNICATES_WITH"   # Host -> Host (netflow/zeek/suricata)
+    COMMUNICATES_WITH = "COMMUNICATES_WITH"   # Host -> Host (netflow/suricata)
     CONNECTS_TO = "CONNECTS_TO"               # Process/Host -> Endpoint/IP
     RESOLVES = "RESOLVES"                     # Host/Process -> Domain
     RESOLVES_TO = "RESOLVES_TO"               # Domain -> IP
