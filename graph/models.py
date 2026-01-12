@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from hashlib import sha1
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -16,11 +16,13 @@ class NodeType(str, Enum):
     PROCESS = "Process"
     FILE = "File"
     DOMAIN = "Domain"
-    IP = "IP"
-    ENDPOINT = "Endpoint"   # ip:port 可选
+    
+    def get_ts(self) -> Optional[str]:
+        return self.props.get("@timestamp", 0)
 
 
 # ---------- 2) 关系类型（枚举） ----------
+
 class RelType(str, Enum):
     # 主机/网络
     COMMUNICATES_WITH = "COMMUNICATES_WITH"   # Host -> Host (netflow/zeek/suricata)
@@ -59,6 +61,9 @@ class GraphNode(BaseModel):
     key: Dict[str, Any] = Field(default_factory=dict)      # 唯一键
     props: Dict[str, Any] = Field(default_factory=dict)    # 其它属性（可包含ECS字段子集）
 
+    def get_ts(self) -> Optional[str]:
+        return self.props.get("@timestamp", 0)
+
 
 class GraphEdge(BaseModel):
     src_uid: str
@@ -66,6 +71,21 @@ class GraphEdge(BaseModel):
     rtype: RelType
     # 关系属性：时间、证据源、ATT&CK标签、置信度等
     props: Dict[str, Any] = Field(default_factory=dict)
+    
+    def __init__(self, src_uid: str, dst_uid: str, rtype: RelType, props: Optional[Dict[str, Any]] = None):
+        self.src_uid = src_uid
+        self.dst_uid = dst_uid
+        self.rtype = rtype
+        self.props = props or {}
+        
+    def get_ts(self) -> Optional[str]:
+        return self.props.get("@timestamp", 0)
+    
+    def get_src_uid(self) -> str:
+        return self.src_uid
+    
+    def get_dst_uid(self) -> str:
+        return self.dst_uid
 
 
 # ---------- 5) 你们确认的“实体键”规范 ----------
@@ -101,10 +121,6 @@ def file_node(path: str, props: Optional[Dict[str, Any]] = None) -> GraphNode:
 def domain_node(dns_query: str, props: Optional[Dict[str, Any]] = None) -> GraphNode:
     key = {"dns.question.name": dns_query}
     return GraphNode(uid=make_uid(NodeType.DOMAIN, key), ntype=NodeType.DOMAIN, key=key, props=props or {})
-
-def ip_node(ip: str, props: Optional[Dict[str, Any]] = None) -> GraphNode:
-    key = {"ip": ip}
-    return GraphNode(uid=make_uid(NodeType.IP, key), ntype=NodeType.IP, key=key, props=props or {})
 
 
 from typing import Iterable, Mapping, Tuple, Set, Optional, Dict, Any, Union
@@ -232,3 +248,91 @@ def caused_by(effect: GraphNode, cause: GraphNode, **kw) -> GraphEdge:
 
 def mapped_to_attack(x: GraphNode, y: GraphNode, **kw) -> GraphEdge:
     return make_edge(x, y, RelType.MAPPED_TO_ATTACK, **kw)
+
+
+from typing import Optional, Set, List, Tuple
+
+# 假设在同一包内；按你们实际路径调整
+from graph.api import get_edges, get_node
+
+
+
+
+class KillChainSubgraph:
+    nodes_edges: List[Dict[str, Any]]  # [{'node': GraphNode, 'edge': GraphEdge|None}, ...]
+
+    def __init__(self, nodes_edges: Optional[List[Dict[str, Any]]] = None):
+        self.nodes_edges = nodes_edges or []
+
+    def append_node_edge(self, node: GraphNode, edge: Optional[GraphEdge] = None):
+        self.nodes_edges.append({"node": node, "edge": edge})
+
+    def pop_node_edge(self) -> Tuple[GraphNode, Optional[GraphEdge]]:
+        d = self.nodes_edges.pop()
+        return d["node"], d["edge"]
+
+    @classmethod
+    def get_subgraph(cls, alarm_node: GraphNode) -> "KillChainSubgraph":
+        """
+        从 alarm_node 开始逆序回溯：
+        - 当前节点记为 dst_node
+        - 遍历所有入边：src_node -> dst_node
+        - 仅保留 src.ts < dst.ts 的分支，否则剪枝
+        - 回溯法：找到一条满足条件的链路就返回（你也可以改成收集全部分支）
+        """
+        path = cls(nodes_edges=[])
+        path.append_node_edge(alarm_node, edge=None)  # 起点：告警节点，没有“指向下一跳”的边
+
+        visited: Set[str] = set()  # 防环；按 uid 去重
+
+        def dfs(dst_node: GraphNode, depth: int) -> bool:
+            dst_uid = dst_node.uid
+            if dst_uid in visited:
+                # 防止环导致无限递归；是否剪枝可按需调整
+                return False
+            visited.add(dst_uid)
+
+            # ---- 终止条件预留（不直接调用，避免 should_stop 里 pass 导致运行报错） ----
+            # if should_stop(dst_node, depth, path):
+            #     return True
+
+            # 取出与 dst_node 相关的边；我们只取“入边”（src -> dst）
+            all_edges = get_edges(dst_node) or []
+            incoming = [e for e in all_edges if e.get_dst_uid() == dst_uid]
+
+            dst_ts = dst_node.get_ts()
+
+            for edge in incoming:
+                src_node = get_node(edge.get_src_uid())
+                if src_node is None:
+                    # 数据不完整的剪枝留白
+                    pass
+                    continue
+
+                src_ts = src_node.get_ts()
+
+                # ---- 核心约束：src.ts < dst.ts（字符串比较）----
+                if src_ts < dst_ts:
+                    # ---- 其他剪枝预留（不直接调用，避免 should_prune 里 pass 导致运行报错）----
+                    # if should_prune(edge, src_node, dst_node, depth):
+                    #     continue
+
+                    # 记录：src_node 通过 edge 指向当前 dst_node
+                    path.append_node_edge(src_node, edge)
+
+                    # 继续往前回溯
+                    if dfs(src_node, depth + 1):
+                        return True
+
+                    # 回溯撤销
+                    path.pop_node_edge()
+                else:
+                    # 不满足时间单调性：剪枝（按你要求保留 pass）
+                    pass
+
+            # 没有可继续的分支：自然结束（如果你想把“到头”当作成功终止，可在这里 return True）
+            return False
+
+        dfs(alarm_node, depth=0)
+
+        return path
