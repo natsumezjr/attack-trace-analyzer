@@ -525,7 +525,7 @@
 
 | 字段 | 类型 | 必填 | 说明 | 示例 |
 |------|------|:----:|------|------|
-| `event.severity` | `integer` | ✅ | 严重程度（0-100） | `70` (高危), `30` (低危) |
+| `event.severity` | `long` | ✅ | 严重程度（0-100） | `70` (高危), `30` (低危) |
 | `rule.id` | `keyword` | ✅ | 规则唯一 ID | `R-DNS-001`, `T1055-001` |
 | `rule.name` | `keyword` | ✅ | 规则名称（人类可读） | `DNS Tunnel Suspected` |
 | `rule.ruleset` | `keyword` | ⭐ | 规则集/引擎 | `suricata`, `falco`, `opensearch-security` |
