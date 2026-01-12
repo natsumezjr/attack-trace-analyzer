@@ -19,8 +19,10 @@ type Config struct {
 	BindAddr      string
 
 	SQLitePath string
+	StatePath  string
 
-	AuthDisable bool
+	AuthDisable     bool
+	RegisterDisable bool
 
 	WazuhAlertsJSON   string
 	WazuhArchivesJSON string
@@ -29,6 +31,10 @@ type Config struct {
 	SuricataEveJSON   string
 	SuricataFastLog   string
 	SuricataStatsJSON string
+
+	CapWazuh    bool
+	CapFalco    bool
+	CapSuricata bool
 }
 
 func LoadFromEnv() (Config, error) {
@@ -54,8 +60,13 @@ func LoadFromEnv() (Config, error) {
 	if cfg.SQLitePath == "" {
 		cfg.SQLitePath = "/var/lib/ata/buffer.sqlite"
 	}
+	cfg.StatePath = strings.TrimSpace(os.Getenv("ATA_STATE_PATH"))
+	if cfg.StatePath == "" {
+		cfg.StatePath = "/var/lib/ata/state.json"
+	}
 
 	cfg.AuthDisable = parseBool(os.Getenv("CLIENT_AUTH_DISABLE"))
+	cfg.RegisterDisable = parseBool(os.Getenv("CLIENT_REGISTER_DISABLE"))
 
 	cfg.WazuhAlertsJSON = strings.TrimSpace(os.Getenv("ATA_WAZUH_ALERTS_JSON"))
 	cfg.WazuhArchivesJSON = strings.TrimSpace(os.Getenv("ATA_WAZUH_ARCHIVES_JSON"))
@@ -63,6 +74,10 @@ func LoadFromEnv() (Config, error) {
 	cfg.SuricataEveJSON = strings.TrimSpace(os.Getenv("ATA_SURICATA_EVE_JSON"))
 	cfg.SuricataFastLog = strings.TrimSpace(os.Getenv("ATA_SURICATA_FAST_LOG"))
 	cfg.SuricataStatsJSON = strings.TrimSpace(os.Getenv("ATA_SURICATA_STATS_JSON"))
+
+	cfg.CapWazuh = cfg.WazuhAlertsJSON != "" || cfg.WazuhArchivesJSON != ""
+	cfg.CapFalco = cfg.FalcoEventsJSON != ""
+	cfg.CapSuricata = cfg.SuricataEveJSON != "" || cfg.SuricataFastLog != "" || cfg.SuricataStatsJSON != ""
 
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
@@ -107,4 +122,3 @@ func parseBool(s string) bool {
 		return false
 	}
 }
-
