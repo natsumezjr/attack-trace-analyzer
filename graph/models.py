@@ -1,11 +1,9 @@
 # graph_models.py
 from __future__ import annotations
-
-from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha1
 import json
-from typing import Any, Dict, Optional, Literal
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -108,7 +106,129 @@ def ip_node(ip: str, props: Optional[Dict[str, Any]] = None) -> GraphNode:
     key = {"ip": ip}
     return GraphNode(uid=make_uid(NodeType.IP, key), ntype=NodeType.IP, key=key, props=props or {})
 
-def endpoint_node(ip: str, port: int, transport: Optional[str] = None,
-                  props: Optional[Dict[str, Any]] = None) -> GraphNode:
-    key = {"ip": ip, "port": port, "transport": transport or ""}
-    return GraphNode(uid=make_uid(NodeType.ENDPOINT, key), ntype=NodeType.ENDPOINT, key=key, props=props or {})
+
+from typing import Iterable, Mapping, Tuple, Set, Optional, Dict, Any, Union
+
+# 可选：让 src/dst 既支持 GraphNode，也支持 uid 字符串
+NodeOrUid = Union["GraphNode", str]
+
+# ---------- 6) 关系两端类型约束（可按需增删） ----------
+EDGE_TYPE_RULES: Dict[RelType, Tuple[Set[NodeType], Set[NodeType]]] = {
+    # 主机/网络
+    RelType.COMMUNICATES_WITH: ({NodeType.HOST}, {NodeType.HOST}),
+    RelType.CONNECTS_TO: ({NodeType.PROCESS, NodeType.HOST}, {NodeType.ENDPOINT, NodeType.IP}),
+    RelType.RESOLVES: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.DOMAIN}),
+    RelType.RESOLVES_TO: ({NodeType.DOMAIN}, {NodeType.IP}),
+
+    # 主机内部行为
+    RelType.LOGON: ({NodeType.USER}, {NodeType.SESSION}),
+    RelType.ON_HOST: ({NodeType.PROCESS, NodeType.USER, NodeType.SESSION}, {NodeType.HOST}),
+    RelType.SPAWNED: ({NodeType.PROCESS}, {NodeType.PROCESS}),
+    RelType.ACCESSED: ({NodeType.PROCESS}, {NodeType.FILE}),
+    RelType.WROTE: ({NodeType.PROCESS}, {NodeType.FILE}),
+
+    # 关联/溯源输出（这里通常不强约束两端类型）
+    # 你也可以按你们实际建模把 Event/AttackStage 加进 NodeType 再约束
+    RelType.SAME_ATTACK: (set(NodeType), set(NodeType)),
+    RelType.CAUSED_BY: (set(NodeType), set(NodeType)),
+    RelType.MAPPED_TO_ATTACK: (set(NodeType), set(NodeType)),
+}
+
+
+def _uid_of(x: NodeOrUid) -> str:
+    return x.uid if isinstance(x, GraphNode) else x
+
+
+def _ntype_of(x: NodeOrUid) -> Optional[NodeType]:
+    return x.ntype if isinstance(x, GraphNode) else None
+
+
+def _validate_edge_types(rtype: RelType, src: NodeOrUid, dst: NodeOrUid) -> None:
+    """
+    只有当 src/dst 是 GraphNode 时才校验类型（如果你传入的是 uid 字符串，就跳过校验）。
+    """
+    src_t = _ntype_of(src)
+    dst_t = _ntype_of(dst)
+    if src_t is None or dst_t is None:
+        return
+
+    if rtype not in EDGE_TYPE_RULES:
+        return
+
+    allowed_src, allowed_dst = EDGE_TYPE_RULES[rtype]
+    if src_t not in allowed_src or dst_t not in allowed_dst:
+        raise ValueError(
+            f"Invalid edge types for {rtype.value}: "
+            f"{src_t.value} -> {dst_t.value}, "
+            f"allowed: {sorted(t.value for t in allowed_src)} -> {sorted(t.value for t in allowed_dst)}"
+        )
+
+
+def make_edge(
+    src: NodeOrUid,
+    dst: NodeOrUid,
+    rtype: RelType,
+    props: Optional[Dict[str, Any]] = None,
+    *,
+    ts: Optional[str] = None,
+    evidence: Optional[Dict[str, Any]] = None,
+    confidence: Optional[float] = None,
+) -> GraphEdge:
+    """
+    通用边工厂：统一 props 注入（时间/证据/置信度）+ 关系两端类型校验。
+    """
+    _validate_edge_types(rtype, src, dst)
+
+    p: Dict[str, Any] = {}
+    if props:
+        p.update(props)
+    if ts is not None:
+        p.setdefault("@timestamp", ts)  # 常见字段名，可按你们规范改
+    if evidence is not None:
+        p.setdefault("evidence", evidence)
+    if confidence is not None:
+        p.setdefault("confidence", confidence)
+
+    return GraphEdge(
+        src_uid=_uid_of(src),
+        dst_uid=_uid_of(dst),
+        rtype=rtype,
+        props=p,
+    )
+
+
+def communicates_with(src_host: GraphNode, dst_host: GraphNode, **kw) -> GraphEdge:
+    return make_edge(src_host, dst_host, RelType.COMMUNICATES_WITH, **kw)
+
+def connects_to(src: GraphNode, dst: GraphNode, **kw) -> GraphEdge:
+    return make_edge(src, dst, RelType.CONNECTS_TO, **kw)
+
+def resolves(src: GraphNode, domain: GraphNode, **kw) -> GraphEdge:
+    return make_edge(src, domain, RelType.RESOLVES, **kw)
+
+def resolves_to(domain: GraphNode, ip: GraphNode, **kw) -> GraphEdge:
+    return make_edge(domain, ip, RelType.RESOLVES_TO, **kw)
+
+def logon(user: GraphNode, session: GraphNode, **kw) -> GraphEdge:
+    return make_edge(user, session, RelType.LOGON, **kw)
+
+def on_host(actor: GraphNode, host: GraphNode, **kw) -> GraphEdge:
+    return make_edge(actor, host, RelType.ON_HOST, **kw)
+
+def spawned(parent: GraphNode, child: GraphNode, **kw) -> GraphEdge:
+    return make_edge(parent, child, RelType.SPAWNED, **kw)
+
+def accessed(proc: GraphNode, file: GraphNode, **kw) -> GraphEdge:
+    return make_edge(proc, file, RelType.ACCESSED, **kw)
+
+def wrote(proc: GraphNode, file: GraphNode, **kw) -> GraphEdge:
+    return make_edge(proc, file, RelType.WROTE, **kw)
+
+def same_attack(a: GraphNode, b: GraphNode, **kw) -> GraphEdge:
+    return make_edge(a, b, RelType.SAME_ATTACK, **kw)
+
+def caused_by(effect: GraphNode, cause: GraphNode, **kw) -> GraphEdge:
+    return make_edge(effect, cause, RelType.CAUSED_BY, **kw)
+
+def mapped_to_attack(x: GraphNode, y: GraphNode, **kw) -> GraphEdge:
+    return make_edge(x, y, RelType.MAPPED_TO_ATTACK, **kw)
