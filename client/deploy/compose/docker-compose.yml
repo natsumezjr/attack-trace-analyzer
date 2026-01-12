@@ -47,29 +47,38 @@ services:
       - ./data/falco:/var/log/falco
 
   # --- Client Backend (Go + SQLite): ECS normalize + buffer + register + /health + /pull ---
-  #
-  # This service is intentionally left as a placeholder for now (you asked to not write Go code yet).
-  # When you start implementing, you can:
-  # - add `build: ../../backend` (or the actual path),
-  # - or set `image: ...` if you publish a dev image.
-  #
-  # client-backend:
-  #   image: ghcr.io/your-org/ata-client-backend:dev
-  #   container_name: ata-client-backend
-  #   restart: unless-stopped
-  #   network_mode: host
-  #   environment:
-  #     - CLIENT_ID=${CLIENT_ID}
-  #     - HOST_ID=${HOST_ID}
-  #     - HOST_NAME=${HOST_NAME}
-  #     - CENTER_BASE_URL=${CENTER_BASE_URL}
-  #     - CLIENT_LISTEN_URL=${CLIENT_LISTEN_URL}
-  #     - CLIENT_BIND_ADDR=${CLIENT_BIND_ADDR:-0.0.0.0:18080}
-  #     - WAZUH_ALERTS_JSON=${WAZUH_ALERTS_JSON:-/var/ossec/logs/alerts/alerts.json}
-  #     - SURICATA_EVE_JSON=/var/log/suricata/eve.json
-  #     - FALCO_EVENTS_JSON=/var/log/falco/events.json
-  #   volumes:
-  #     - ./data/client:/var/lib/ata
-  #     - ${WAZUH_ALERTS_JSON:-/var/ossec/logs/alerts/alerts.json}:/var/lib/wazuh/alerts.json:ro
-  #     - ./data/suricata:/var/log/suricata:ro
-  #     - ./data/falco:/var/log/falco:ro
+  client-backend:
+    build:
+      context: ../../backend
+    container_name: ata-client-backend
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - falco
+      - suricata
+    environment:
+      # Identity
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_VERSION=0.1.0
+      - HOST_ID=${HOST_ID}
+      - HOST_NAME=${HOST_NAME}
+
+      # Center connectivity
+      - CENTER_BASE_URL=${CENTER_BASE_URL}
+      - CLIENT_LISTEN_URL=${CLIENT_LISTEN_URL}
+      - CLIENT_BIND_ADDR=${CLIENT_BIND_ADDR:-0.0.0.0:18080}
+
+      # Storage
+      - ATA_SQLITE_PATH=/var/lib/ata/buffer.sqlite
+
+      # Sensor inputs (container paths)
+      - ATA_WAZUH_ALERTS_JSON=/var/lib/wazuh/logs/alerts/alerts.json
+      - ATA_WAZUH_ARCHIVES_JSON=/var/lib/wazuh/logs/archives/archives.json
+      - ATA_FALCO_EVENTS_JSON=/var/log/falco/events.json
+      - ATA_SURICATA_EVE_JSON=/var/log/suricata/eve.json
+    volumes:
+      - ./data/client:/var/lib/ata
+      # Wazuh is installed on the host; mount its log directory so the backend can read JSON logs.
+      - /var/ossec/logs:/var/lib/wazuh/logs:ro
+      - ./data/suricata:/var/log/suricata:ro
+      - ./data/falco:/var/log/falco:ro

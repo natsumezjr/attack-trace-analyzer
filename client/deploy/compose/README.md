@@ -29,16 +29,17 @@ cp .env.example .env
 - `SURICATA_INTERFACE`（网卡名，如 `eth0/ens33/enp0s3`）
 - `WAZUH_ALERTS_JSON`（Wazuh JSON 文件路径，默认 `/var/ossec/logs/alerts/alerts.json`）
 
-3) 拉起采集器：
+3) 一键拉起（采集器 + 客户端后端）：
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 4) 观察输出（v1 最重要的是“文件能落出来”）：
 
 - Suricata：`./data/suricata/eve.json`
 - Falco：`./data/falco/events.json`
+- Client Backend：监听 `CLIENT_BIND_ADDR`（默认 `0.0.0.0:18080`），提供 `/api/v1/health`
 
 > 说明：客户端后端（Go）后续会把这些原始输出读进来，统一映射为 ECS 子集并写入 SQLite，再由中心机轮询 `/pull` 拉取。
 

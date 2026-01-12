@@ -1,0 +1,11 @@
+.git
+.DS_Store
+**/*.md
+**/*_test.go
+bin/
+dist/
+tmp/
+.context/
+.vscode/
+.idea/
+
