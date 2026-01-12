@@ -15,7 +15,7 @@ def get_edges(node: GraphNode) -> List[GraphEdge]:  # 获取某个节点的所�
 def get_node(uid: str) -> GraphNode:
     pass
 
-def get_alarm_nodes() -> List[GraphNode]:  # 获取所有异常节点
+def get_alarm_edges() -> List[GraphEdge]:  # 获取所有异常节点
     pass
                 
 

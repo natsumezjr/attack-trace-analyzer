@@ -17,10 +17,6 @@ class NodeType(str, Enum):
     FILE = "File"
     DOMAIN = "Domain"
     
-    def get_ts(self) -> Optional[str]:
-        return self.props.get("@timestamp", 0)
-
-
 # ---------- 2) 关系类型（枚举） ----------
 
 class RelType(str, Enum):
@@ -60,10 +56,15 @@ class GraphNode(BaseModel):
     ntype: NodeType
     key: Dict[str, Any] = Field(default_factory=dict)      # 唯一键
     props: Dict[str, Any] = Field(default_factory=dict)    # 其它属性（可包含ECS字段子集）
-
-    def get_ts(self) -> Optional[str]:
-        return self.props.get("@timestamp", 0)
-
+    
+    def get_uid(self) -> str:
+        return self.uid
+    
+    def get_ntype(self) -> NodeType:
+        return self.ntype
+    
+    def get_key(self) -> Dict[str, Any]:
+        return self.key
 
 class GraphEdge(BaseModel):
     src_uid: str
@@ -86,6 +87,9 @@ class GraphEdge(BaseModel):
     
     def get_dst_uid(self) -> str:
         return self.dst_uid
+    
+    def get_rtype(self) -> RelType:
+        return self.rtype
 
 
 # ---------- 5) 你们确认的“实体键”规范 ----------
@@ -258,7 +262,13 @@ from graph.api import get_edges, get_node
 
 
 
-class KillChainSubgraph:
+from typing import Any, Dict, Optional, List, Tuple, Set
+
+from graph.api import get_edges, get_node
+from models import GraphNode, GraphEdge
+
+
+class KillChain:
     nodes_edges: List[Dict[str, Any]]  # [{'node': GraphNode, 'edge': GraphEdge|None}, ...]
 
     def __init__(self, nodes_edges: Optional[List[Dict[str, Any]]] = None):
@@ -272,67 +282,108 @@ class KillChainSubgraph:
         return d["node"], d["edge"]
 
     @classmethod
-    def get_subgraph(cls, alarm_node: GraphNode) -> "KillChainSubgraph":
+    def get_kill_chain(cls, alarm_edge: GraphEdge) -> "KillChain":
         """
-        从 alarm_node 开始逆序回溯：
-        - 当前节点记为 dst_node
-        - 遍历所有入边：src_node -> dst_node
-        - 仅保留 src.ts < dst.ts 的分支，否则剪枝
-        - 回溯法：找到一条满足条件的链路就返回（你也可以改成收集全部分支）
+        基于回溯法，从告警边 alarm_edge 开始逆序遍历：
+        - 只沿“入边”回溯：prev_edge.dst_uid == curr_src_uid
+        - 时间单调约束：prev_edge.ts < curr_edge.ts（字符串比较）
+        - 不满足约束则剪枝（留白 pass）
+        - 终止条件留白（should_stop 内 pass）
         """
         path = cls(nodes_edges=[])
-        path.append_node_edge(alarm_node, edge=None)  # 起点：告警节点，没有“指向下一跳”的边
 
-        visited: Set[str] = set()  # 防环；按 uid 去重
+        # ---- 内部留白：终止条件（你后续补）----
+        def should_stop(curr_node: GraphNode, curr_edge: GraphEdge, depth: int) -> bool:
+            """
+            终止条件留白（按需实现）：
+            - 深度达到上限
+            - 回溯到“边界实体”（如 Host/User/某类节点）
+            - 时间超出窗口
+            - 命中特定关系类型
+            """
+            pass
 
-        def dfs(dst_node: GraphNode, depth: int) -> bool:
-            dst_uid = dst_node.uid
-            if dst_uid in visited:
-                # 防止环导致无限递归；是否剪枝可按需调整
+        # ---- 内部留白：额外剪枝策略（你后续补）----
+        def should_prune(prev_edge: GraphEdge, curr_edge: GraphEdge, depth: int) -> bool:
+            """
+            其他剪枝策略留白（按需实现）：
+            - prev_edge 置信度过低
+            - 关系类型不在允许集合
+            - evidence/source 不可信
+            - 白名单过滤
+            """
+            pass
+
+        # 以 alarm_edge 为起点：先把“告警边的 dst 节点 + alarm_edge 本身 + src 节点”放入 path
+        dst_node = get_node(alarm_edge.get_dst_uid())
+        src_node = get_node(alarm_edge.get_src_uid())
+
+        if dst_node is None or src_node is None:
+            # 数据缺失：这里怎么处理你们定；先返回空/或部分
+            # 留白
+            pass
+            return path
+
+        # 约定：path 里每条记录是 “node + edge(从该 node 指向下一跳 node 的那条边)”
+        # 所以先记录 dst_node（终点，edge=None），再记录 src_node（edge=alarm_edge 指向 dst_node）
+        path.append_node_edge(dst_node, edge=None)
+        path.append_node_edge(src_node, edge=alarm_edge)
+
+        visited_edge: Set[Tuple[str, str, str]] = set()  # (src_uid, dst_uid, rtype) 防环；可按需增强
+
+        def dfs(curr_node: GraphNode, curr_edge: GraphEdge, depth: int) -> bool:
+            # 防止边循环
+            src_uid = curr_edge.get_src_uid()
+            dst_uid = curr_edge.get_dst_uid()
+            rtype = curr_edge.get_rtype().value
+            sig = (src_uid, dst_uid, rtype)
+            if sig in visited_edge:
                 return False
-            visited.add(dst_uid)
+            visited_edge.add(sig)
 
-            # ---- 终止条件预留（不直接调用，避免 should_stop 里 pass 导致运行报错） ----
-            # if should_stop(dst_node, depth, path):
+            # ---- 终止条件预留：不直接调用（避免 should_stop 里 pass 导致运行报错）----
+            # if should_stop(curr_node, curr_edge, depth):
             #     return True
 
-            # 取出与 dst_node 相关的边；我们只取“入边”（src -> dst）
-            all_edges = get_edges(dst_node) or []
-            incoming = [e for e in all_edges if e.get_dst_uid() == dst_uid]
+            # 找所有与 curr_node 相关的边，再筛“入边”：prev_edge.dst_uid == curr_node.uid
+            all_edges = get_edges(curr_node) or []
+            incoming = []
+            for e in all_edges:
+                e_dst = e.get_dst_uid()
+                if e_dst == curr_node.get_uid():
+                    incoming.append(e)
 
-            dst_ts = dst_node.get_ts()
+            curr_ts = curr_edge.get_ts()
 
-            for edge in incoming:
-                src_node = get_node(edge.get_src_uid())
-                if src_node is None:
-                    # 数据不完整的剪枝留白
-                    pass
-                    continue
+            for prev_edge in incoming:
+                prev_ts = prev_edge.get_ts()
 
-                src_ts = src_node.get_ts()
-
-                # ---- 核心约束：src.ts < dst.ts（字符串比较）----
-                if src_ts < dst_ts:
-                    # ---- 其他剪枝预留（不直接调用，避免 should_prune 里 pass 导致运行报错）----
-                    # if should_prune(edge, src_node, dst_node, depth):
+                # ---- 核心约束：prev_edge.ts < curr_edge.ts（字符串比较）----
+                if prev_ts < curr_ts:
+                    # ---- 额外剪枝预留：不直接调用（避免 should_prune 里 pass 导致运行报错）----
+                    # if should_prune(prev_edge, curr_edge, depth):
                     #     continue
 
-                    # 记录：src_node 通过 edge 指向当前 dst_node
-                    path.append_node_edge(src_node, edge)
+                    prev_src_uid = prev_edge.get_src_uid()
+                    prev_src_node = get_node(prev_src_uid)
+                    if prev_src_node is None:
+                        # 数据缺失剪枝留白
+                        pass
+                        continue
 
-                    # 继续往前回溯
-                    if dfs(src_node, depth + 1):
+                    # 记录：prev_src_node --prev_edge--> curr_node
+                    path.append_node_edge(prev_src_node, edge=prev_edge)
+
+                    if dfs(prev_src_node, prev_edge, depth + 1):
                         return True
 
-                    # 回溯撤销
+                    # 回溯
                     path.pop_node_edge()
                 else:
-                    # 不满足时间单调性：剪枝（按你要求保留 pass）
+                    # 时间不满足：剪枝（留白 pass）
                     pass
 
-            # 没有可继续的分支：自然结束（如果你想把“到头”当作成功终止，可在这里 return True）
             return False
 
-        dfs(alarm_node, depth=0)
-
+        dfs(src_node, alarm_edge, depth=0)
         return path
