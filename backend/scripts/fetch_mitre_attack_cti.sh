@@ -71,7 +71,7 @@ if [[ "${1:-}" == "--force" || "${1:-}" == "-f" ]]; then
   shift
 fi
 
-OUT_PATH="${1:-${ATTACK_CTI_PATH:-${DEFAULT_OUT}}"
+OUT_PATH="${1:-${ATTACK_CTI_PATH:-${DEFAULT_OUT}}}"
 
 CTI_URL="https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json"
 

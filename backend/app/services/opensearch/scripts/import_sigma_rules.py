@@ -41,9 +41,10 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 if sys.stdout.isatty():
     sys.stdout.reconfigure(line_buffering=True)
 
-# 添加 backend 目录到路径（仅在需要时导入）
-backend_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(backend_dir))
+# 添加 backend 目录到 sys.path，确保可导入 `app.*`
+backend_dir = Path(__file__).resolve().parents[4]
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 # 延迟导入 opensearch 模块（仅在需要时）
 def get_client():
@@ -54,27 +55,34 @@ def get_client():
     except ImportError as e:
         print("\n[ERROR] 无法导入 opensearch 模块")
         print("提示: 请使用 uv run 运行此脚本:")
-        print("     uv run python import_sigma_rules.py [选项]")
+        print("     cd backend && uv run python app/services/opensearch/scripts/import_sigma_rules.py [选项]")
         print("\n或者确保已安装依赖:")
         print("     uv sync")
         raise
 
 # OpenSearch 配置
-OPENSEARCH_URL = os.getenv("OPENSEARCH_URL", "https://localhost:9200")
-OPENSEARCH_USER = os.getenv("OPENSEARCH_USER", "admin")
+#
+# Prefer the backend-wide variables from docs/ENV_CONFIG.md:
+# - OPENSEARCH_NODE / OPENSEARCH_USERNAME / OPENSEARCH_PASSWORD
+# Keep compatibility with earlier script-specific vars:
+# - OPENSEARCH_URL / OPENSEARCH_USER
+OPENSEARCH_NODE = os.getenv("OPENSEARCH_NODE") or os.getenv("OPENSEARCH_URL") or "https://localhost:9200"
+OPENSEARCH_USERNAME = (
+    os.getenv("OPENSEARCH_USERNAME") or os.getenv("OPENSEARCH_USER") or "admin"
+)
 OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev")
 
 def test_opensearch_connection() -> bool:
     """测试OpenSearch连接"""
     try:
         client = httpx.Client(
-            auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+            auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
             verify=False,
             timeout=httpx.Timeout(10.0, connect=5.0),
             follow_redirects=True
         )
         try:
-            response = client.get(f"{OPENSEARCH_URL}/", follow_redirects=True)
+            response = client.get(f"{OPENSEARCH_NODE}/", follow_redirects=True)
             if response.status_code == 200:
                 return True
             else:
@@ -83,23 +91,24 @@ def test_opensearch_connection() -> bool:
         finally:
             client.close()
     except httpx.ConnectError as e:
-        print(f"\n[错误] 无法连接到 OpenSearch: {OPENSEARCH_URL}")
+        print(f"\n[错误] 无法连接到 OpenSearch: {OPENSEARCH_NODE}")
         print(f"  错误详情: {e}")
         print(f"  请检查:")
         print(f"    1) OpenSearch服务是否运行: docker ps | findstr opensearch")
-        print(f"    2) URL是否正确: {OPENSEARCH_URL}")
+        print(f"    2) URL是否正确: {OPENSEARCH_NODE}")
         print(f"    3) 网络连接是否正常")
         return False
     except httpx.TimeoutException as e:
-        print(f"\n[错误] 连接超时: {OPENSEARCH_URL}")
+        print(f"\n[错误] 连接超时: {OPENSEARCH_NODE}")
         print(f"  提示: OpenSearch可能未启动或响应缓慢")
         return False
     except Exception as e:
         print(f"\n[错误] 连接测试失败: {type(e).__name__}: {e}")
         return False
 
-# Sigma 规则目录
-SIGMA_RULES_DIR = Path(__file__).parent / "sigma-rules"
+# Sigma 规则目录（git submodule）
+# repo: backend/app/services/opensearch/sigma-rules
+SIGMA_RULES_DIR = Path(__file__).resolve().parents[1] / "sigma-rules"
 
 # ECS 字段映射（Sigma 字段 -> ECS 字段）
 SIGMA_TO_ECS_MAPPING = {
@@ -175,7 +184,10 @@ def find_sigma_rules(
     
     if not rules_dir.exists():
         print(f"错误: Sigma 规则目录不存在: {rules_dir}")
-        print("请先运行: cd backend/opensearch/sigma-rules && git clone https://github.com/SigmaHQ/sigma.git .")
+        print("请先初始化 Sigma 规则 submodule：")
+        print("  git submodule update --init --recursive")
+        print("或手动克隆到该目录：")
+        print("  backend/app/services/opensearch/sigma-rules")
         return []
     
     search_paths = []
@@ -372,14 +384,14 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             rule_data["logType"] = log_type
         
         # 使用 POST 方法创建规则（不是 _upload 端点）
-        url = f"{OPENSEARCH_URL}/_plugins/_security_analytics/rules"
+        url = f"{OPENSEARCH_NODE}/_plugins/_security_analytics/rules"
         params = {"category": category}
         
         # 配置httpx客户端，处理HTTPS连接问题
         try:
             # 创建客户端，禁用SSL验证并配置连接池
             client = httpx.Client(
-                auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+                auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
                 verify=False,  # 禁用SSL验证（开发环境）
                 timeout=httpx.Timeout(30.0, connect=10.0),  # 连接超时10秒，总超时30秒
                 follow_redirects=True,  # 跟随重定向
@@ -394,11 +406,11 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             finally:
                 client.close()  # 确保关闭连接
         except httpx.ConnectError as e:
-            print(f"✗ 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_URL}")
+            print(f"✗ 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_NODE}")
             print(f"  错误详情: {e}")
             print(f"  请检查:")
             print(f"    1) OpenSearch服务是否运行 (docker ps)")
-            print(f"    2) URL是否正确 ({OPENSEARCH_URL})")
+            print(f"    2) URL是否正确 ({OPENSEARCH_NODE})")
             print(f"    3) 防火墙/网络是否允许连接")
             return False
         except httpx.TimeoutException as e:
@@ -672,7 +684,7 @@ def main():
                     if 'connection' in error_str.lower() or 'connect' in error_str.lower():
                         print(f"\n  问题: 无法连接到 OpenSearch")
                         print(f"  解决方案: 检查 OpenSearch 服务是否运行")
-                        print(f"           检查 URL: {OPENSEARCH_URL}")
+                        print(f"           检查 URL: {OPENSEARCH_NODE}")
                     
                     print("\n规则已成功导入，但需要手动创建 detector:")
                     print("1. 使用 setup_security_analytics.py:")
