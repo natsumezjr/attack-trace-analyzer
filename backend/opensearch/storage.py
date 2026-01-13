@@ -3,7 +3,7 @@
 from typing import Any
 from datetime import datetime
 
-from .client import bulk_index, get_document
+from .client import bulk_index, get_document, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
 
 
@@ -102,6 +102,9 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             }
             total_success += result["success"]
             total_failed += result.get("failed", 0)
+            # 刷新索引，使新文档立即可搜索
+            if result["success"] > 0:
+                refresh_index(index_name)
         except Exception as error:
             print(f"存储到索引 {index_name} 失败: {error}")
             details[index_name] = {

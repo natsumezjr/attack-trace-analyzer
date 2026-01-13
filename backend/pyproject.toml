@@ -10,4 +10,6 @@ dependencies = [
     "httpx>=0.28.1",
     "opensearch-py>=2.0.0",
     "uvicorn>=0.40.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
 ]
