@@ -1,6 +1,7 @@
 # deploy/compose
 
 本目录不再维护 `docker-compose.yml`，统一入口已迁移到 `client/sensors/docker-compose.yml`。
+主机系统日志采集与异常检测使用 **Filebeat + Sigma**（细节见：`client/sensors/filebeat/`）。
 
 > 适用环境：**Linux 靶机**（Falco/Suricata 通常需要 `privileged` 与 host network；Docker Desktop/macOS 不适用）。
 
@@ -27,7 +28,6 @@ cp .env.example .env
 - `CENTER_BASE_URL`（中心机地址）
 - `CLIENT_LISTEN_URL`（中心机能访问到的本机地址）
 - `SURICATA_INTERFACE`（网卡名，如 `eth0/ens33/enp0s3`）
-- `WAZUH_ALERTS_JSON`（Wazuh JSON 文件路径，默认 `/var/ossec/logs/alerts/alerts.json`）
 
 3) 一键拉起（采集器 + 客户端后端）：
 
@@ -44,6 +44,8 @@ docker compose up -d --build
 - Client Backend：监听 `CLIENT_BIND_ADDR`（默认 `0.0.0.0:18080`），提供 `/api/v1/health`
 
 > 说明：当前 Falco/Suricata/Filebeat 已写入同一个 SQLite（`data.db`），不同表区分来源；客户端后端后续可直接读取该库或继续做统一归并。
+
+> 主机系统日志与 Sigma 检测（Filebeat + Sigma）输出位置见：`client/sensors/filebeat/README.md`（`output/` 目录）。
 
 ## 参考（官方/上游文档）
 

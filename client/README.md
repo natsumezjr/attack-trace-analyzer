@@ -2,7 +2,7 @@
 
 本目录用于存放**部署在靶场各节点（客户机/被监控主机）**上的所有代码与部署文件，覆盖：
 
-- **采集层（Sensors）**：Wazuh / Falco / Suricata
+- **采集层（Sensors）**：Filebeat(+Sigma) / Falco / Suricata
 - **客户端后端（Client Backend）**：Go + SQLite，本地缓冲 + ECS 归一化 + 注册 + `/health` + `/pull`
 
 > 口径以仓库 `docs/` 为准（文档先行）。
@@ -10,7 +10,7 @@
 ## 目录结构（约定）
 
 - `backend/`：客户端后端（Go 服务，SQLite 缓冲，提供 HTTP API）
-- `sensors/`：采集器运行/配置说明（Wazuh/Falco/Suricata）
+- `sensors/`：采集器运行/配置说明（Filebeat/Falco/Suricata）
 - `deploy/`：部署形态（docker compose / systemd 等）
 - `examples/`：样例数据（raw / ecs），用于联调与测试
 
@@ -42,5 +42,4 @@
 
 注意：
 - Falco / Suricata 容器化通常需要 `--privileged`、挂载宿主机目录、以及 host 网络/抓包权限（需在 `deploy/` 中细化）
-- Wazuh 生态相对重：是否“全 docker”需要结合你们靶场资源与时间窗口做取舍（后续在 `sensors/wazuh/` 里落地方案）
-
+- Filebeat 生态相对轻：适合做“主机系统日志采集”，并可结合 Sigma 规则进行异常检测（见 `sensors/filebeat/`）

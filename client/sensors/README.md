@@ -3,7 +3,7 @@
 采集层运行与配置说明（部署在客户机侧）。
 
 本项目固定三类数据源：
-- Wazuh：主机日志（hostlog.*）
+- Filebeat(+Sigma)：主机系统日志（hostlog.*）+ 基于 Sigma 规则的异常检测（finding.*）
 - Falco：主机行为告警（hostbehavior.*）
 - Suricata：网络流量与告警（netflow.* + alert）
 

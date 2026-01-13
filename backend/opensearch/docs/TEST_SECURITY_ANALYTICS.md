@@ -474,7 +474,7 @@ uv run python generate_test_data.py
 
 **说明**：
 这会创建：
-- 端侧告警（wazuh/falco/suricata）
+- 端侧告警（filebeat/falco/suricata）
 - 如果 Security Analytics 有 findings，也会在 `raw-findings-*` 中
 
 **检查点**：
@@ -483,8 +483,8 @@ uv run python generate_test_data.py
 
 **人话解释**：
 - 去重功能的作用是：把"同一个事件"的多个告警合并成一个
-- 比如：Wazuh 和 Security Analytics 都检测到了同一个可疑行为
-- 去重后，应该合并成一条告警，但标记来源为 `["wazuh", "security-analytics"]`
+- 比如：Filebeat+Sigma 和 Security Analytics 都检测到了同一个可疑行为
+- 去重后，应该合并成一条告警，但标记来源为 `["filebeat", "security-analytics"]`
 
 ---
 
