@@ -63,6 +63,7 @@ raw_findings_mapping = {
         "threat.technique.name": {"type": "keyword"},
         "custom.finding.stage": {"type": "keyword"},
         "custom.finding.providers": {"type": "keyword"},
+        "custom.finding.fingerprint": {"type": "keyword"},
         "custom.confidence": {"type": "float"},
         "custom.evidence.event_ids": {"type": "keyword"},
         "host.id": {"type": "keyword"},
