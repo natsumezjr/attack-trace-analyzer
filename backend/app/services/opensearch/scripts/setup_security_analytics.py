@@ -369,7 +369,7 @@ def create_default_detector() -> dict:
             print("1. 手动在 OpenSearch Dashboards 中创建 detector 和规则")
             print("2. 或者导入 Sigma 规则后，再运行此脚本:")
             print("   uv run python app/services/opensearch/scripts/import_sigma_rules.py --auto")
-            print("3. 参考说明: docs/08-后端运行与联调指南.md（OpenSearch 模块 / 脚本工具）")
+            print("3. 参考说明: docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）")
             return {
                 "success": False,
                 "message": "需要至少一个规则才能创建 detector。请手动配置或导入规则。"
@@ -406,7 +406,7 @@ def create_default_detector() -> dict:
             print("\n解决方案:")
             print("1. 手动在 OpenSearch Dashboards 中创建 detector 和规则")
             print("2. 或者导入 Sigma 规则后，再运行此脚本")
-            print("3. 参考说明: docs/08-后端运行与联调指南.md（OpenSearch 模块 / 脚本工具）")
+            print("3. 参考说明: docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）")
         else:
             print(f"[ERROR] 创建 detector 失败: {e}")
         return {
@@ -449,7 +449,7 @@ def main():
     print("\n[1/3] 检查 Security Analytics 插件...")
     if not check_security_analytics_available():
         print("\n配置失败：Security Analytics 插件不可用")
-        print("请参考 docs/08-后端运行与联调指南.md（OpenSearch 模块 / 脚本工具）进行手动配置/联调")
+        print("请参考 docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）进行手动配置/联调")
         return
     
     # 2. 创建默认 detector

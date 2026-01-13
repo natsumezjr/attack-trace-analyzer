@@ -86,7 +86,7 @@ def ensure_schema() -> None:
 
 
 def _create_schema(tx) -> None:
-    # v2 schema aligns with docs/09 (no NetConn nodes; composite keys for User/File).
+    # v2 schema aligns with docs/52 (no NetConn nodes; composite keys for User/File).
     constraints: list[tuple[str, tuple[str, ...]]] = [
         ("Host", ("host.id",)),
         ("User", ("user.id",)),
