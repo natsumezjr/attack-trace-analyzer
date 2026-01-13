@@ -154,6 +154,16 @@ def index_document(
         raise
 
 
+def refresh_index(index_name: str) -> None:
+    """刷新索引，使新写入的文档立即可搜索"""
+    client = get_client()
+    try:
+        client.indices.refresh(index=index_name)
+    except Exception as error:
+        print(f"刷新索引 {index_name} 失败: {error}")
+        # 不抛出异常，刷新失败不影响主流程
+
+
 def bulk_index(
     index_name: str,
     documents: list[dict[str, Any]],

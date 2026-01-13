@@ -10,6 +10,7 @@ from .client import (
     update_document,
     index_document,
     bulk_index,
+    refresh_index,
 )
 from .index import (
     INDEX_PATTERNS,
@@ -47,6 +48,7 @@ __all__ = [
     "update_document",
     "index_document",
     "bulk_index",
+    "refresh_index",
     # 索引管理
     "INDEX_PATTERNS",
     "get_index_name",

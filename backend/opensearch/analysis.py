@@ -5,7 +5,7 @@ import hashlib
 from typing import Any
 from datetime import datetime
 
-from .client import get_client, search, bulk_index
+from .client import get_client, search, bulk_index, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
 
 # 时间窗口（分钟），用于时间桶计算
@@ -238,6 +238,9 @@ def deduplicate_findings() -> dict[str, Any]:
             ]
 
             result = bulk_index(canonical_index_name, documents)
+            # 刷新索引，使新写入的 Canonical Findings 立即可搜索
+            if result.get("success", 0) > 0:
+                refresh_index(canonical_index_name)
 
             return {
                 "total": len(raw_findings),
