@@ -120,9 +120,11 @@ class GraphNode:
     key: dict[str, Any]
     props: dict[str, Any] = field(default_factory=dict)
 
+    # 返回节点 UID
     @property
     def uid(self) -> str:
         return build_uid(self.ntype, self.key)
+    # 合并唯一键与属性字段
     def merged_props(self) -> dict[str, Any]:
         merged = dict(self.props)
         for k, v in self.key.items():
@@ -143,15 +145,19 @@ class GraphEdge:
     rtype: RelType
     props: dict[str, Any] = field(default_factory=dict)
 
+    # 获取边的时间戳
     def get_ts(self) -> str | None:
         return self.props.get("@timestamp") or self.props.get("ts")
 
+    # 获取起点 UID
     def get_src_uid(self) -> str:
         return self.src_uid
 
+    # 获取终点 UID
     def get_dst_uid(self) -> str:
         return self.dst_uid
 
+    # 获取关系类型
     def get_rtype(self) -> RelType:
         return self.rtype
 
@@ -441,15 +447,19 @@ class Subgraph:
     _incoming_index: dict[str, list[GraphEdge]] = field(default_factory=lambda: defaultdict(list))
 
     def add_node(self, node: GraphNode) -> None:
+        # 添加节点到子图
         self.nodes[node.uid] = node
 
     def add_edge(self, edge: GraphEdge) -> None:
+        # 添加边并维护入边索引
         self.edges.append(edge)
         self._incoming_index[edge.dst_uid].append(edge)
 
     def get_node(self, uid: str) -> GraphNode | None:
+        # 按 UID 获取节点
         return self.nodes.get(uid)
 
+    # 获取指定节点的入边列表
     def get_incoming_edges(self, node_uid: str) -> list[GraphEdge]:
         """获取指向该节点的所有边 (用于回溯)"""
         return self._incoming_index[node_uid]
@@ -459,6 +469,7 @@ class Subgraph:
 class CallChain:
     # 存储结构：直接存由边组成的有序列表，节点信息隐含在边中
     chain: list[GraphEdge] = field(default_factory=list)
+    # 返回链路长度
     @property
     def length(self) -> int:
         return len(self.chain)
@@ -469,6 +480,7 @@ class CallChain:
 # ==========================================
 
 #### 1. 数据获取
+# 从数据库拉取正常/异常边数据
 def fetch_edges_from_db() -> tuple[list[GraphEdge], list[GraphEdge]]:
     return [], []
 
@@ -522,6 +534,7 @@ class MockLLMClient:
     实际项目中请替换为真实的 LangChain 或 OpenAI 客户端
     """
     @staticmethod
+    # 模拟语义分析，返回风险分数和特征向量
     def analyze_intent(src_context: dict, action: str, dst_context: dict) -> tuple[float, list[float]]:
         # 返回: (恶意置信度 0.0-1.0, 行为特征向量 128维)
         # 这是一个模拟逻辑：如果进程名包含 weird 字符或者是 powershell，认为高危
@@ -713,6 +726,7 @@ def backtrack_call_chain(subgraph: Subgraph, alarm_edge: GraphEdge | None = None
     
     
 #### 5. 向量提取
+# 从链路中提取向量特征
 def extract_vectors(chain: CallChain) -> list[list[float]]:
     vectors = []
     for edge in chain.chain:
@@ -722,10 +736,12 @@ def extract_vectors(chain: CallChain) -> list[list[float]]:
     return vectors
 
 #### 6.特征匹配
+# 依据向量特征进行匹配并返回结果
 def match_vector_features(vectors: list[list[float]]) -> dict[str, Any]:
     return {"attack_type": "Ransomware", "confidence": 0.98}
 
 #### 7. LLM 分析
+# 生成面向用户的分析文本
 def analyze_with_llm(match_result: dict[str, Any], chain: CallChain) -> str:
     # 构建 Prompt，描述 chain 里的每一步
     chain_desc = "\n".join(
@@ -739,6 +755,7 @@ def analyze_with_llm(match_result: dict[str, Any], chain: CallChain) -> str:
 # 编排入口 (Orchestrator)
 # ==========================================
 
+# 运行完整的分析流程
 def run_analysis_pipeline() -> None:
     print("[*] Starting Pipeline...")
     
