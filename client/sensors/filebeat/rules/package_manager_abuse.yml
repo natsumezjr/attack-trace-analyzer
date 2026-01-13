@@ -1,0 +1,26 @@
+title: Package Manager Abuse
+id: c2345678-901a-bcde-f012-3456789abcde
+status: stable
+description: Detects suspicious use of package managers to install potentially malicious packages
+references:
+  - https://attack.mitre.org/techniques/T1072/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'apt-get install'
+    - message|contains: 'yum install'
+    - message|contains: 'dpkg -i'
+    - message|contains: 'rpm -i'
+    - message|contains: 'pip install'
+    - message|contains: 'gem install'
+  condition: selection
+falsepositives:
+  - Legitimate software installation
+level: low
+tags:
+  - attack.execution
+  - attack.t1072

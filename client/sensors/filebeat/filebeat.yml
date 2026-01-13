@@ -1,0 +1,78 @@
+# Filebeat configuration for Ubuntu system logs
+
+filebeat.inputs:
+  # System auth logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/auth.log
+      - /var/log/auth.log.*
+    fields:
+      log_type: auth
+    fields_under_root: true
+
+  # System logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/syslog
+      - /var/log/syslog.*
+    fields:
+      log_type: syslog
+    fields_under_root: true
+
+  # Kernel logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/kern.log
+      - /var/log/kern.log.*
+    fields:
+      log_type: kernel
+    fields_under_root: true
+
+# ECS format processor
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+  # Parse common log patterns
+  - dissect:
+      when:
+        contains:
+          log_type: "auth"
+      tokenizer: "%{timestamp} %{hostname} %{process}[%{pid}]: %{message}"
+      field: "message"
+      target_prefix: "parsed"
+
+  # Add ECS fields
+  - add_fields:
+      target: ''
+      fields:
+        ecs.version: "8.0.0"
+
+  - rename:
+      fields:
+        - from: "log.file.path"
+          to: "log.origin.file.path"
+      ignore_missing: true
+
+# Output to file (for local processing)
+output.file:
+  path: "/tmp/filebeat-output"
+  filename: ecs_logs.json
+  codec.json:
+    pretty: false
+    escape_html: false
+
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644

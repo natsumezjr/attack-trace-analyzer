@@ -1,0 +1,24 @@
+title: Firewall Rule Modification
+id: 3a4b5c6d-7e8f-9012-3a4b-5c6d7e8f9012
+status: stable
+description: Detects modifications to firewall rules (iptables, ufw, firewalld)
+references:
+  - https://attack.mitre.org/techniques/T1562/004/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'iptables'
+    - message|contains: 'ufw'
+    - message|contains: 'firewalld'
+    - message|contains: 'firewall-cmd'
+  condition: selection
+falsepositives:
+  - Legitimate firewall configuration changes
+level: high
+tags:
+  - attack.defense_evasion
+  - attack.t1562.004

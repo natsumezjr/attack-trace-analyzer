@@ -1,0 +1,24 @@
+title: LD_PRELOAD Hijacking
+id: e4567890-123a-bcde-f012-3456789abcde
+status: stable
+description: Detects LD_PRELOAD environment variable manipulation for library hijacking
+references:
+  - https://attack.mitre.org/techniques/T1574/006/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'LD_PRELOAD'
+    - message|contains: 'LD_LIBRARY_PATH'
+    - message|contains: '/etc/ld.so.preload'
+  condition: selection
+falsepositives:
+  - Development and debugging
+level: high
+tags:
+  - attack.persistence
+  - attack.privilege_escalation
+  - attack.t1574.006
