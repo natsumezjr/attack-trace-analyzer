@@ -540,6 +540,14 @@ def _node_uid_from_record(labels: Iterable[str], props: Dict[str, Any]) -> Optio
     ntype = _label_to_ntype(labels)
     if ntype is None:
         return None
+    if ntype == NodeType.USER:
+        user_id = props.get("user.id")
+        if user_id:
+            return build_uid(ntype, {"user.id": user_id})
+        host_id = props.get("host.id")
+        user_name = props.get("user.name")
+        if host_id and user_name:
+            return build_uid(ntype, {"host.id": host_id, "user.name": user_name})
     key_field = NODE_UNIQUE_KEY.get(ntype)
     if key_field and key_field in props:
         return build_uid(ntype, {key_field: props[key_field]})

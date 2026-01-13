@@ -22,13 +22,21 @@ func main() {
 	// 2. 初始化 Gin 引擎
 	r := gin.Default()
 
-	// 3. 定义路由 GET /falco_events
-	r.GET("/falco_events", func(c *gin.Context) {
+	// 3. 定义路由：分别读取不同表
+	registerEventsRoute(r, "/falco", "falco")
+	registerEventsRoute(r, "/suricata", "suricata")
+	registerEventsRoute(r, "/wazuh", "wazuh")
+
+	// 4. 启动服务，运行在 0.0.0.0:8888
+	r.Run("0.0.0.0:8888")
+}
+
+func registerEventsRoute(r *gin.Engine, path string, table string) {
+	r.GET(path, func(c *gin.Context) {
 		var events []model.EventData
 
-		// 查询逻辑：从数据库中查找所有记录
-		// Result 包含了查询结果和错误信息
-		result := database.DB.Find(&events)
+		// 查询逻辑：从指定表中查找所有记录
+		result := database.DB.Table(table).Find(&events)
 
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -43,7 +51,4 @@ func main() {
 			"data":  events,              // 返回具体数据
 		})
 	})
-
-	// 4. 启动服务，运行在 0.0.0.0:8888
-	r.Run("0.0.0.0:8888")
 }

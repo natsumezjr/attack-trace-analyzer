@@ -31,7 +31,7 @@
 - **统一数据范式**: 基于 ECS (Elastic Common Schema) v9.2.0 的字段规范
 - **智能关联分析**: 时间窗聚合 + 实体关系图 + Neo4j 图算法
 - **攻击链重建**: 基于 ATT&CK 框架的攻击阶段识别与路径重建
-- **APT 相似度匹配**: 基于离线 CTI 数据的 TTP 相似性分析
+- **APT 相似度匹配**: 基于离线 MITRE ATT&CK Enterprise CTI（STIX 2.1）做 TTP 相似性分析
 - **可视化展示**: 时间线、关系图、ATT&CK 矩阵多维度展示
 
 ---
@@ -75,14 +75,13 @@
 │   → 实体关系抽取: 提取节点(host/user/process/file/ip/domain)和边            │
 │   → 攻击链重建: 基于 Neo4j GDS 加权最短路输出关键路径                        │
 │   → APT 相似度匹配: TF-IDF + 余弦相似度输出 Top-3 候选组织                    │
-│   → 攻击者指纹: YARA 规则匹配结果进入溯源报告                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Step 5️⃣  图谱层 (Neo4j + GDS)                                              │
 │   → Neo4j 存储实体关系图                                                      │
 │   → 支持多跳查询和路径推理                                                    │
-│   → GDS 算法: 加权最短路、相似度检索                                          │
+│   → GDS 算法: 加权最短路（路径重建）                                          │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -215,21 +214,20 @@ npm run dev
 | **中心机前端** | Next.js + React | 页面展示、可视化、报告导出 |
 | **存储** | OpenSearch | 3 个索引( events/raw-findings/canonical-findings) |
 | **检测** | Security Analytics + Sigma | Store-first 检测 |
-| **分析** | Python + Neo4j GDS + YARA + 离线 ATT&CK CTI | 告警融合、攻击链重建、APT 相似度、攻击者指纹 |
-| **图谱** | Neo4j + GDS | 实体关系图、加权最短路、相似度检索 |
+| **分析** | Python + Neo4j GDS + 离线 ATT&CK Enterprise CTI(STIX 2.1) | 告警融合、攻击链重建、APT 相似度 |
+| **图谱** | Neo4j + GDS | 实体关系图、加权最短路（路径重建） |
 
 ### 最终选型(已拍板)
 
 - **存储/检索**: OpenSearch
 - **库内检测**: OpenSearch Security Analytics (Sigma 规则)
-- **图谱与图算法**: Neo4j + Neo4j GDS (加权最短路、相似度检索)
+- **图谱与图算法**: Neo4j + Neo4j GDS (加权最短路｜路径重建)
 - **中心机后端**: Python FastAPI + uv (API、注册表、轮询器)
 - **中心机前端**: Next.js + React (页面展示、可视化)
 - **主机侧**: Wazuh (主机日志) + Falco (主机行为告警)
 - **网络侧**: Suricata (统一作为网络流量数据源,EVE JSON 同时产出事实与告警)
 - **统一范式**: ECS v9.2.0 + 自定义字段 `custom.*`
-- **攻击者指纹**: YARA (离线规则库)
-- **TTP 知识库**: 离线 ATT&CK CTI (STIX) 数据包
+- **TTP 知识库**: 离线 ATT&CK Enterprise CTI（STIX 2.1｜attack-stix-data｜固定路径：`backend/app/services/ttp_similarity/cti/enterprise-attack.json`）
 - **攻击复现**: Atomic Red Team
 - **输出导出**: ATT&CK Navigator layer
 - **Python 包管理**: uv (快速、可靠的 Python 包管理器)

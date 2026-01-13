@@ -158,14 +158,6 @@ attack_chains_mapping = {
                 "top_techniques": {"type": "keyword"},
             },
         },
-        "chain.fingerprint_evidence": {
-            "type": "nested",
-            "properties": {
-                "yara_rule_names": {"type": "keyword"},
-                "labels": {"type": "keyword"},
-                "file_paths": {"type": "keyword"},
-            },
-        },
     },
 }
 
@@ -181,7 +173,6 @@ client_registry_mapping = {
         "client.capabilities.wazuh": {"type": "boolean"},
         "client.capabilities.falco": {"type": "boolean"},
         "client.capabilities.suricata": {"type": "boolean"},
-        "client.capabilities.yara": {"type": "boolean"},
         "client.token_hash": {"type": "keyword"},
         "poll.cursor": {"type": "keyword"},
         "poll.last_seen": {"type": "date"},

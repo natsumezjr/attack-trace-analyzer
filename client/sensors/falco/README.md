@@ -1,17 +1,34 @@
-# sensors/falco
+﻿# Falco -> ECS -> SQLite
 
-Falco 的部署与输出约定（v1）。
+本项目使用 Falco 采集主机行为日志，将 Falco JSON 转换为 ECS 格式并写入 SQLite，便于后端直接读取。
 
-你已确认：靶机 Linux 且允许高权限，因此推荐 **Docker（privileged）+ host network** 快速落地。
+## 目录结构
 
-后续需要明确：
-- 规则集：MVP 优先使用高价值规则命中（不要全量 syscall 入库）
+- `docker-compose.yml`：一键启动 Falco 与 ECS 转换器
+- `ecs-converter/falco_json_to_ecs.py`：转换脚本（Falco JSON -> ECS JSON -> SQLite）
+- `ecs-converter/Dockerfile`：转换器镜像构建文件
+- `data/`：运行时数据目录
+  - `data/falco.jsonl`：Falco 原始 JSONL（输入）
+  - `data/falco_events.db`：SQLite 数据库（输出）
 
-## 推荐输出（给客户端后端消费）
+## 使用方法
 
-v1 推荐把 Falco 输出为 JSON 并落盘为文件，客户端后端直接 tail/读取：
+1) 启动
 
-- `events.json`：例如 `client/deploy/compose/data/falco/events.json`
+```bash
+sudo docker compose up -d --build
+```
 
-对应模板配置在：
-- `client/deploy/compose/falco/falco.yaml`
+2) 查看数据库
+
+```bash
+sqlite3 data/falco_events.db "SELECT id, event_json FROM data ORDER BY id DESC LIMIT 10;"
+```
+
+## 关键说明
+
+- 转换器只写 SQLite，不再生成 ECS 的 JSONL 文件。
+- `--reset` 已启用：每次启动会清空 `data/falco.jsonl` 和 `data/falco_events.db`（含 WAL/SHM）。
+- SQLite 表结构固定为：
+  - 表名：`data`
+  - 字段：`id`（自增主键）、`event_json`（完整 ECS JSON 字符串）

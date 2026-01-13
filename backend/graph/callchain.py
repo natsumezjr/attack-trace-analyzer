@@ -1,21 +1,21 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
 from typing import Any, List, Sequence, Tuple
+from dataclasses import dataclass, field
 from collections import defaultdict
-from graph.models import GraphNode, GraphEdge, RelType
+from backend.graph.models import GraphNode, GraphEdge, RelType
 from backend.graph import api as graph_api
-from backend.graph.models import GraphEdge, RelType
 from backend.graph.utils import _parse_ts_to_float
 from backend.data.attack_fsa import FSAGraph, KillChainEdgeNode
 
 # 1. 基础威胁权重表 (Base Risk Weights)
-BASE_RISK_WEIGHTS: dict[RelType, float] = {
-    RelType.SPAWNED: 5.0,     # 进程衍生是核心
-    RelType.CONNECTED: 4.0,   # C2通信
-    RelType.LOGON: 3.0,       # 横向移动风险
-    RelType.ACCESSED: 2.0,    # 文件读写
-    RelType.RESOLVES_TO: 1.0, # 基础设施解析
-    RelType.RESOLVED: 1.0,
+BASE_RISK_WEIGHTS: dict[str, float] = {
+    RelType.PARENT_OF.value: 5.0,   # 进程父子是核心
+    RelType.CONNECTED.value: 4.0,   # C2 通信
+    RelType.LOGON.value: 3.0,       # 横向移动风险
+    RelType.USES.value: 2.0,        # 文件读写
+    RelType.OWNS.value: 1.0,        # 归属关系
+    RelType.RESOLVES_TO.value: 1.0, # 基础设施解析
+    RelType.RESOLVED.value: 1.0,
 }
 
 DEFAULT_ALLOWED_RELTYPES: Tuple[str, ...] = tuple(BASE_RISK_WEIGHTS.keys())

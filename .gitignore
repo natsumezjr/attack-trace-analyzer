@@ -63,6 +63,10 @@ coverage.xml
 # Local scratch
 .context/
 
+# Offline CTI bundles (large)
+backend/app/services/ttp_similarity/cti/enterprise-attack.json
+data/cti/enterprise-attack.json
+
 # --- Node.js / Next.js ---
 node_modules/
 .next/
