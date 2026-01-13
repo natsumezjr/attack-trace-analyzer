@@ -14,7 +14,12 @@ def main() -> None:
     # 使用 OpenSearch API 拉取 ECS 事件并写入 Neo4j
     if "--file" in sys.argv:
         data = json.loads((ROOT_DIR / "graph" / "testExample.json").read_text(encoding="utf-8"))
-        events = data.get("events", [])
+        if isinstance(data, dict):
+            events = data.get("events", [])
+        elif isinstance(data, list):
+            events = data
+        else:
+            events = []
         total_events = len(events)
         node_count, edge_count = graph_api.ingest_ecs_events(events)
     else:
