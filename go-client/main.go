@@ -1,8 +1,8 @@
 package main
 
 import (
-	"falco-events-client/database"
-	"falco-events-client/model"
+	"go-client/database"
+	"go-client/model"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
