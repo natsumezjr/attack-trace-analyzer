@@ -5,13 +5,23 @@ from typing import Any, Iterable, Mapping
 from graph import models
 
 
+_MISSING = object()
+
+
 def _get_in(data: Mapping[str, Any], path: Iterable[str]) -> Any | None:
+    parts = list(path)
     cur: Any = data
-    for key in path:
+    for key in parts:
         if not isinstance(cur, Mapping) or key not in cur:
-            return None
+            cur = _MISSING
+            break
         cur = cur[key]
-    return cur
+    if cur is not _MISSING:
+        return cur
+    dotted = ".".join(parts)
+    if isinstance(data, Mapping) and dotted in data:
+        return data[dotted]
+    return None
 
 
 def _basename(path: str | None) -> str | None:
@@ -28,8 +38,8 @@ def _as_list(value: Any) -> list[Any]:
     return [value]
 
 
-def _extract_dns_answer_ips(dns: Mapping[str, Any]) -> list[str]:
-    answers = _as_list(dns.get("answers"))
+def _extract_dns_answer_ips(event: Mapping[str, Any]) -> list[str]:
+    answers = _as_list(_get_in(event, ["dns", "answers"]))
     ips: list[str] = []
     for ans in answers:
         if isinstance(ans, Mapping):
@@ -38,7 +48,7 @@ def _extract_dns_answer_ips(dns: Mapping[str, Any]) -> list[str]:
             data = ans
         if isinstance(data, str) and data:
             ips.append(data)
-    resolved = dns.get("resolved_ip") or dns.get("resolved_ips")
+    resolved = _get_in(event, ["dns", "resolved_ip"]) or _get_in(event, ["dns", "resolved_ips"])
     for item in _as_list(resolved):
         if isinstance(item, str) and item:
             ips.append(item)
@@ -62,12 +72,25 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     nodes_by_uid: dict[str, models.GraphNode] = {}
     edges: list[models.GraphEdge] = []
 
-    event_block = event.get("event", {}) if isinstance(event.get("event"), Mapping) else {}
-    event_kind = event_block.get("kind")
-    dataset = event_block.get("dataset") or ""
-    event_action = event_block.get("action")
+    event_kind = _get_in(event, ["event", "kind"])
+    if isinstance(event_kind, str):
+        event_kind = event_kind.lower()
+    dataset_raw = _get_in(event, ["event", "dataset"])
+    dataset = dataset_raw if isinstance(dataset_raw, str) else ""
+    event_action = _get_in(event, ["event", "action"])
+    event_category = _as_list(_get_in(event, ["event", "category"]))
+    event_type = _as_list(_get_in(event, ["event", "type"]))
     ts = event.get("@timestamp")
-    event_id = event_block.get("id")
+    event_id = _get_in(event, ["event", "id"])
+
+    if not event_kind:
+        if isinstance(dataset, str) and dataset.startswith("finding."):
+            event_kind = "alert"
+        elif dataset:
+            event_kind = "event"
+
+    if event_kind not in ("event", "alert"):
+        return [], []
 
     evidence_ids: list[str] | None = None
     if event_kind == "alert":
@@ -76,6 +99,20 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         evidence_ids = [event_id]
 
     is_alarm = event_kind == "alert"
+
+    base_edge_props: dict[str, Any] = {}
+    if event_id:
+        base_edge_props["event.id"] = event_id
+    if event_kind:
+        base_edge_props["event.kind"] = event_kind
+    if dataset:
+        base_edge_props["event.dataset"] = dataset
+    if event_action:
+        base_edge_props["event.action"] = event_action
+    if event_category:
+        base_edge_props["event.category"] = event_category
+    if event_type:
+        base_edge_props["event.type"] = event_type
 
     def add_node(node: models.GraphNode | None) -> models.GraphNode | None:
         if node is None:
@@ -91,7 +128,9 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     ) -> None:
         if src is None or dst is None:
             return
-        edge_props = dict(props or {})
+        edge_props = dict(base_edge_props)
+        if props:
+            edge_props.update(props)
         if is_alarm:
             edge_props.setdefault("is_alarm", True)
         edge = models.make_edge(
@@ -214,10 +253,10 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         else None
     )
 
-    if dataset.startswith("hostlog.auth") or "authentication" in _as_list(event_block.get("category")):
+    if dataset.startswith("hostlog.auth") or "authentication" in event_category:
         add_edge(models.RelType.LOGON, user_node, host_node)
 
-    if proc_node and parent_node and (dataset.startswith("hostlog.process") or "process" in _as_list(event_block.get("category"))):
+    if proc_node and parent_node and (dataset.startswith("hostlog.process") or "process" in event_category):
         add_edge(models.RelType.SPAWNED, parent_node, proc_node)
 
     if proc_node and file_node:
@@ -239,10 +278,9 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         props = {"destination.port": dst_port} if dst_port is not None else {}
         add_edge(models.RelType.CONNECTED, proc_node, ip_node, props=props)
 
-    if host_node and domain_node and (dataset.startswith("netflow.dns") or "dns" in _as_list(event_block.get("type", []))):
+    if host_node and domain_node and (dataset.startswith("netflow.dns") or "dns" in event_type):
         add_edge(models.RelType.RESOLVED, host_node, domain_node)
-        dns_block = event.get("dns", {}) if isinstance(event.get("dns"), Mapping) else {}
-        for ans_ip in _extract_dns_answer_ips(dns_block):
+        for ans_ip in _extract_dns_answer_ips(event):
             ans_ip_node = add_node(models.ip_node(ans_ip))
             add_edge(models.RelType.RESOLVES_TO, domain_node, ans_ip_node)
 
