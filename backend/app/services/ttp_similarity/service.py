@@ -220,13 +220,13 @@ def build_enterprise_cti_index(stix_path: Path) -> EnterpriseCtiIndex:
 
 @lru_cache(maxsize=1)
 def get_enterprise_cti_index() -> EnterpriseCtiIndex:
-    repo_root = Path(__file__).resolve().parents[3]
-    default_path = repo_root / "data" / "cti" / "enterprise-attack.json"
+    default_path = Path(__file__).resolve().parent / "cti" / "enterprise-attack.json"
     path = Path(os.environ.get("ATTACK_CTI_PATH", str(default_path)))
     if not path.exists():
         raise FileNotFoundError(
             f"ATT&CK Enterprise CTI file not found: {path}. "
-            "Place attack-stix-data Enterprise bundle at data/cti/enterprise-attack.json "
+            "Place attack-stix-data Enterprise bundle at "
+            "backend/app/services/ttp_similarity/cti/enterprise-attack.json "
             "or set ATTACK_CTI_PATH."
         )
     return build_enterprise_cti_index(path)

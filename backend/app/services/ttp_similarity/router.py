@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.services.ttp_similarity import (
+from app.services.ttp_similarity.service import (
     fetch_attack_techniques_from_canonical_findings,
     rank_similar_intrusion_sets,
 )
