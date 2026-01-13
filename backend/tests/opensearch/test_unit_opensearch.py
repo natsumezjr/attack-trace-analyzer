@@ -11,22 +11,13 @@ OpenSearch 模块单元测试
 """
 
 import pytest
-import sys
-from pathlib import Path
 from datetime import datetime
 from typing import Any
 
-# 添加父目录到路径，以便导入 opensearch 模块
-test_dir = Path(__file__).parent
-parent_dir = test_dir.parent  # backend/opensearch
-backend_dir = parent_dir.parent  # backend
-sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
-sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
+pytestmark = [pytest.mark.unit, pytest.mark.requires_opensearch]
 
-# 添加 test 目录到路径，以便导入 test_utils
-sys.path.insert(0, str(test_dir))
 
-from test_utils import (
+from .test_utils import (
     create_test_event,
     create_test_finding,
     create_test_finding_with_process,
@@ -44,14 +35,14 @@ class TestClientOperations:
     
     def test_get_client(self, opensearch_client):
         """测试获取客户端"""
-        from .. import get_client
+        from app.services.opensearch import get_client
         client = get_client()
         assert client is not None
         assert client == opensearch_client  # 单例模式
     
     def test_index_exists(self, initialized_indices):
         """测试检查索引是否存在"""
-        from .. import index_exists, get_index_name, INDEX_PATTERNS
+        from app.services.opensearch import INDEX_PATTERNS, get_index_name, index_exists
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -63,7 +54,7 @@ class TestClientOperations:
     
     def test_search_empty_index(self, initialized_indices):
         """测试搜索空索引"""
-        from .. import search, get_index_name, INDEX_PATTERNS
+        from app.services.opensearch import INDEX_PATTERNS, get_index_name, search
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -73,7 +64,7 @@ class TestClientOperations:
     
     def test_get_document_not_exists(self, initialized_indices):
         """测试获取不存在的文档"""
-        from .. import get_document, get_index_name, INDEX_PATTERNS
+        from app.services.opensearch import INDEX_PATTERNS, get_document, get_index_name
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -88,9 +79,8 @@ class TestIndexManagement:
     
     def test_get_index_name(self):
         """测试生成索引名（带日期后缀）"""
-        from ...index import get_index_name, INDEX_PATTERNS
-        from opensearch import get_index_name, INDEX_PATTERNS
-        
+        from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
+
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -100,9 +90,8 @@ class TestIndexManagement:
     
     def test_get_index_name_default_date(self):
         """测试生成索引名（使用默认日期）"""
-        from ...index import get_index_name, INDEX_PATTERNS
-        from opensearch import get_index_name, INDEX_PATTERNS
-        
+        from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
+
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"])
         
         assert index_name.startswith("ecs-events-")
@@ -111,9 +100,8 @@ class TestIndexManagement:
     
     def test_hash_token(self):
         """测试token哈希生成"""
-        from ...index import hash_token
-        from opensearch import hash_token
-        
+        from app.services.opensearch.index import hash_token
+
         token = "test-token-123"
         hash1 = hash_token(token)
         hash2 = hash_token(token)
@@ -126,8 +114,8 @@ class TestIndexManagement:
     
     def test_initialize_indices(self, clean_test_indices):
         """测试初始化所有索引"""
-        from .. import initialize_indices, index_exists, get_index_name, INDEX_PATTERNS
-        
+        from app.services.opensearch import INDEX_PATTERNS, get_index_name, index_exists, initialize_indices
+
         initialize_indices()
         
         today = datetime.now()
@@ -146,9 +134,8 @@ class TestStorageOperations:
     
     def test_route_to_index_event(self):
         """测试事件路由到ecs-events索引"""
-        from ...storage import route_to_index
-        from opensearch import route_to_index
-        
+        from app.services.opensearch import route_to_index
+
         event = create_test_event("evt-001", kind="event")
         index_name = route_to_index(event)
         
@@ -156,9 +143,8 @@ class TestStorageOperations:
     
     def test_route_to_index_raw_finding(self):
         """测试原始告警路由到raw-findings索引"""
-        from ...storage import route_to_index
-        from opensearch import route_to_index
-        
+        from app.services.opensearch import route_to_index
+
         finding = create_test_finding("finding-001")
         index_name = route_to_index(finding)
         
@@ -166,9 +152,8 @@ class TestStorageOperations:
     
     def test_route_to_index_canonical_finding(self):
         """测试规范告警路由到canonical-findings索引"""
-        from ...storage import route_to_index
-        from opensearch import route_to_index
-        
+        from app.services.opensearch import route_to_index
+
         finding = create_test_finding("finding-001")
         finding["event"]["dataset"] = "finding.canonical"
         index_name = route_to_index(finding)
@@ -177,7 +162,7 @@ class TestStorageOperations:
     
     def test_store_single_event(self, initialized_indices):
         """测试存储单个事件"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         event = create_test_event("evt-unit-001")
         result = store_events([event])
@@ -189,7 +174,7 @@ class TestStorageOperations:
     
     def test_store_multiple_events(self, initialized_indices):
         """测试批量存储多个事件"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         events = [
             create_test_event("evt-unit-002"),
@@ -208,7 +193,7 @@ class TestStorageOperations:
     
     def test_store_duplicate_event(self, initialized_indices):
         """测试存储重复事件（去重）"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         event = create_test_event("evt-unit-duplicate")
         
@@ -224,7 +209,7 @@ class TestStorageOperations:
     
     def test_store_empty_list(self, initialized_indices):
         """测试存储空列表"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         result = store_events([])
         
@@ -235,7 +220,7 @@ class TestStorageOperations:
     
     def test_store_event_without_id(self, initialized_indices):
         """测试存储没有event.id的事件（应该失败或使用自动ID）"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         event = create_test_event("evt-no-id")
         del event["event"]["id"]
@@ -253,7 +238,7 @@ class TestAnalysisOperations:
     
     def test_generate_fingerprint_basic(self):
         """测试生成基本指纹"""
-        from ...analysis import generate_fingerprint
+        from app.services.opensearch.analysis import generate_fingerprint
         
         finding = create_test_finding("finding-001", technique_id="T1078", host_id="h-001")
         fingerprint = generate_fingerprint(finding)
@@ -264,7 +249,7 @@ class TestAnalysisOperations:
     
     def test_generate_fingerprint_with_process(self):
         """测试生成带进程的指纹"""
-        from ...analysis import generate_fingerprint
+        from app.services.opensearch.analysis import generate_fingerprint
         
         finding = create_test_finding_with_process("finding-002", process_entity_id="proc-001")
         fingerprint = generate_fingerprint(finding)
@@ -273,7 +258,7 @@ class TestAnalysisOperations:
     
     def test_generate_fingerprint_with_destination(self):
         """测试生成带目标IP的指纹"""
-        from ...analysis import generate_fingerprint
+        from app.services.opensearch.analysis import generate_fingerprint
         
         finding = create_test_finding_with_destination("finding-003", dst_ip="192.168.1.100")
         fingerprint = generate_fingerprint(finding)
@@ -282,7 +267,7 @@ class TestAnalysisOperations:
     
     def test_generate_fingerprint_with_file(self):
         """测试生成带文件哈希的指纹"""
-        from ...analysis import generate_fingerprint
+        from app.services.opensearch.analysis import generate_fingerprint
         
         finding = create_test_finding_with_file("finding-004", file_hash="abc123")
         fingerprint = generate_fingerprint(finding)
@@ -291,7 +276,7 @@ class TestAnalysisOperations:
     
     def test_extract_provider_from_custom(self):
         """测试从custom字段提取provider"""
-        from ...analysis import extract_provider
+        from app.services.opensearch.analysis import extract_provider
         
         finding = create_test_finding("finding-005")
         finding["custom"]["finding"]["providers"] = ["wazuh", "falco"]
@@ -301,7 +286,7 @@ class TestAnalysisOperations:
     
     def test_extract_provider_from_rule_id(self):
         """测试从rule.id推断provider"""
-        from ...analysis import extract_provider
+        from app.services.opensearch.analysis import extract_provider
         
         finding = create_test_finding("finding-006")
         finding["rule"]["id"] = "wazuh-rule-001"
@@ -314,7 +299,7 @@ class TestAnalysisOperations:
     
     def test_merge_findings_single(self):
         """测试合并单个finding（应该直接转换）"""
-        from ...analysis import merge_findings
+        from app.services.opensearch.analysis import merge_findings
         
         finding = create_test_finding("finding-007")
         merged = merge_findings([finding])
@@ -324,7 +309,7 @@ class TestAnalysisOperations:
     
     def test_merge_findings_multiple(self):
         """测试合并多个findings"""
-        from ...analysis import merge_findings
+        from app.services.opensearch.analysis import merge_findings
         
         findings = [
             create_test_finding("finding-008", provider="wazuh"),
@@ -343,14 +328,14 @@ class TestAnalysisOperations:
     
     def test_merge_findings_empty_list(self):
         """测试合并空列表（应该抛出异常）"""
-        from ...analysis import merge_findings
+        from app.services.opensearch.analysis import merge_findings
         
         with pytest.raises(ValueError, match="无法合并空数组"):
             merge_findings([])
     
     def test_deduplicate_findings_empty(self, initialized_indices):
         """测试去重空索引"""
-        from .. import deduplicate_findings
+        from app.services.opensearch import deduplicate_findings
         
         result = deduplicate_findings()
         
@@ -361,7 +346,7 @@ class TestAnalysisOperations:
     
     def test_deduplicate_findings_with_data(self, initialized_indices):
         """测试去重有数据的索引"""
-        from .. import store_events, deduplicate_findings
+        from app.services.opensearch import deduplicate_findings, store_events
         
         # 创建多个相似的findings（相同technique和host）
         findings = []
@@ -385,7 +370,7 @@ class TestAnalysisOperations:
     
     def test_run_security_analytics(self, initialized_indices):
         """测试运行Security Analytics（当前为MVP版本）"""
-        from .. import run_security_analytics
+        from app.services.opensearch import run_security_analytics
         
         result = run_security_analytics()
         
@@ -396,7 +381,7 @@ class TestAnalysisOperations:
     
     def test_run_data_analysis(self, initialized_indices):
         """测试运行完整数据分析流程"""
-        from .. import run_data_analysis
+        from app.services.opensearch import run_data_analysis
         
         result = run_data_analysis()
         
@@ -413,7 +398,7 @@ class TestEdgeCases:
     
     def test_store_event_missing_required_fields(self, initialized_indices):
         """测试存储缺少必需字段的事件"""
-        from .. import store_events
+        from app.services.opensearch import store_events
         
         # 创建缺少必需字段的事件
         event = {"@timestamp": datetime.now().isoformat()}
@@ -425,7 +410,7 @@ class TestEdgeCases:
     
     def test_search_with_complex_query(self, initialized_indices):
         """测试复杂查询"""
-        from .. import search, get_index_name, INDEX_PATTERNS
+        from app.services.opensearch import INDEX_PATTERNS, get_index_name, search
         
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"])
         
@@ -446,7 +431,7 @@ class TestEdgeCases:
     
     def test_fingerprint_with_missing_fields(self):
         """测试生成缺少字段的指纹"""
-        from ...analysis import generate_fingerprint
+        from app.services.opensearch.analysis import generate_fingerprint
         
         # 创建缺少关键字段的finding
         finding = {

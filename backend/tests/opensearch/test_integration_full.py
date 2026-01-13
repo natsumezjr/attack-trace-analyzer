@@ -5,19 +5,13 @@
 """
 
 import pytest
-import sys
-from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
-test_dir = Path(__file__).parent
-parent_dir = test_dir.parent  # backend/opensearch
-backend_dir = parent_dir.parent  # backend
-sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
-sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
-sys.path.insert(0, str(test_dir))  # 添加test目录
+pytestmark = pytest.mark.requires_opensearch
 
-from test_utils import (
+
+from .test_utils import (
     create_test_event,
     create_test_finding,
     assert_event_structure,
@@ -37,7 +31,7 @@ class TestFullWorkflowWithIncremental:
         2. 模拟增量处理（只处理新的findings）
         3. 验证去重和规范findings生成
         """
-        from opensearch import (
+        from app.services.opensearch import (
             store_events,
             deduplicate_findings,
             run_data_analysis,
@@ -45,7 +39,7 @@ class TestFullWorkflowWithIncremental:
             get_index_name,
             INDEX_PATTERNS,
         )
-        from opensearch.analysis import (
+        from app.services.opensearch.analysis import (
             _get_last_processed_timestamp,
             _filter_new_findings,
         )
@@ -106,8 +100,8 @@ class TestFullWorkflowWithIncremental:
     
     def test_incremental_processing_avoids_duplicates(self, initialized_indices):
         """测试增量处理避免重复存储"""
-        from opensearch import store_events
-        from opensearch.analysis import (
+        from app.services.opensearch import store_events
+        from app.services.opensearch.analysis import (
             _get_last_processed_timestamp,
             _filter_new_findings,
         )
@@ -154,7 +148,7 @@ class TestErrorHandling:
     
     def test_handle_missing_detector(self, initialized_indices):
         """测试处理缺失detector的情况"""
-        from opensearch.analysis import _get_detector_id, _get_detector_details
+        from app.services.opensearch.analysis import _get_detector_details, _get_detector_id
         
         # 使用不存在的detector ID
         detector = _get_detector_details(initialized_indices, "non-existent-detector")
@@ -162,7 +156,7 @@ class TestErrorHandling:
     
     def test_handle_invalid_timestamp_format(self):
         """测试处理无效时间戳格式"""
-        from opensearch.analysis import _filter_new_findings
+        from app.services.opensearch.analysis import _filter_new_findings
         
         finding = create_test_finding("f-invalid-ts")
         finding["@timestamp"] = "invalid-timestamp-format"

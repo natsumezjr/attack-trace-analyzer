@@ -1,24 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试存储功能（先清除已有数据，再测试存储）
+OpenSearch Findings 存储测试工具（含数据清理）
+
+功能说明：
+    测试 findings 存储功能，先清除已有数据，再运行检测和存储。
+    此工具用于验证完整的存储流程。
+
+测试内容：
+    1. 检查当前 raw-findings 数据量
+    2. 清除已有数据（如果需要）
+    3. 运行 Security Analytics 检测
+    4. 验证存储结果
+
+使用场景：
+    - 验证 findings 存储功能
+    - 反复测试存储逻辑（自动清理旧数据）
+    - 调试存储问题
+
+环境要求：
+    - OpenSearch 服务运行中
+    - 已配置环境变量（OPENSEARCH_URL等）
+    - Security Analytics 已配置
+
+运行方式：
+    cd backend
+    uv run python scripts/opensearch/test_storage_with_cleanup.py
 """
 import sys
 import io
 from pathlib import Path
 
+# Windows UTF-8 兼容
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# 添加 backend 目录到 Python 路径
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from .. import run_security_analytics, get_client, get_index_name, INDEX_PATTERNS
+from app.services.opensearch import run_security_analytics, get_client, get_index_name, INDEX_PATTERNS
 from datetime import datetime
 
 print("=" * 60)
-print("测试存储功能（先清除已有数据）")
+print("OpenSearch Findings 存储测试（含数据清理）")
 print("=" * 60)
 
 try:
