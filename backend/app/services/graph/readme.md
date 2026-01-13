@@ -14,20 +14,28 @@
 - `RESOLVED`：Host -> Domain（发起解析）
 - `RESOLVES_TO`：Domain -> IP（解析结果）
 
-### Docker（Neo4j）
+### Docker（Neo4j + OpenSearch）
+
+**注意**：Neo4j 的 docker-compose.yml 已合并到 `backend/opensearch/docker-compose.yml`。
 
 ```bash
+# 从 opensearch 目录启动（包含 OpenSearch + Neo4j）
+cd backend/opensearch
 docker compose up -d     # 创建
 docker compose down -v   # 删除
+
+# 或者从项目根目录启动
+docker compose -f backend/opensearch/docker-compose.yml up -d
 ```
 
 默认地址：
-- Browser：`http://localhost:7474`
-- Bolt：`bolt://localhost:7687`
+- **OpenSearch**: `https://localhost:9200`
+- **Neo4j Browser**: `http://localhost:7474`
+- **Neo4j Bolt**: `bolt://localhost:7687`
 
 默认账号：
-- 用户名：`neo4j`
-- 密码：`password`
+- **OpenSearch**: `admin` / `OpenSearch@2024!Dev`
+- **Neo4j**: `neo4j` / `password`
 
 ### 运行方式
 

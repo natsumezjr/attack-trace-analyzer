@@ -18,8 +18,10 @@ from typing import Any
 
 # 添加父目录到路径，以便导入 opensearch 模块
 test_dir = Path(__file__).parent
-parent_dir = test_dir.parent
-sys.path.insert(0, str(parent_dir))
+parent_dir = test_dir.parent  # backend/opensearch
+backend_dir = parent_dir.parent  # backend
+sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
+sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
 
 # 添加 test 目录到路径，以便导入 test_utils
 sys.path.insert(0, str(test_dir))
