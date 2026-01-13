@@ -658,3 +658,14 @@ def ingest_from_opensearch(
         total_edges += edge_count
 
     return total_events, total_nodes, total_edges
+
+
+def get_edges_inter_nodes(
+    node_uids: List[str],
+    t_start: float,
+    t_end: float,
+) -> List[GraphEdge]:
+ '''
+    查询指定节点集合内部，在特定时间窗口内发生的所有交互边。
+ '''
+ pass
