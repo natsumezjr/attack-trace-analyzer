@@ -27,6 +27,9 @@ export function hashToken(token: string): string {
 // ========== 存储功能（核心接口）==========
 export { storeEvents, routeToIndex } from './storage';
 
+// ========== 数据分析功能 ==========
+export { runDataAnalysis, deduplicateFindings, runSecurityAnalytics } from './analysis';
+
 // ========== 客户端操作 ==========
 export {
   getClient,

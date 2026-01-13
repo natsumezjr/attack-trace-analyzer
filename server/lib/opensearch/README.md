@@ -7,37 +7,37 @@ lib/opensearch/
 ├── index.ts          # 统一对外接口（唯一导入入口）
 ├── client.ts         # 客户端配置和基础操作
 ├── storage.ts        # 存储功能（数据路由、批量存储）
+├── analysis.ts       # 数据分析功能（检测和去重）
 ├── mappings.ts       # 索引映射定义
 └── README.md         # 本文件
 ```
 
-## 🎯 使用方式
+## 🎯 快速开始
 
-### 标准导入（推荐）
+### 标准导入
 
 ```typescript
-// 只从这个文件导入
 import {
   // 存储功能
   storeEvents,
   
-  // 索引常量
+  // 数据分析
+  runDataAnalysis,
+  
+  // 查询功能
+  searchDocuments,
+  getDocument,
+  
+  // 索引管理
   INDEX_PATTERNS,
   getIndexName,
-  
-  // 客户端操作
-  search,
-  getDocument,
-  ensureIndex,
-  
-  // 初始化
   initializeIndices,
 } from '@/lib/opensearch';
 ```
 
-### 核心接口说明
+## 📚 核心功能
 
-#### 1. 存储事件（自动路由）
+### 1. 存储事件（自动路由）
 
 ```typescript
 import { storeEvents } from '@/lib/opensearch';
@@ -47,31 +47,37 @@ const result = await storeEvents([
   { event: { kind: 'alert', dataset: 'finding.raw', ... }, ... },
 ]);
 
-// 返回：
+// 自动路由到对应索引：
+// - event.kind='event' → ecs-events-*
+// - event.kind='alert' + dataset='finding.raw' → raw-findings-*
+// - event.kind='alert' + dataset='finding.canonical' → canonical-findings-*
+```
+
+### 2. 数据分析
+
+```typescript
+import { runDataAnalysis } from '@/lib/opensearch';
+
+// 执行数据分析（检测 + 去重）
+const result = await runDataAnalysis();
 // {
-//   total: 2,
-//   success: 2,
-//   failed: 0,
-//   details: {
-//     'ecs-events-2026.01.13': { success: 1, failed: 0 },
-//     'raw-findings-2026.01.13': { success: 1, failed: 0 }
-//   }
+//   detection: { success, message },
+//   deduplication: { total, merged, canonical, errors }
 // }
 ```
 
-#### 2. 查询数据
+API 接口：`POST /api/v1/analysis/run`
+
+### 3. 查询数据
 
 ```typescript
-import { search, getIndexName, INDEX_PATTERNS } from '@/lib/opensearch';
+import { searchDocuments, getIndexName, INDEX_PATTERNS } from '@/lib/opensearch';
 
 const indexName = getIndexName(INDEX_PATTERNS.ECS_EVENTS);
-const results = await search(indexName, {
-  query: { match_all: {} },
-  size: 10
-});
+const results = await searchDocuments(indexName, { match_all: {} }, 100);
 ```
 
-#### 3. 初始化索引
+### 4. 初始化索引
 
 ```typescript
 import { initializeIndices } from '@/lib/opensearch';
@@ -79,18 +85,23 @@ import { initializeIndices } from '@/lib/opensearch';
 await initializeIndices(); // 自动创建所有需要的索引
 ```
 
-## 🔧 内部实现
+## 📋 索引常量
 
-- **client.ts**：OpenSearch 客户端连接、基础 CRUD 操作
-- **storage.ts**：数据路由逻辑、批量存储
-- **mappings.ts**：索引字段定义
-- **index.ts**：统一导出，提供标准接口
+```typescript
+INDEX_PATTERNS.ECS_EVENTS          // 'ecs-events'
+INDEX_PATTERNS.RAW_FINDINGS         // 'raw-findings'
+INDEX_PATTERNS.CANONICAL_FINDINGS   // 'canonical-findings'
+INDEX_PATTERNS.ATTACK_CHAINS        // 'attack-chains'
+INDEX_PATTERNS.CLIENT_REGISTRY       // 'client-registry'
+```
 
 ## ⚠️ 重要提示
 
-**外部代码应该只从 `index.ts` 导入**，不要直接导入 `client.ts`、`storage.ts` 等内部文件。
+1. **统一导入**：只从 `@/lib/opensearch` 导入，不要直接导入内部文件
+2. **自动路由**：`storeEvents` 会根据 `event.kind` 和 `event.dataset` 自动路由
+3. **数据分析**：使用 `runDataAnalysis()` 或 `/api/v1/analysis/run` API 接口
 
-这样可以：
-- 保持接口稳定
-- 方便后续重构
-- 统一管理依赖
+## 📖 详细文档
+
+- **数据分析功能**：见 `ANALYSIS.md`
+- **API 接口**：`POST /api/v1/events/store`、`POST /api/v1/analysis/run`
