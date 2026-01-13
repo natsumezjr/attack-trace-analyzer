@@ -195,8 +195,8 @@ class KillChainEdgeNode(EdgeNode):
 
     def __init__(self, edge: GraphEdge, *, is_key: bool, is_completion: bool):
         super().__init__(edge)
-        self._is_key = bool(is_key)
-        self._is_completion = bool(is_completion)
+        self._is_key = bool(is_key)  # 是否FSA选出的关键边
+        self._is_completion = bool(is_completion)  # 是否GDS得出的完成边
 
     @property
     def is_key(self) -> bool:
