@@ -86,34 +86,44 @@ def ensure_schema() -> None:
 
 
 def _create_schema(tx) -> None:
-    constraints = [
-        ("Host", "host.id"),
-        ("User", "user.name"),
-        ("Process", "process.entity_id"),
-        ("File", "file.path"),
-        ("Domain", "dns.question.name"),
-        ("IP", "related.ip"),
-        ("NetConn", "flow.id"),
+    # v2 schema aligns with docs/09 (no NetConn nodes; composite keys for User/File).
+    constraints: list[tuple[str, tuple[str, ...]]] = [
+        ("Host", ("host.id",)),
+        ("User", ("user.id",)),
+        ("User", ("host.id", "user.name")),
+        ("Process", ("process.entity_id",)),
+        ("File", ("host.id", "file.path")),
+        ("Domain", ("domain.name",)),
+        ("IP", ("ip",)),
     ]
-    indexes = [
+    indexes: list[tuple[str, str]] = [
         ("Host", "host.name"),
-        ("User", "user.id"),
+        ("User", "user.name"),
         ("Process", "process.executable"),
-        ("File", "file.hash.sha256"),
-        ("Domain", "url.domain"),
-        ("NetConn", "network.community_id"),
+        ("File", "file.path"),
+        ("Domain", "domain.name"),
+        ("IP", "ip"),
     ]
-    for label, prop in constraints:
-        cname = f"{label.lower()}_{_name_suffix(prop)}_unique"
-        tx.run(
-            f"CREATE CONSTRAINT {cname} IF NOT EXISTS FOR (n:{label}) "
-            f"REQUIRE n.{_cypher_prop(prop)} IS UNIQUE"
-        )
+
+    for label, props in constraints:
+        suffix = "_".join(_name_suffix(p) for p in props)
+        cname = f"{label.lower()}_{suffix}_unique"
+        if len(props) == 1:
+            prop = props[0]
+            tx.run(
+                f"CREATE CONSTRAINT {cname} IF NOT EXISTS FOR (n:{label}) "
+                f"REQUIRE n.{_cypher_prop(prop)} IS UNIQUE"
+            )
+        else:
+            prop_list = ", ".join(f"n.{_cypher_prop(p)}" for p in props)
+            tx.run(
+                f"CREATE CONSTRAINT {cname} IF NOT EXISTS FOR (n:{label}) "
+                f"REQUIRE ({prop_list}) IS UNIQUE"
+            )
+
     for label, prop in indexes:
         iname = f"{label.lower()}_{_name_suffix(prop)}_index"
-        tx.run(
-            f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})"
-        )
+        tx.run(f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})")
 
 
 def add_node(node: GraphNode) -> None:
@@ -545,6 +555,11 @@ def _node_uid_from_record(labels: Iterable[str], props: Dict[str, Any]) -> Optio
         user_name = props.get("user.name")
         if host_id and user_name:
             return build_uid(ntype, {"host.id": host_id, "user.name": user_name})
+    if ntype == NodeType.FILE:
+        host_id = props.get("host.id")
+        file_path = props.get("file.path")
+        if host_id and file_path:
+            return build_uid(ntype, {"host.id": host_id, "file.path": file_path})
     key_field = NODE_UNIQUE_KEY.get(ntype)
     if key_field and key_field in props:
         return build_uid(ntype, {key_field: props[key_field]})
@@ -566,13 +581,28 @@ def _label_to_ntype(labels: Iterable[str]) -> Optional[NodeType]:
 def _fallback_key(ntype: NodeType, props: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     fallback_fields = {
         NodeType.HOST: ["host.id", "host.name"],
-        NodeType.USER: ["user.name", "user.id"],
+        NodeType.USER: ["user.id", "host.id", "user.name"],
         NodeType.PROCESS: ["process.entity_id"],
-        NodeType.FILE: ["file.path", "file.hash.sha256", "file.hash.sha1", "file.hash.md5"],
-        NodeType.DOMAIN: ["dns.question.name", "url.domain"],
-        NodeType.IP: ["related.ip"],
-        NodeType.NETCON: ["flow.id", "network.community_id"],
+        NodeType.FILE: ["host.id", "file.path"],
+        NodeType.DOMAIN: ["domain.name"],
+        NodeType.IP: ["ip"],
     }
+    if ntype == NodeType.USER:
+        user_id = props.get("user.id")
+        if user_id:
+            return {"user.id": user_id}
+        host_id = props.get("host.id")
+        user_name = props.get("user.name")
+        if host_id and user_name:
+            return {"host.id": host_id, "user.name": user_name}
+        return None
+    if ntype == NodeType.FILE:
+        host_id = props.get("host.id")
+        file_path = props.get("file.path")
+        if host_id and file_path:
+            return {"host.id": host_id, "file.path": file_path}
+        return None
+
     for field in fallback_fields.get(ntype, []):
         if field in props:
             return {field: props[field]}
@@ -623,7 +653,7 @@ def ingest_from_opensearch(
     *,
     size: int = 100,
     include_events: bool = True,
-    include_raw_findings: bool = True,
+    include_raw_findings: bool = False,
     include_canonical_findings: bool = True,
     date: datetime | None = None,
 ) -> tuple[int, int, int]:
@@ -662,7 +692,52 @@ def get_edges_inter_nodes(
     t_start: float,
     t_end: float,
 ) -> List[GraphEdge]:
- '''
-    查询指定节点集合内部，在特定时间窗口内发生的所有交互边。
- '''
- pass
+    """Query edges among a set of node uids within a time window.
+
+    Note:
+        - This is used by Phase B graph completion to stitch FSA segments.
+        - It returns directed edges, but callers may treat them as undirected.
+    """
+    if not node_uids or len(node_uids) < 2:
+        return []
+    with _get_session() as session:
+        rows = _execute_read(session, _fetch_edges_inter_nodes, list(node_uids), float(t_start), float(t_end))
+    edges: List[GraphEdge] = []
+    for row in rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+    return edges
+
+
+def _fetch_edges_inter_nodes(tx, node_uids: List[str], t_start: float, t_end: float) -> List[Dict[str, Any]]:
+    params: Dict[str, Any] = {"t_min": float(t_start), "t_max": float(t_end)}
+
+    # Match each uid into a bound variable.
+    match_parts: List[str] = []
+    id_parts: List[str] = []
+    for idx, uid in enumerate(node_uids):
+        alias = f"n{idx}"
+        match_parts.append(_match_clause_for_uid(uid, alias, params, f"u{idx}"))
+        id_parts.append(f"id({alias})")
+
+    match_clause = "\n".join(match_parts)
+    ids_expr = ", ".join(id_parts)
+
+    cypher = (
+        f"{match_clause}\n"
+        f"WITH [{ids_expr}] AS node_ids\n"
+        "MATCH (s)-[r]->(t)\n"
+        "WHERE id(s) IN node_ids AND id(t) IN node_ids\n"
+        "AND coalesce(r.ts_float, 0.0) >= $t_min AND coalesce(r.ts_float, 0.0) <= $t_max\n"
+        "RETURN type(r) AS rtype, properties(r) AS rprops, "
+        "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
+        "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
+    )
+    return list(tx.run(cypher, **params))

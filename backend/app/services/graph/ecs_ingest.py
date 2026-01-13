@@ -61,6 +61,8 @@ def _extract_dns_answer_ips(event: Mapping[str, Any]) -> list[str]:
             data = ans
         if isinstance(data, str) and data:
             ips.append(data)
+    # Backward-compatible fallback for any legacy normalization that used
+    # dns.resolved_ip(s). The v2 docs prefer dns.answers[].data.
     resolved = _get_in(event, ["dns", "resolved_ip"]) or _get_in(event, ["dns", "resolved_ips"])
     for item in _as_list(resolved):
         if isinstance(item, str) and item:
@@ -94,8 +96,13 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     if event_kind not in ("event", "alert"):
         return [], []
 
-    dataset_raw = _get_in(event, ["event", "dataset"])
-    dataset = dataset_raw if isinstance(dataset_raw, str) else ""
+    # v2 graph: only Telemetry events + Canonical Findings.
+    dataset_raw0 = _get_in(event, ["event", "dataset"])
+    dataset0 = dataset_raw0 if isinstance(dataset_raw0, str) else ""
+    if event_kind == "alert" and dataset0 != "finding.canonical":
+        return [], []
+
+    dataset = dataset0
     event_action = _get_in(event, ["event", "action"])
     event_category_raw = _as_list(_get_in(event, ["event", "category"]))
     event_type_raw = _as_list(_get_in(event, ["event", "type"]))
@@ -253,18 +260,6 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     file_hash_sha256 = _get_in(event, ["file", "hash", "sha256"])
     file_hash_sha1 = _get_in(event, ["file", "hash", "sha1"])
     file_hash_md5 = _get_in(event, ["file", "hash", "md5"])
-    file_node = (
-        add_node(
-            models.file_node(
-                path=file_path,
-                hash_sha256=file_hash_sha256,
-                hash_sha1=file_hash_sha1,
-                hash_md5=file_hash_md5,
-            )
-        )
-        if file_path or file_hash_sha256 or file_hash_sha1 or file_hash_md5
-        else None
-    )
 
     is_auth = "authentication" in event_category or dataset.startswith("hostlog.auth")
     is_process = "process" in event_category or dataset.startswith("hostlog.process")
@@ -272,11 +267,8 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     is_network = "network" in event_category or dataset.startswith("netflow.")
 
     dns_name = _get_in(event, ["dns", "question", "name"])
-    dns_action = event_action.lower() if isinstance(event_action, str) else ""
-    is_dns = bool(dns_name) or "dns" in dns_action or dataset.startswith("netflow.dns")
     url_domain = _get_in(event, ["url", "domain"])
     domain_name = dns_name or url_domain
-    domain_node = add_node(models.domain_node(dns_name=dns_name, url_domain=url_domain)) if (is_dns and domain_name) else None
 
     src_ip = _get_in(event, ["source", "ip"])
     src_port = _get_in(event, ["source", "port"])
@@ -287,60 +279,105 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     flow_id = _get_in(event, ["flow", "id"])
     community_id = _get_in(event, ["network", "community_id"])
 
-    src_ip_node = add_node(models.ip_node(src_ip)) if (is_network and host_node and src_ip) else None
-    flow_node = (
-        add_node(
-            models.netcon_node(
-                flow_id=flow_id,
-                source_ip=src_ip,
-                source_port=src_port,
-                destination_ip=dst_ip,
-                destination_port=dst_port,
-                transport=net_transport,
-                protocol=net_protocol,
-            )
-        )
-        if (is_network and flow_id)
-        else None
-    )
-    community_node = (
-        add_node(
-            models.netcon_node(
-                community_id=community_id,
-                transport=net_transport,
-                protocol=net_protocol,
-            )
-        )
-        if (is_network and community_id)
-        else None
-    )
-    netcon_node = flow_node or community_node
-
     if is_auth:
         add_edge(models.RelType.LOGON, user_node, host_node)
 
-    if proc_node and parent_node and is_process:
-        add_edge(models.RelType.PARENT_OF, parent_node, proc_node)
+    # RUNS_ON: Process -> Host (structural edge)
+    if proc_node and host_node and (dataset in ("hostlog.process", "hostbehavior.syscall", "hostbehavior.file")):
+        add_edge(models.RelType.RUNS_ON, proc_node, host_node)
 
-    if proc_node and file_node and is_file:
-        op = _map_file_op(event_action)
+    # SPAWN: parent -> child (only when parent entity_id is available; do not guess from PID)
+    if proc_node and parent_node and (dataset in ("hostlog.process", "hostbehavior.syscall")):
+        add_edge(models.RelType.SPAWN, parent_node, proc_node)
+
+    # FILE_ACCESS
+    if is_file and host_id and file_path:
+        try:
+            file_node2 = add_node(
+                models.file_node(
+                    host_id=str(host_id),
+                    path=str(file_path),
+                    hash_sha256=file_hash_sha256,
+                    hash_sha1=file_hash_sha1,
+                    hash_md5=file_hash_md5,
+                )
+            )
+        except Exception:
+            file_node2 = None
+
+        op = _map_file_op(event_action) if isinstance(event_action, str) else None
         props = {"op": op} if op else {}
-        add_edge(models.RelType.USES, proc_node, file_node, props=props)
 
-    if is_network:
-        if flow_node and community_node:
-            add_edge(models.RelType.CONNECTED, flow_node, community_node)
-        if proc_node and netcon_node:
-            add_edge(models.RelType.OWNS, proc_node, netcon_node)
-        elif host_node and netcon_node:
-            add_edge(models.RelType.OWNS, host_node, netcon_node)
-        if host_node and src_ip_node:
-            add_edge(models.RelType.OWNS, host_node, src_ip_node)
+        if dataset == "hostbehavior.file":
+            # hostbehavior.file requires process.entity_id by spec; do not downgrade to Host.
+            if proc_node and file_node2:
+                add_edge(models.RelType.FILE_ACCESS, proc_node, file_node2, props=props)
+        else:
+            # hostlog.file_registry allows missing process.entity_id; downgrade to Host->File when needed.
+            if proc_node and file_node2:
+                add_edge(models.RelType.FILE_ACCESS, proc_node, file_node2, props=props)
+            elif host_node and file_node2:
+                add_edge(models.RelType.FILE_ACCESS, host_node, file_node2, props=props)
 
-    if host_node and domain_node and is_dns and (is_network or dataset.startswith("netflow.dns")):
-        add_edge(models.RelType.RESOLVED, host_node, domain_node)
+    # HAS_IP: Host -> IP (optional)
+    host_ips = _as_list(_get_in(event, ["host", "ip"]))
+    if host_node and host_ips:
+        for hip in host_ips:
+            if isinstance(hip, str) and hip:
+                ipn = add_node(models.ip_node(hip))
+                add_edge(models.RelType.HAS_IP, host_node, ipn)
+
+    # NET_CONNECT: Host/Process -> IP
+    is_flow = dataset == "netflow.flow"
+    is_syscall_connect = dataset == "hostbehavior.syscall" and (
+        (isinstance(event_action, str) and "connect" in event_action.lower())
+        or (isinstance(event_code, str) and event_code.lower() == "connect")
+    )
+    is_network_alert = event_kind == "alert" and ("network" in event_category)
+    if (is_flow or is_syscall_connect or is_network_alert) and dst_ip and host_node:
+        dst_ip_node = add_node(models.ip_node(str(dst_ip)))
+        props: dict[str, Any] = {}
+        if dst_port is not None:
+            props["destination.port"] = dst_port
+        if net_transport:
+            props["network.transport"] = net_transport
+        if net_protocol:
+            props["network.protocol"] = net_protocol
+        if flow_id:
+            props["flow.id"] = flow_id
+        if community_id:
+            props["network.community_id"] = community_id
+
+        if proc_node:
+            add_edge(models.RelType.NET_CONNECT, proc_node, dst_ip_node, props=props)
+        else:
+            add_edge(models.RelType.NET_CONNECT, host_node, dst_ip_node, props=props)
+
+    # DNS_QUERY + RESOLVES_TO
+    is_dns_event = dataset == "netflow.dns"
+    is_dns_alert = event_kind == "alert" and bool(dns_name) and (isinstance(event_action, str) and ("dns" in event_action.lower()))
+    if (is_dns_event or is_dns_alert) and domain_name and host_node:
+        domain_node2 = add_node(models.domain_node(domain_name=str(domain_name)))
+        src = proc_node or host_node
+        props: dict[str, Any] = {}
+        dns_qtype = _get_in(event, ["dns", "question", "type"])
+        if dns_qtype:
+            props["dns.question.type"] = dns_qtype
+        dns_rcode = _get_in(event, ["dns", "response_code"])
+        if dns_rcode:
+            props["dns.response_code"] = dns_rcode
+        dns_custom = _get_in(event, ["custom", "dns"])
+        if isinstance(dns_custom, Mapping):
+            for k in ("entropy", "query_length", "tunnel_score"):
+                v = dns_custom.get(k)
+                if v is not None:
+                    props[f"custom.dns.{k}"] = v
+
+        add_edge(models.RelType.DNS_QUERY, src, domain_node2, props=props)
+
         for ans_ip in _extract_dns_answer_ips(event):
-            ans_ip_node = add_node(models.ip_node(ans_ip))
-            add_edge(models.RelType.RESOLVES_TO, domain_node, ans_ip_node)
+            if isinstance(ans_ip, str) and ans_ip:
+                ans_ip_node = add_node(models.ip_node(ans_ip))
+                add_edge(models.RelType.RESOLVES_TO, domain_node2, ans_ip_node)
 
     return list(nodes_by_uid.values()), edges

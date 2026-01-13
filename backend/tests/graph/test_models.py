@@ -34,8 +34,8 @@ def test_build_uid_multi_key_is_sorted_and_roundtrips() -> None:
 
 
 def test_graphnode_uid_uses_build_uid() -> None:
-    node = models.GraphNode(models.NodeType.IP, key={"related.ip": "8.8.8.8"})
-    assert node.uid == "IP:related.ip=8.8.8.8"
+    node = models.GraphNode(models.NodeType.IP, key={"ip": "8.8.8.8"})
+    assert node.uid == "IP:ip=8.8.8.8"
 
 
 def test_graphnode_merged_props_prefers_existing_props_values() -> None:
@@ -58,6 +58,7 @@ def test_make_edge_valid_types_ok() -> None:
     assert edge.rtype == models.RelType.LOGON
     assert edge.src_uid.startswith("User:")
     assert edge.dst_uid.startswith("Host:")
+    assert edge.props["ts"] == "2026-01-12T00:00:00Z"
     assert edge.props["@timestamp"] == "2026-01-12T00:00:00Z"
 
 
@@ -72,8 +73,7 @@ def test_get_attack_tag_reads_nested_threat_tactic_name() -> None:
     edge = models.GraphEdge(
         src_uid="Host:host.id=h-001",
         dst_uid="Host:host.id=h-002",
-        rtype=models.RelType.CONNECTED,
+        rtype=models.RelType.NET_CONNECT,
         props={"threat": {"tactic": {"name": "Execution"}}},
     )
     assert edge.get_attack_tag() == "Execution"
-

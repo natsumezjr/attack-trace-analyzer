@@ -17,17 +17,17 @@ class NodeType(str, Enum):
     FILE = "File"
     IP = "IP"
     DOMAIN = "Domain"
-    NETCON = "NetConn"
 
 # 枚举图内动作类型
 class RelType(str, Enum):
     LOGON = "LOGON"
-    PARENT_OF = "PARENT_OF"
-    USES = "USES"
-    OWNS = "OWNS"
-    CONNECTED = "CONNECTED"
-    RESOLVED = "RESOLVED"
+    RUNS_ON = "RUNS_ON"
+    SPAWN = "SPAWN"
+    FILE_ACCESS = "FILE_ACCESS"
+    NET_CONNECT = "NET_CONNECT"
+    DNS_QUERY = "DNS_QUERY"
     RESOLVES_TO = "RESOLVES_TO"
+    HAS_IP = "HAS_IP"
 
 # 每种节点类型的唯一键字段
     # 这里的定义是为例parase时简写时正确解析
@@ -35,23 +35,25 @@ class RelType(str, Enum):
     # uid = "Host:h-aaa" parse_uid(uid)简写# 定义各节点的key字段
 NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.HOST: "host.id",
-    NodeType.USER: "user.name",
+    # User 优先使用 user.id；当 user.id 缺失时使用 (host.id, user.name) 复合键。
+    NodeType.USER: "user.id",
     NodeType.PROCESS: "process.entity_id",
+    # File 在 v2 中使用 (host.id, file.path) 复合键；短写解析仍使用 file.path。
     NodeType.FILE: "file.path",
-    NodeType.IP: "related.ip",
-    NodeType.DOMAIN: "dns.question.name",
-    NodeType.NETCON: "flow.id",
+    NodeType.IP: "ip",
+    NodeType.DOMAIN: "domain.name",
 }
 
 # 定义边的类型规则(每种边允许的源节点类型和目标节点类型)# 定义连接规则
 EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.LOGON: ({NodeType.USER}, {NodeType.HOST}),
-    RelType.PARENT_OF: ({NodeType.PROCESS}, {NodeType.PROCESS}),
-    RelType.USES: ({NodeType.PROCESS}, {NodeType.FILE}),
-    RelType.OWNS: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.IP, NodeType.NETCON}),
-    RelType.CONNECTED: ({NodeType.NETCON}, {NodeType.NETCON}),
-    RelType.RESOLVED: ({NodeType.HOST}, {NodeType.DOMAIN}),
+    RelType.RUNS_ON: ({NodeType.PROCESS}, {NodeType.HOST}),
+    RelType.SPAWN: ({NodeType.PROCESS}, {NodeType.PROCESS}),
+    RelType.FILE_ACCESS: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.FILE}),
+    RelType.NET_CONNECT: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.IP}),
+    RelType.DNS_QUERY: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.DOMAIN}),
     RelType.RESOLVES_TO: ({NodeType.DOMAIN}, {NodeType.IP}),
+    RelType.HAS_IP: ({NodeType.HOST}, {NodeType.IP}),
 }
 
 # 去重逻辑：避免因为数据源不同导致同一结点重复定义
@@ -164,7 +166,13 @@ class GraphEdge:
         return self.rtype
 
     def get_attack_tag(self) -> str | None:
-        return self.props.get("threat", {}).get("tactic", {}).get("name", None)
+        # Support both nested threat objects and flattened ECS-style keys.
+        if isinstance(self.props.get("threat"), dict):
+            nested = self.props.get("threat", {}).get("tactic", {}).get("name")
+            if isinstance(nested, str) and nested:
+                return nested
+        flat = self.props.get("threat.tactic.name")
+        return flat if isinstance(flat, str) and flat else None
 
 # 主机节点
     # host_id 主机ID
@@ -266,88 +274,44 @@ def process_node(
 
 # 文件节点定义
 def file_node(
+    *,
+    host_id: str,
     path: str | None = None,
     hash_sha256: str | None = None,
     hash_sha1: str | None = None,
     hash_md5: str | None = None,
     props: dict[str, Any] | None = None,
 ) -> GraphNode:
-    if path is None and hash_sha256 is None and hash_sha1 is None and hash_md5 is None:
-        raise ValueError("file.path or file.hash.* is required.")
+    if not host_id:
+        raise ValueError("host_id is required for File node key (v2).")
+    if not path:
+        raise ValueError("file.path is required for File node key (v2).")
     node_props = dict(props or {})
-    if path:
-        node_props.setdefault("file.path", path)
+    node_props.setdefault("host.id", host_id)
+    node_props.setdefault("file.path", path)
     if hash_sha256:
         node_props.setdefault("file.hash.sha256", hash_sha256)
     if hash_sha1:
         node_props.setdefault("file.hash.sha1", hash_sha1)
     if hash_md5:
         node_props.setdefault("file.hash.md5", hash_md5)
-    if path:
-        key = {"file.path": path}
-    elif hash_sha256:
-        key = {"file.hash.sha256": hash_sha256}
-    elif hash_sha1:
-        key = {"file.hash.sha1": hash_sha1}
-    else:
-        key = {"file.hash.md5": hash_md5}
-    return GraphNode(ntype=NodeType.FILE, key=key, props=node_props)
+    return GraphNode(ntype=NodeType.FILE, key={"host.id": host_id, "file.path": path}, props=node_props)
 
 # IP节点定义
 def ip_node(addr: str, props: dict[str, Any] | None = None) -> GraphNode:
     if not addr:
         raise ValueError("ip address is required.")
     node_props = dict(props or {})
-    node_props.setdefault("related.ip", addr)
-    return GraphNode(ntype=NodeType.IP, key={"related.ip": addr}, props=node_props)
+    node_props.setdefault("ip", addr)
+    return GraphNode(ntype=NodeType.IP, key={"ip": addr}, props=node_props)
 
 # 域名节点定义
-def domain_node(dns_name: str | None = None, url_domain: str | None = None, props: dict[str, Any] | None = None) -> GraphNode:
-    if not dns_name and not url_domain:
-        raise ValueError("dns.question.name or url.domain is required.")
+def domain_node(domain_name: str, props: dict[str, Any] | None = None) -> GraphNode:
+    if not domain_name:
+        raise ValueError("domain.name is required.")
     node_props = dict(props or {})
-    if dns_name:
-        node_props.setdefault("dns.question.name", dns_name)
-    if url_domain:
-        node_props.setdefault("url.domain", url_domain)
-    key = {"dns.question.name": dns_name} if dns_name else {"url.domain": url_domain}
-    return GraphNode(ntype=NodeType.DOMAIN, key=key, props=node_props)
-
-
-# 网络连接节点定义
-def netcon_node(
-    flow_id: str | None = None,
-    community_id: str | None = None,
-    source_ip: str | None = None,
-    source_port: int | None = None,
-    destination_ip: str | None = None,
-    destination_port: int | None = None,
-    transport: str | None = None,
-    protocol: str | None = None,
-    props: dict[str, Any] | None = None,
-) -> GraphNode:
-    # NetConn 使用 flow/community id 作为唯一键，对齐 ECS 的会话语义。
-    if flow_id is None and community_id is None:
-        raise ValueError("flow.id or network.community_id is required.")
-    node_props = dict(props or {})
-    if flow_id:
-        node_props.setdefault("flow.id", flow_id)
-    if community_id:
-        node_props.setdefault("network.community_id", community_id)
-    if source_ip:
-        node_props.setdefault("source.ip", source_ip)
-    if source_port is not None:
-        node_props.setdefault("source.port", source_port)
-    if destination_ip:
-        node_props.setdefault("destination.ip", destination_ip)
-    if destination_port is not None:
-        node_props.setdefault("destination.port", destination_port)
-    if transport:
-        node_props.setdefault("network.transport", transport)
-    if protocol:
-        node_props.setdefault("network.protocol", protocol)
-    key = {"flow.id": flow_id} if flow_id else {"network.community_id": community_id}
-    return GraphNode(ntype=NodeType.NETCON, key=key, props=node_props)
+    node_props.setdefault("domain.name", domain_name)
+    return GraphNode(ntype=NodeType.DOMAIN, key={"domain.name": domain_name}, props=node_props)
 
 
 NodeOrUid = GraphNode | str
@@ -398,6 +362,7 @@ def make_edge(
     _validate_edge_types(rtype, src, dst)
     edge_props: dict[str, Any] = dict(props or {})
     if ts is not None:
+        edge_props.setdefault("ts", ts)
         edge_props.setdefault("@timestamp", ts)
     if evidence_event_ids is not None:
         edge_props.setdefault("custom.evidence.event_ids", evidence_event_ids)
@@ -418,24 +383,28 @@ def logon(user: GraphNode, host: GraphNode, **kw: Any) -> GraphEdge:
 
 # 进程衍生子进程
 def spawned(parent: GraphNode, child: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(parent, child, RelType.PARENT_OF, **kw)
+    return make_edge(parent, child, RelType.SPAWN, **kw)
 
 # 进程访问文件
 def accessed(proc: GraphNode, file: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(proc, file, RelType.USES, **kw)
+    return make_edge(proc, file, RelType.FILE_ACCESS, **kw)
 
-# å®žä½“æ‹¥æœ‰/å½’å±ž
-def owns(src: GraphNode, dst: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(src, dst, RelType.OWNS, **kw)
+# Process runs on host
+def runs_on(proc: GraphNode, host: GraphNode, **kw: Any) -> GraphEdge:
+    return make_edge(proc, host, RelType.RUNS_ON, **kw)
 
-# 网络连接
-def connected(src: GraphNode, dst: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(src, dst, RelType.CONNECTED, **kw)
+# 网络连接（Host/Process -> IP）
+def net_connect(src: GraphNode, ip: GraphNode, **kw: Any) -> GraphEdge:
+    return make_edge(src, ip, RelType.NET_CONNECT, **kw)
 
-# 主机解析域名
-def resolved(host: GraphNode, domain: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(host, domain, RelType.RESOLVED, **kw)
+# DNS 查询（Host/Process -> Domain）
+def dns_query(src: GraphNode, domain: GraphNode, **kw: Any) -> GraphEdge:
+    return make_edge(src, domain, RelType.DNS_QUERY, **kw)
 
-# 域名解析到IP
+# 域名解析到 IP
 def resolves_to(domain: GraphNode, ip: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(domain, ip, RelType.RESOLVES_TO, **kw)
+
+# 主机拥有 IP
+def has_ip(host: GraphNode, ip: GraphNode, **kw: Any) -> GraphEdge:
+    return make_edge(host, ip, RelType.HAS_IP, **kw)

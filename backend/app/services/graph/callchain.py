@@ -5,9 +5,9 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, List, Sequence, Tuple, Dict, Optional, Set
 
-from api import get_alarm_edges
-from models import GraphEdge, RelType
-from utils import _parse_ts_to_float
+from .api import get_alarm_edges, get_edges_inter_nodes
+from .models import GraphEdge, RelType
+from .utils import _parse_ts_to_float
 from ..algorithm.attack_fsa import FSAGraph, KillChainEdgeNode
 
 
@@ -17,12 +17,14 @@ from ..algorithm.attack_fsa import FSAGraph, KillChainEdgeNode
 
 # 基础威胁权重表
 BASE_RISK_WEIGHTS: Dict[str, float] = {
-    RelType.SPAWNED.value: 5.0,     # 进程衍生
-    RelType.CONNECTED.value: 4.0,   # C2通信
+    RelType.SPAWN.value: 5.0,       # 进程衍生
+    RelType.NET_CONNECT.value: 4.0, # C2/外联/横向通信
     RelType.LOGON.value: 3.0,       # 横向移动
-    RelType.ACCESSED.value: 2.0,    # 文件读写
+    RelType.FILE_ACCESS.value: 2.0, # 文件读写
+    RelType.DNS_QUERY.value: 1.5,   # DNS 行为
     RelType.RESOLVES_TO.value: 1.0, # 基础设施
-    RelType.RESOLVED.value: 1.0,
+    RelType.RUNS_ON.value: 0.5,     # 结构边
+    RelType.HAS_IP.value: 0.1,      # 结构边
 }
 
 # 向量特征库 (Knowledge Base) - 模拟数据
@@ -86,7 +88,8 @@ class MockLLMClient:
         
         vector = [0.1 * confidence] * 8 
         # 对 vector 进行微扰动以模拟多样性
-        if action == "CONNECTED": vector[3] = 0.9 
+        if action == "NET_CONNECT":
+            vector[3] = 0.9
         
         return confidence, vector
 
