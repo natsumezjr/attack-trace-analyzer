@@ -15,8 +15,9 @@
 
 1. **OpenSearch 服务运行中**
    ```bash
-   # 如果使用 Docker
-   docker-compose up -d opensearch
+   # 使用 backend 统一 docker-compose（推荐）
+   cd backend
+   docker compose up -d opensearch
    
    # 检查服务状态
    curl -k https://localhost:9200 -u admin:OpenSearch@2024!Dev

@@ -176,6 +176,8 @@
 **启动后端 (FastAPI)**:
 ```bash
 cd backend
+cp .env.example .env  # 可选：覆盖默认配置
+docker compose up -d  # 启动 OpenSearch + Neo4j
 uv sync
 uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```

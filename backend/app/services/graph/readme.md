@@ -16,16 +16,15 @@
 
 ### Docker（Neo4j + OpenSearch）
 
-**注意**：Neo4j 的 docker-compose.yml 已合并到 `backend/opensearch/docker-compose.yml`。
+本项目 backend 侧依赖（OpenSearch + Neo4j）已统一合并到：
+
+- `backend/docker-compose.yml`
 
 ```bash
-# 从 opensearch 目录启动（包含 OpenSearch + Neo4j）
-cd backend/opensearch
-docker compose up -d     # 创建
-docker compose down -v   # 删除
-
-# 或者从项目根目录启动
-docker compose -f backend/opensearch/docker-compose.yml up -d
+cd backend
+cp .env.example .env  # 可选：覆盖默认配置
+docker compose up -d  # 创建（启动 OpenSearch + Neo4j）
+docker compose down -v # 删除（含数据卷）
 ```
 
 默认地址：
