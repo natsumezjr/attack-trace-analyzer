@@ -45,7 +45,7 @@ class TestEndToEndWorkflow:
         2. 搜索事件
         3. 获取事件详情
         """
-        from opensearch import store_events, search, get_document, get_index_name, INDEX_PATTERNS
+        from .. import store_events, search, get_document, get_index_name, INDEX_PATTERNS
         
         # Step 1: 存储事件
         event = create_test_event("evt-e2e-001", host_name="e2e-host")
@@ -75,7 +75,7 @@ class TestEndToEndWorkflow:
         2. 执行去重
         3. 验证Canonical Findings生成
         """
-        from opensearch import (
+        from .. import (
             store_events,
             deduplicate_findings,
             search,
@@ -126,7 +126,7 @@ class TestEndToEndWorkflow:
         2. 验证数据路由到正确索引
         3. 验证各索引数据独立
         """
-        from opensearch import (
+        from .. import (
             store_events,
             search,
             get_index_name,
@@ -167,7 +167,7 @@ class TestEndToEndWorkflow:
         2. 运行数据分析
         3. 验证分析结果
         """
-        from opensearch import store_events, run_data_analysis, search, get_index_name, INDEX_PATTERNS
+        from .. import store_events, run_data_analysis, search, get_index_name, INDEX_PATTERNS
         
         # Step 1: 准备测试数据
         findings = [
@@ -200,7 +200,7 @@ class TestRealWorldScenarios:
         场景：多个攻击技术点的检测
         验证：不同technique的findings应该分别处理
         """
-        from opensearch import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
+        from .. import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
         
         # 创建不同technique的findings
         findings = [
@@ -228,7 +228,7 @@ class TestRealWorldScenarios:
         场景：相同攻击技术在不同主机上检测到
         验证：不同主机的findings应该分别处理（不合并）
         """
-        from opensearch import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
+        from .. import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
         
         # 创建相同technique但不同host的findings
         findings = [
@@ -257,7 +257,7 @@ class TestRealWorldScenarios:
         场景：时间窗口内的去重
         验证：相同指纹但在不同时间窗口的findings不应该合并
         """
-        from opensearch import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
+        from .. import store_events, deduplicate_findings, search, get_index_name, INDEX_PATTERNS
         
         # 创建相同指纹但不同时间窗口的findings
         base_time = datetime.now()
@@ -295,7 +295,7 @@ class TestRealWorldScenarios:
         场景：不同实体类型的指纹生成
         验证：process、destination、file等不同实体类型都能正确生成指纹
         """
-        from opensearch import store_events, deduplicate_findings
+        from .. import store_events, deduplicate_findings
         
         # 创建不同类型的findings
         findings = [
@@ -317,7 +317,7 @@ class TestPerformanceAndScalability:
     
     def test_bulk_store_large_dataset(self, initialized_indices):
         """测试批量存储大量数据"""
-        from opensearch import store_events
+        from .. import store_events
         
         # 创建100个事件
         events = [create_test_event(f"evt-bulk-{i:03d}") for i in range(100)]
@@ -330,7 +330,7 @@ class TestPerformanceAndScalability:
     
     def test_search_with_pagination(self, initialized_indices):
         """测试分页搜索"""
-        from opensearch import store_events, search, get_index_name, INDEX_PATTERNS
+        from .. import store_events, search, get_index_name, INDEX_PATTERNS
         
         # 创建多个事件
         events = [create_test_event(f"evt-page-{i}") for i in range(20)]
@@ -351,7 +351,7 @@ class TestErrorHandling:
     
     def test_handle_invalid_event_structure(self, initialized_indices):
         """测试处理无效事件结构"""
-        from opensearch import store_events
+        from .. import store_events
         
         # 创建无效结构的事件
         invalid_event = {"invalid": "structure"}

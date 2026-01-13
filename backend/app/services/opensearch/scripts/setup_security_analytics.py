@@ -9,12 +9,12 @@ from pathlib import Path
 from datetime import datetime
 
 # 添加 backend 目录到路径，以便从 opensearch 包导入
-backend_dir = Path(__file__).parent.parent
+backend_dir = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client
-from opensearch.index import INDEX_PATTERNS, get_index_name
-from opensearch import initialize_indices, index_exists
+from app.services.opensearch import get_client
+from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
+from app.services.opensearch import initialize_indices, index_exists
 
 
 def check_security_analytics_available() -> bool:

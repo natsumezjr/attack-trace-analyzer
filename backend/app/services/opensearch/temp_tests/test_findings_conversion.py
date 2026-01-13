@@ -14,7 +14,7 @@ if sys.platform == 'win32':
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import run_security_analytics
+from .. import run_security_analytics
 
 print("=" * 60)
 print("测试Findings转换和存储")

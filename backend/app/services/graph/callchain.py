@@ -365,7 +365,7 @@ def match_vector_features(vectors: List[List[float]]) -> Dict[str, Any]:
 def run_killchain_pipeline_final() -> None:
     print("[*] Starting Kill Chain Analysis Pipeline (Segment-Based)...")
     
-    from backend.data.attack_fsa import behavior_state_machine
+    from ..data.attack_fsa import behavior_state_machine
     
     # 1. Phase A: 获取数据并生成 FSA Graphs
     abnormal_edges = get_alarm_edges()

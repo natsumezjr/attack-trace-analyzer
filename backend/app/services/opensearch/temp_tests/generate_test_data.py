@@ -25,7 +25,7 @@ if sys.platform == 'win32':
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import store_events
+from .. import store_events
 
 # DNS可疑域名列表（用于触发检测规则）
 SUSPICIOUS_DOMAINS = [
