@@ -77,3 +77,6 @@ yarn-error.log*
 .env*.local
 .vercel
 .turbo
+
+#curicata
+client/sensors/suricata/rules/
