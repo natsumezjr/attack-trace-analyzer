@@ -22,6 +22,6 @@ def _env_flag(name: str) -> bool:
 def pytest_runtest_setup(item: pytest.Item) -> None:
     # Keep unit tests runnable on a developer machine without bringing up infra.
     if "requires_opensearch" in item.keywords and not _env_flag("RUN_OPENSEARCH_TESTS"):
-        raise pytest.SkipTest("Set RUN_OPENSEARCH_TESTS=1 to run OpenSearch-dependent tests.")
+        pytest.skip("Set RUN_OPENSEARCH_TESTS=1 to run OpenSearch-dependent tests.")
     if "requires_neo4j" in item.keywords and not _env_flag("RUN_NEO4J_TESTS"):
-        raise pytest.SkipTest("Set RUN_NEO4J_TESTS=1 to run Neo4j-dependent tests.")
+        pytest.skip("Set RUN_NEO4J_TESTS=1 to run Neo4j-dependent tests.")
