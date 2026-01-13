@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from graph import models
+from . import models
 
 
 _MISSING = object()
