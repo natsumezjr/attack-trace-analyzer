@@ -41,36 +41,3 @@ class Event:
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class Edge:
-    """实体关系边：把实体连起来的证据"""
-    src_type: str        # process/domain/ip/file/host/user/session
-    src_id: str
-    relation: str        # spawned/queries/connects_to/reads/writes/logged_in_to/...
-    dst_type: str
-    dst_id: str
-    evidence_event_ids: List[str] = field(default_factory=list)
-
-
-@dataclass
-class AttackChain:
-    """一次攻击实例（attack instance）"""
-    chain_id: str
-    host: str
-    start_ts: datetime
-    end_ts: datetime
-    edges: List[Edge] = field(default_factory=list)
-
-    # ATT&CK 标注（可以来自规则或后处理）
-    tactics: Set[str] = field(default_factory=set)
-    techniques: Set[str] = field(default_factory=set)
-
-    # 你们自己的阶段输出（Kill Chain）
-    stages: List[Dict[str, Any]] = field(default_factory=list)
-
-    # 可选：APT 相似度结果
-    apt_topn: List[Dict[str, Any]] = field(default_factory=list)
-
-
-def new_id(prefix: str) -> str:
-    return f"{prefix}-{uuid.uuid4().hex[:12]}"

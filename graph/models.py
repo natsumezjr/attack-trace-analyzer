@@ -71,6 +71,7 @@ class GraphEdge(BaseModel):
     dst_uid: str
     rtype: RelType
     # 关系属性：时间、证据源、ATT&CK标签、置信度等
+    
     props: Dict[str, Any] = Field(default_factory=dict)
     
     def __init__(self, src_uid: str, dst_uid: str, rtype: RelType, props: Optional[Dict[str, Any]] = None):
@@ -81,6 +82,9 @@ class GraphEdge(BaseModel):
         
     def get_ts(self) -> Optional[str]:
         return self.props.get("@timestamp", 0)
+    
+    def get_attack_tag(self) -> Optional[str]:
+        return self.props.get("attack_tag", None)
     
     def get_src_uid(self) -> str:
         return self.src_uid
