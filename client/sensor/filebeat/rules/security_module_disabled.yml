@@ -1,0 +1,24 @@
+title: SELinux or AppArmor Disabled
+id: d3456789-012a-bcde-f012-3456789abcde
+status: stable
+description: Detects disabling of security modules (SELinux, AppArmor)
+references:
+  - https://attack.mitre.org/techniques/T1562/001/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'setenforce 0'
+    - message|contains: 'apparmor'
+    - message|contains: 'aa-disable'
+    - message|contains: 'SELinux'
+  condition: selection
+falsepositives:
+  - Troubleshooting security module issues
+level: critical
+tags:
+  - attack.defense_evasion
+  - attack.t1562.001

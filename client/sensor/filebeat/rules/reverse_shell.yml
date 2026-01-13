@@ -1,0 +1,24 @@
+title: Reverse Shell Execution
+id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+status: stable
+description: Detects execution of commands commonly used to establish reverse shells
+author: Security Team
+date: 2026-01-13
+tags:
+  - attack.t1059.004  # Command and Scripting Interpreter: Unix Shell
+  - attack.ta0002     # Execution
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    message|contains:
+      - 'nc -e /bin/sh'
+      - 'bash -i >& /dev/tcp/'
+      - '/bin/bash -c "bash -i'
+      - 'python -c "import socket'
+      - 'perl -e "use Socket'
+      - 'ruby -rsocket'
+      - 'sh -i >& /dev/tcp/'
+  condition: selection
+level: critical

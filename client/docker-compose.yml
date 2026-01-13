@@ -1,0 +1,112 @@
+services:
+  falco:
+    image: falcosecurity/falco:0.42.0
+    container_name: falco
+    privileged: true
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /dev:/host/dev
+      - /proc:/host/proc:ro
+      - /boot:/host/boot:ro
+      - /lib/modules:/host/lib/modules:ro
+      - /usr:/host/usr:ro
+      - /etc:/host/etc:ro
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/tracing:/sys/kernel/tracing
+      - ./data:/data
+    command:
+      - falco
+      - -o
+      - json_output=true
+      - -o
+      - file_output.enabled=true
+      - -o
+      - file_output.filename=/data/falco.jsonl
+
+  falco-ecs:
+    build:
+      context: ./sensor/falco/ecs-converter
+    container_name: falco-ecs
+    depends_on:
+      - falco
+    environment:
+      TABLE_NAME: "falco"
+    volumes:
+      - ./data:/data
+    command:
+      - --input
+      - /data/falco.jsonl
+      - --follow
+      - --sqlite
+      - /data/data.db
+      - --reset
+      - --no-json
+
+  filebeat:
+    build:
+      context: ./sensor/filebeat
+      dockerfile: Dockerfile
+    container_name: filebeat
+    volumes:
+      - /var/log:/var/log/host:ro
+      - ./data/filebeat-output:/app/output
+      - ./data:/data
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - DB_PATH=/data/data.db
+      - TABLE_NAME=filebeat
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  suricata:
+    build:
+      context: ./sensor/suricata/engine
+    command: ["/bin/sh", "/run-suricata.sh"]
+    volumes:
+      - ./data:/data
+    environment:
+      SURICATA_MODE: ${SURICATA_MODE:-live}
+      # Optional override, otherwise auto-detected inside container.
+      SURICATA_INTERFACE: ${SURICATA_INTERFACE:-auto}
+      # Only used when SURICATA_MODE=pcap
+      PCAP_FILE: ${PCAP_FILE:-/data/pcap/sample.pcap}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: host
+
+  suricata-exporter:
+    build:
+      context: ./sensor/suricata/exporter
+    depends_on:
+      - suricata
+    ports:
+      - "8080:8080"
+    environment:
+      HOST_ID: ${HOST_ID:-sensor-01}
+      HOST_NAME: ${HOST_NAME:-suricata-sensor}
+      DB_FILE: "/data/data.db"
+      TABLE_NAME: "suricata"
+    volumes:
+      - ./data:/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: backend
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data:/data
+    command: ["-db", "/data/data.db"]
+    depends_on:
+      - falco
+      - falco-ecs
+      - filebeat
+      - suricata
+      - suricata-exporter

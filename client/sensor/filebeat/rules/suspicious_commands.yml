@@ -1,0 +1,27 @@
+title: Suspicious Command Execution
+id: e0f1a2b3-4c5d-6e7f-8a9b-0c1d2e3f4a5b
+status: stable
+description: Detects execution of suspicious commands often used by attackers
+references:
+  - https://attack.mitre.org/techniques/T1059/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'nc -'
+    - message|contains: 'netcat'
+    - message|contains: '/dev/tcp'
+    - message|contains: 'wget http'
+    - message|contains: 'curl http'
+    - message|contains: 'chmod 777'
+    - message|contains: 'chmod +x'
+  condition: selection
+falsepositives:
+  - Legitimate system administration
+level: high
+tags:
+  - attack.execution
+  - attack.t1059

@@ -1,11 +1,5 @@
-.git
+go-client
+*.exe
+*.out
+*.test
 .DS_Store
-**/*.md
-**/*_test.go
-bin/
-dist/
-tmp/
-.context/
-.vscode/
-.idea/
-

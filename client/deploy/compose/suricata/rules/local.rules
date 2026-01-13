@@ -1,5 +1,0 @@
-# Local Suricata rules (starter).
-#
-# Keep this file minimal at first: the project can still benefit from flow/dns/http telemetry even without rich rules.
-# You can add a few demo rules later (e.g. suspicious DNS, known bad UA, etc.).
-

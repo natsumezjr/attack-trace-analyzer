@@ -1,0 +1,20 @@
+title: Root Account Brute Force Attack
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: stable
+description: Detects multiple failed login attempts to the root account, indicating potential brute force attack
+author: Security Team
+date: 2026-01-13
+tags:
+  - attack.t1110.001  # Brute Force: Password Guessing
+  - attack.ta0006     # Credential Access
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    message|contains:
+      - 'Failed password for root'
+      - 'authentication failure'
+      - 'Invalid user root'
+  condition: selection
+level: high

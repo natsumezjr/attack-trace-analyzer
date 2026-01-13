@@ -1,0 +1,24 @@
+title: File Deletion or Shredding
+id: 8f901234-5a6b-7c8d-9e0f-1234567890ab
+status: stable
+description: Detects use of file deletion and shredding tools to remove evidence
+references:
+  - https://attack.mitre.org/techniques/T1070/004/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'shred'
+    - message|contains: 'rm -rf'
+    - message|contains: 'wipe'
+    - message|contains: 'srm'
+  condition: selection
+falsepositives:
+  - Legitimate file cleanup
+level: medium
+tags:
+  - attack.defense_evasion
+  - attack.t1070.004

@@ -1,0 +1,24 @@
+title: Unauthorized Database Access
+id: 12bcdef0-3456-789a-bcde-f01234567890
+status: stable
+description: Detects potential unauthorized database access attempts
+references:
+  - https://attack.mitre.org/techniques/T1213/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'mysql'
+    - message|contains: 'psql'
+    - message|contains: 'mongod'
+    - message|contains: 'redis-cli'
+  condition: selection
+falsepositives:
+  - Normal database operations
+level: low
+tags:
+  - attack.collection
+  - attack.t1213

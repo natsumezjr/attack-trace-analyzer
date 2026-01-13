@@ -1,0 +1,21 @@
+title: Hosts File Modification
+id: b1234567-890a-bcde-f012-3456789abcde
+status: stable
+description: Detects modifications to /etc/hosts file
+references:
+  - https://attack.mitre.org/techniques/T1565/001/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: '/etc/hosts'
+  condition: selection
+falsepositives:
+  - Legitimate network configuration
+level: medium
+tags:
+  - attack.defense_evasion
+  - attack.t1565.001

@@ -1,45 +1,51 @@
-# 客户端（采集层 + 客户端后端）代码区
+# client/（客户机侧部署包）
 
-本目录用于存放**部署在靶场各节点（客户机/被监控主机）**上的所有代码与部署文件，覆盖：
+本目录是“客户机侧”一键部署入口：**3 个传感器 + 1 个 Go 后端**，最终以共享 SQLite `data.db` 为数据交换与持久化介质。
 
-- **采集层（Sensors）**：Filebeat(+Sigma) / Falco / Suricata
-- **客户端后端（Client Backend）**：Go + SQLite，本地缓冲 + ECS 归一化 + 注册 + `/health` + `/pull`
+## 目录结构（最终约定）
 
-> 口径以仓库 `docs/` 为准（文档先行）。
+- `docker-compose.yml`：一键部署入口（Linux 客户机）
+- `.env.example`：环境变量模板（复制为 `.env` 后修改）
+- `backend/`：唯一 Go 后端（从 SQLite 读取数据并提供 HTTP API）
+- `sensor/`：三类传感器（不包含 Go）
+  - `falco/`：主机行为告警（写入 `falco` 表）
+  - `suricata/`：网络流量/告警（写入 `suricata` 表）
+  - `filebeat/`：主机日志 + Sigma 检测（写入 `filebeat` 表）
+- `data/`：运行时数据目录（会生成 `data.db`；不应提交到 git）
 
-## 目录结构（约定）
+## 数据流（已拍板）
 
-- `backend/`：客户端后端（Go 服务，SQLite 缓冲，提供 HTTP API）
-- `sensors/`：采集器运行/配置说明（Filebeat/Falco/Suricata）
-- `deploy/`：部署形态（docker compose / systemd 等）
-- `examples/`：样例数据（raw / ecs），用于联调与测试
+1) Sensors 侧写入共享 SQLite：`./data/data.db`
 
-## 与中心机的接口（v1）
+- Falco → `falco-ecs` 转换 → 表 `falco`
+- Suricata → `suricata-exporter` 转换 → 表 `suricata`
+- Filebeat(+Sigma) → detector 写库 → 表 `filebeat`
 
-接口规范见：
-- `docs/06C-客户端中心机接口规范.md`
+2) Backend 侧只做读取与对外查询（完全按照 sqlite-api 逻辑）：
 
-重点约束（实现时不要偏离）：
-- 客户端启动后 `POST /api/v1/clients/register`
-- 中心机轮询 `GET /api/v1/health` 与 `POST /api/v1/pull`
-- `cursor = SQLite 自增 id`（项目已拍板）
-- 中心机拉取必须携带 `Authorization: Bearer <client_token>`
+- 读取：`/data/data.db`
+- 提供接口：`GET /falco`、`GET /suricata`、`GET /filebeat`
 
-## 归一化字段（ECS 子集）
+> 本仓库当前 **不提供任何兼容层**：没有 `/api/v1/pull`、没有注册、没有 token 鉴权；只保留上述 3 个查询接口。
 
-字段规范见：
-- `docs/06A-ECS字段规范.md`
+## 一键启动
 
-核心要求：
-- `ecs.version = 9.2.0`
-- `event.kind ∈ {event, alert}`
-- `event.dataset` 统一为：`hostlog.*` / `hostbehavior.*` / `netflow.*` / `finding.*`
-- 自定义字段统一放入 `custom.*`
+```bash
+cd client
+cp .env.example .env
+docker compose up -d --build
+```
 
-## 部署建议（MVP）
+## Backend API
 
-推荐把**客户端后端 +（尽可能）采集器**一起用 `docker compose` 编排在每台客户机上，便于 5 节点靶场快速复制部署。
+默认端口：`8888`。
 
-注意：
-- Falco / Suricata 容器化通常需要 `--privileged`、挂载宿主机目录、以及 host 网络/抓包权限（需在 `deploy/` 中细化）
-- Filebeat 生态相对轻：适合做“主机系统日志采集”，并可结合 Sigma 规则进行异常检测（见 `sensors/filebeat/`）
+- `GET http://<client-ip>:8888/falco`
+- `GET http://<client-ip>:8888/suricata`
+- `GET http://<client-ip>:8888/filebeat`
+
+响应格式（示例）：
+
+```json
+{"total":123,"data":[{"id":1,"event_json":"{...}"}]}
+```
