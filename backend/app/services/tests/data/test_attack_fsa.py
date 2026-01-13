@@ -16,8 +16,8 @@ from datetime import datetime
 from typing import Any
 
 
-# 使用相对导入
-from .attack_fsa import (
+# 使用绝对导入，避免 pytest 收集路径变化导致的相对导入失败
+from app.services.data.attack_fsa import (
     AttackState,
     TAG_TO_STATE,
     TransitionPolicy,
@@ -29,7 +29,7 @@ from .attack_fsa import (
     behavior_state_machine,
     _can_transition,
 )
-from ..graph.models import GraphEdge, RelType
+from app.services.graph.models import GraphEdge, RelType
 
 
 # ========== 测试辅助函数 ==========

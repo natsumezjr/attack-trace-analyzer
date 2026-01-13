@@ -45,17 +45,13 @@ cd backend
 python -m app.services.graph.load
 ```
 
-2) 使用本地样例 `testExample.json` 导入
+2) 使用本地样例 `testExample.json` 导入（样例文件位于 `app/services/tests/fixtures/graph/testExample.json`）
 ```bash
 cd backend
 python -m app.services.graph.load --file
 ```
 
-3) 模块测试（基于 `testExample.json`）
-```bash
-cd backend
-python -m app.services.graph.test
-```
+3) 快速联调（同上，推荐直接跑 `load --file`）
 
 ### 环境变量
 
@@ -75,4 +71,4 @@ OpenSearch（使用 `load.py` 默认分支时需要）：
 - `ecs_ingest.py`：ECS 事件 -> 图节点/边映射
 - `api.py`：Neo4j 读写与批量导入
 - `load.py`：导入入口（OpenSearch / 文件）
-- `test.py`：样例测试入口
+- `app/services/tests/fixtures/graph/testExample.json`：ECS 样例数据（用于 `load.py --file` 与单元测试）
