@@ -8,7 +8,7 @@ from typing import Any, List, Sequence, Tuple, Dict, Optional, Set
 from api import get_alarm_edges
 from models import GraphEdge, RelType
 from utils import _parse_ts_to_float
-from ..data.attack_fsa import FSAGraph, KillChainEdgeNode
+from ..algorithm.attack_fsa import FSAGraph, KillChainEdgeNode
 
 
 # ==========================================
@@ -365,7 +365,7 @@ def match_vector_features(vectors: List[List[float]]) -> Dict[str, Any]:
 def run_killchain_pipeline_final() -> None:
     print("[*] Starting Kill Chain Analysis Pipeline (Segment-Based)...")
     
-    from ..data.attack_fsa import behavior_state_machine
+    from ..algorithm.attack_fsa import behavior_state_machine
     
     # 1. Phase A: 获取数据并生成 FSA Graphs
     abnormal_edges = get_alarm_edges()
