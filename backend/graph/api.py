@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import Any, Iterable, Mapping
 
 from neo4j import GraphDatabase
@@ -337,3 +338,42 @@ def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> tuple[int, int]:
         total_nodes += len(nodes)
         total_edges += len(edges)
     return total_nodes, total_edges
+
+
+def ingest_from_opensearch(
+    query: Mapping[str, Any] | None = None,
+    *,
+    size: int = 100,
+    include_events: bool = True,
+    include_raw_findings: bool = True,
+    include_canonical_findings: bool = True,
+    date: datetime | None = None,
+) -> tuple[int, int, int]:
+    # 使用 OpenSearch API 拉取 ECS 事件并写入 Neo4j
+    from opensearch import INDEX_PATTERNS, get_index_name, index_exists, search
+
+    query_body = dict(query) if query is not None else {"match_all": {}}
+    index_names: list[str] = []
+    if include_events:
+        index_names.append(get_index_name(INDEX_PATTERNS["ECS_EVENTS"], date))
+    if include_raw_findings:
+        index_names.append(get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], date))
+    if include_canonical_findings:
+        index_names.append(get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], date))
+
+    total_events = 0
+    total_nodes = 0
+    total_edges = 0
+
+    for index_name in index_names:
+        if not index_exists(index_name):
+            continue
+        events = search(index_name, query_body, size=size)
+        if not events:
+            continue
+        total_events += len(events)
+        node_count, edge_count = ingest_ecs_events(events)
+        total_nodes += node_count
+        total_edges += edge_count
+
+    return total_events, total_nodes, total_edges

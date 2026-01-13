@@ -287,12 +287,11 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     flow_id = _get_in(event, ["flow", "id"])
     community_id = _get_in(event, ["network", "community_id"])
 
-    ip_node = add_node(models.ip_node(dst_ip)) if (is_network and dst_ip) else None
-    netcon_node = (
+    src_ip_node = add_node(models.ip_node(src_ip)) if (is_network and host_node and src_ip) else None
+    flow_node = (
         add_node(
             models.netcon_node(
                 flow_id=flow_id,
-                community_id=community_id,
                 source_ip=src_ip,
                 source_port=src_port,
                 destination_ip=dst_ip,
@@ -301,37 +300,42 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
                 protocol=net_protocol,
             )
         )
-        if (is_network and (flow_id or community_id))
+        if (is_network and flow_id)
         else None
     )
+    community_node = (
+        add_node(
+            models.netcon_node(
+                community_id=community_id,
+                transport=net_transport,
+                protocol=net_protocol,
+            )
+        )
+        if (is_network and community_id)
+        else None
+    )
+    netcon_node = flow_node or community_node
 
     if is_auth:
         add_edge(models.RelType.LOGON, user_node, host_node)
 
     if proc_node and parent_node and is_process:
-        add_edge(models.RelType.SPAWNED, parent_node, proc_node)
+        add_edge(models.RelType.PARENT_OF, parent_node, proc_node)
 
     if proc_node and file_node and is_file:
         op = _map_file_op(event_action)
         props = {"op": op} if op else {}
-        add_edge(models.RelType.ACCESSED, proc_node, file_node, props=props)
+        add_edge(models.RelType.USES, proc_node, file_node, props=props)
 
-    if is_network and netcon_node is not None:
-        if proc_node:
-            add_edge(models.RelType.CONNECTED, proc_node, netcon_node)
-        elif host_node:
-            add_edge(models.RelType.CONNECTED, host_node, netcon_node)
-        if ip_node and dst_ip:
-            props: dict[str, Any] = {}
-            if dst_port is not None:
-                props["destination.port"] = dst_port
-            add_edge(models.RelType.CONNECTED, netcon_node, ip_node, props=props)
-    elif is_network and ip_node and dst_ip:
-        props = {"destination.port": dst_port} if dst_port is not None else {}
-        if proc_node:
-            add_edge(models.RelType.CONNECTED, proc_node, ip_node, props=props)
-        elif host_node:
-            add_edge(models.RelType.CONNECTED, host_node, ip_node, props=props)
+    if is_network:
+        if flow_node and community_node:
+            add_edge(models.RelType.CONNECTED, flow_node, community_node)
+        if proc_node and netcon_node:
+            add_edge(models.RelType.OWNS, proc_node, netcon_node)
+        elif host_node and netcon_node:
+            add_edge(models.RelType.OWNS, host_node, netcon_node)
+        if host_node and src_ip_node:
+            add_edge(models.RelType.OWNS, host_node, src_ip_node)
 
     if host_node and domain_node and is_dns and (is_network or dataset.startswith("netflow.dns")):
         add_edge(models.RelType.RESOLVED, host_node, domain_node)

@@ -22,8 +22,9 @@ class NodeType(str, Enum):
 # 枚举图内动作类型
 class RelType(str, Enum):
     LOGON = "LOGON"
-    SPAWNED = "SPAWNED"
-    ACCESSED = "ACCESSED"
+    PARENT_OF = "PARENT_OF"
+    USES = "USES"
+    OWNS = "OWNS"
     CONNECTED = "CONNECTED"
     RESOLVED = "RESOLVED"
     RESOLVES_TO = "RESOLVES_TO"
@@ -45,9 +46,10 @@ NODE_UNIQUE_KEY: dict[NodeType, str] = {
 # 定义边的类型规则(每种边允许的源节点类型和目标节点类型)# 定义连接规则
 EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.LOGON: ({NodeType.USER}, {NodeType.HOST}),
-    RelType.SPAWNED: ({NodeType.PROCESS}, {NodeType.PROCESS}),
-    RelType.ACCESSED: ({NodeType.PROCESS}, {NodeType.FILE}),
-    RelType.CONNECTED: ({NodeType.PROCESS, NodeType.HOST, NodeType.NETCON}, {NodeType.IP, NodeType.NETCON}),
+    RelType.PARENT_OF: ({NodeType.PROCESS}, {NodeType.PROCESS}),
+    RelType.USES: ({NodeType.PROCESS}, {NodeType.FILE}),
+    RelType.OWNS: ({NodeType.HOST, NodeType.PROCESS}, {NodeType.IP, NodeType.NETCON}),
+    RelType.CONNECTED: ({NodeType.NETCON}, {NodeType.NETCON}),
     RelType.RESOLVED: ({NodeType.HOST}, {NodeType.DOMAIN}),
     RelType.RESOLVES_TO: ({NodeType.DOMAIN}, {NodeType.IP}),
 }
@@ -416,11 +418,15 @@ def logon(user: GraphNode, host: GraphNode, **kw: Any) -> GraphEdge:
 
 # 进程衍生子进程
 def spawned(parent: GraphNode, child: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(parent, child, RelType.SPAWNED, **kw)
+    return make_edge(parent, child, RelType.PARENT_OF, **kw)
 
 # 进程访问文件
 def accessed(proc: GraphNode, file: GraphNode, **kw: Any) -> GraphEdge:
-    return make_edge(proc, file, RelType.ACCESSED, **kw)
+    return make_edge(proc, file, RelType.USES, **kw)
+
+# å®žä½“æ‹¥æœ‰/å½’å±ž
+def owns(src: GraphNode, dst: GraphNode, **kw: Any) -> GraphEdge:
+    return make_edge(src, dst, RelType.OWNS, **kw)
 
 # 网络连接
 def connected(src: GraphNode, dst: GraphNode, **kw: Any) -> GraphEdge:

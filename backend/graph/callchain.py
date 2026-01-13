@@ -86,12 +86,13 @@ def expand_to_complete_subgraph(subgraph: Subgraph) -> Subgraph:
 
 # 1. 基础威胁权重表 (Base Risk Weights)
 BASE_RISK_WEIGHTS: dict[RelType, float] = {
-    RelType.SPAWNED: 5.0,     # 进程衍生是核心
+    RelType.PARENT_OF: 5.0,   # 进程衍生是核心
     RelType.CONNECTED: 4.0,   # C2通信
     RelType.LOGON: 3.0,       # 横向移动风险
-    RelType.ACCESSED: 2.0,    # 文件读写
+    RelType.USES: 2.0,        # 文件读写
     RelType.RESOLVES_TO: 1.0, # 基础设施解析
     RelType.RESOLVED: 1.0,
+    RelType.OWNS: 1.0,
 }
 
 # 模拟 LLM 客户端

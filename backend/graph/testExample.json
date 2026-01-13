@@ -1,104 +1,473 @@
-{
-  "meta": {
-    "description": "ECS sample events aligned with docs/06A-ECS字段规范.md",
-    "version": "1.0"
+[
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:10.123Z",
+    "event": {
+      "id": "evt-56489be4abef0ac5",
+      "kind": "event",
+      "created": "2026-01-12T03:21:12.001Z",
+      "ingested": "2026-01-12T03:21:12.900Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "dataset": "hostlog.auth",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "user": {
+      "name": "alice"
+    },
+    "source": {
+      "ip": "10.0.0.8"
+    },
+    "session": {
+      "id": "sess-b274ea402cea1ec0"
+    },
+    "agent": {
+      "name": "wazuh-agent",
+      "version": "4.0.0"
+    },
+    "message": "User alice logged in from 10.0.0.8"
   },
-  "events": [
-    {
-      "ecs": { "version": "9.2.0" },
-      "@timestamp": "2026-01-12T03:21:10.123Z",
-      "event": {
-        "id": "evt-1b2c3d4e5f6a7b8c",
-        "kind": "event",
-        "created": "2026-01-12T03:21:12.001Z",
-        "ingested": "2026-01-12T03:21:12.900Z",
-        "category": ["authentication"],
-        "type": ["start"],
-        "action": "user_login",
-        "dataset": "hostlog.auth",
-        "outcome": "success"
-      },
-      "host": { "id": "h-a1b2c3d4e5f6a7b8c", "name": "victim-01" },
-      "user": { "name": "alice" },
-      "source": { "ip": "10.0.0.8" },
-      "session": { "id": "sess-0123456789abcdef" },
-      "agent": { "name": "wazuh-agent", "version": "4.0.0" }
+  {
+    "ecs": {
+      "version": "9.2.0"
     },
-    {
-      "ecs": { "version": "9.2.0" },
-      "@timestamp": "2026-01-12T03:21:15.321Z",
-      "event": {
-        "id": "evt-2b3c4d5e6f7a8b9c",
-        "kind": "event",
-        "created": "2026-01-12T03:21:15.400Z",
-        "ingested": "2026-01-12T03:21:15.900Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "dataset": "hostlog.process"
-      },
-      "host": { "id": "h-a1b2c3d4e5f6a7b8c", "name": "victim-01" },
-      "process": {
-        "entity_id": "p-f1e2d3c4b5a69788",
-        "pid": 1024,
-        "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-        "command_line": "powershell.exe -nop -w hidden -c whoami",
-        "parent": {
-          "entity_id": "p-0a1b2c3d4e5f6789",
-          "pid": 900,
-          "executable": "C:\\Windows\\explorer.exe"
-        }
-      },
-      "agent": { "name": "wazuh-agent", "version": "4.0.0" }
+    "@timestamp": "2026-01-12T03:21:15.321Z",
+    "event": {
+      "id": "evt-8198522ff97bdb58",
+      "kind": "event",
+      "created": "2026-01-12T03:21:15.400Z",
+      "ingested": "2026-01-12T03:21:15.900Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "dataset": "hostlog.process"
     },
-    {
-      "ecs": { "version": "9.2.0" },
-      "@timestamp": "2026-01-12T03:25:00.000Z",
-      "event": {
-        "id": "evt-9f8e7d6c5b4a3928",
-        "kind": "event",
-        "created": "2026-01-12T03:25:00.010Z",
-        "ingested": "2026-01-12T03:25:00.200Z",
-        "category": ["network"],
-        "type": ["info"],
-        "action": "dns_query",
-        "dataset": "netflow.dns"
-      },
-      "host": { "id": "h-a1b2c3d4e5f6a7b8c", "name": "sensor-01" },
-      "source": { "ip": "10.0.0.5", "port": 51514 },
-      "destination": { "ip": "8.8.8.8", "port": 53 },
-      "network": { "transport": "udp", "protocol": "dns" },
-      "dns": { "question": { "name": "evil-c2.com", "type": "A" } },
-      "custom": { "dns": { "entropy": 4.2, "query_length": 180, "tunnel_score": 0.91 } },
-      "agent": { "name": "suricata", "version": "7.0.0" }
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
     },
-    {
-      "ecs": { "version": "9.2.0" },
-      "@timestamp": "2026-01-12T03:25:01.000Z",
-      "event": {
-        "id": "alrt-a1b2c3d4e5f6a7b8",
-        "kind": "alert",
-        "created": "2026-01-12T03:25:01.010Z",
-        "ingested": "2026-01-12T03:25:01.200Z",
-        "category": ["network"],
-        "type": ["info"],
-        "action": "dns_tunnel_suspected",
-        "dataset": "finding.raw",
-        "severity": 70
-      },
-      "host": { "id": "h-a1b2c3d4e5f6a7b8c", "name": "sensor-01" },
-      "rule": { "id": "R-DNS-001", "name": "DNS Tunnel Suspected" },
-      "threat": {
-        "framework": "MITRE ATT&CK",
-        "tactic": { "id": "TA0011", "name": "Command and Control" },
-        "technique": { "id": "T1071", "name": "Application Layer Protocol" }
-      },
-      "dns": { "question": { "name": "evil-c2.com", "type": "TXT" } },
-      "custom": {
-        "finding": { "stage": "raw", "providers": ["suricata"], "fingerprint": "fp-a1b2c3d4e5f6a7b8" },
-        "evidence": { "event_ids": ["evt-9f8e7d6c5b4a3928"] }
-      },
-      "agent": { "name": "suricata", "version": "7.0.0" }
+    "user": {
+      "name": "alice"
+    },
+    "process": {
+      "entity_id": "p-2b8f7c01142ea740",
+      "pid": 1024,
+      "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "command_line": "powershell.exe -nop -w hidden -c whoami",
+      "name": "powershell.exe",
+      "start": "2026-01-12T03:21:15.321Z",
+      "parent": {
+        "entity_id": "p-23946da188cb9314",
+        "pid": 900,
+        "executable": "C:\\Windows\\explorer.exe"
+      }
+    },
+    "agent": {
+      "name": "wazuh-agent",
+      "version": "4.0.0"
     }
-  ]
-}
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:18.000Z",
+    "event": {
+      "id": "evt-0923473f76d910c4",
+      "kind": "event",
+      "created": "2026-01-12T03:21:18.050Z",
+      "ingested": "2026-01-12T03:21:18.300Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "dataset": "hostlog.file_registry"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "user": {
+      "name": "alice"
+    },
+    "process": {
+      "entity_id": "p-2b8f7c01142ea740"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\.ssh\\id_rsa",
+      "name": "id_rsa"
+    },
+    "agent": {
+      "name": "wazuh-agent",
+      "version": "4.0.0"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:50.000Z",
+    "event": {
+      "id": "evt-dc72e17ed388f27c",
+      "kind": "event",
+      "created": "2026-01-12T03:24:50.010Z",
+      "ingested": "2026-01-12T03:24:50.200Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "dataset": "netflow.flow"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01"
+    },
+    "source": {
+      "ip": "10.0.0.5",
+      "port": 51514
+    },
+    "destination": {
+      "ip": "8.8.8.8",
+      "port": 53
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns",
+      "community_id": "1:b07775c48ee730c0"
+    },
+    "flow": {
+      "id": "flow-40739ec9c5f87f61"
+    },
+    "agent": {
+      "name": "suricata",
+      "version": "7.0.0"
+    },
+    "related": {
+      "ip": [
+        "10.0.0.5",
+        "8.8.8.8"
+      ]
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:00.000Z",
+    "event": {
+      "id": "evt-eaae9bea5af714d0",
+      "kind": "event",
+      "created": "2026-01-12T03:25:00.010Z",
+      "ingested": "2026-01-12T03:25:00.200Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_query",
+      "dataset": "netflow.dns"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01"
+    },
+    "source": {
+      "ip": "10.0.0.5",
+      "port": 51514
+    },
+    "destination": {
+      "ip": "8.8.8.8",
+      "port": 53
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns",
+      "community_id": "1:b07775c48ee730c0"
+    },
+    "flow": {
+      "id": "flow-40739ec9c5f87f61"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      }
+    },
+    "custom": {
+      "dns": {
+        "entropy": 4.2,
+        "query_length": 180,
+        "tunnel_score": 0.91
+      }
+    },
+    "agent": {
+      "name": "suricata",
+      "version": "7.0.0"
+    },
+    "related": {
+      "ip": [
+        "10.0.0.5",
+        "8.8.8.8"
+      ]
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:02.000Z",
+    "event": {
+      "id": "evt-b23d339a69f3ed60",
+      "kind": "event",
+      "created": "2026-01-12T03:25:02.010Z",
+      "ingested": "2026-01-12T03:25:02.200Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "http_request",
+      "dataset": "netflow.http"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01"
+    },
+    "source": {
+      "ip": "10.0.0.5",
+      "port": 51515
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 80
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "http"
+    },
+    "http": {
+      "request": {
+        "method": "GET"
+      },
+      "response": {
+        "status_code": 200
+      }
+    },
+    "url": {
+      "full": "http://evil-c2.com/bootstrap",
+      "domain": "evil-c2.com"
+    },
+    "user_agent": {
+      "original": "curl/7.88.1"
+    },
+    "agent": {
+      "name": "suricata",
+      "version": "7.0.0"
+    },
+    "related": {
+      "ip": [
+        "10.0.0.5",
+        "93.184.216.34"
+      ]
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:01.000Z",
+    "event": {
+      "id": "alrt-442d3b781f63cf0f",
+      "kind": "alert",
+      "created": "2026-01-12T03:25:01.010Z",
+      "ingested": "2026-01-12T03:25:01.200Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "dataset": "finding.raw",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01"
+    },
+    "rule": {
+      "id": "R-DNS-001",
+      "name": "DNS Tunnel Suspected",
+      "ruleset": "suricata"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "TXT"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-367dc3498b5948e8"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-eaae9bea5af714d0"
+        ]
+      }
+    },
+    "agent": {
+      "name": "suricata",
+      "version": "7.0.0"
+    },
+    "tags": [
+      "attack.ta0011",
+      "attack.t1071"
+    ]
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:05.000Z",
+    "event": {
+      "id": "calrt-731ebadcf1808cf5",
+      "kind": "alert",
+      "created": "2026-01-12T03:25:05.010Z",
+      "ingested": "2026-01-12T03:25:05.200Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "dataset": "finding.canonical",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01"
+    },
+    "rule": {
+      "id": "R-DNS-001",
+      "name": "DNS Tunnel Suspected",
+      "ruleset": "suricata"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "TXT"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-367dc3498b5948e8"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-eaae9bea5af714d0"
+        ]
+      }
+    },
+    "agent": {
+      "name": "suricata",
+      "version": "7.0.0"
+    },
+    "tags": [
+      "attack.ta0011",
+      "attack.t1071"
+    ]
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:00.000Z",
+    "event": {
+      "id": "evt-b5f63ec8ea105435",
+      "kind": "event",
+      "created": "2026-01-12T03:30:00.010Z",
+      "ingested": "2026-01-12T03:30:00.200Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "dataset": "hostlog.auth",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "user": {
+      "name": "alice"
+    },
+    "source": {
+      "ip": "10.0.0.8"
+    },
+    "session": {
+      "id": "sess-b274ea402cea1ec0"
+    },
+    "agent": {
+      "name": "wazuh-agent",
+      "version": "4.0.0"
+    }
+  }
+]
