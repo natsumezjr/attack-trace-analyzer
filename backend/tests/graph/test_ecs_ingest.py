@@ -88,10 +88,9 @@ def test_ecs_event_to_graph_file_op_creates_uses_edge_with_op() -> None:
     }
     nodes, edges = ecs_event_to_graph(event)
 
-    assert any(e.rtype == models.RelType.USES for e in edges)
-    uses_edges = [e for e in edges if e.rtype == models.RelType.USES]
-    assert len(uses_edges) == 1
-    assert uses_edges[0].props.get("op") == "write"
+    access_edges = [e for e in edges if e.rtype == models.RelType.FILE_ACCESS]
+    assert len(access_edges) == 1
+    assert access_edges[0].props.get("op") == "write"
 
 
 def test_ecs_event_to_graph_dns_creates_resolved_edges() -> None:
@@ -116,16 +115,46 @@ def test_ecs_event_to_graph_dns_creates_resolved_edges() -> None:
     }
     nodes, edges = ecs_event_to_graph(event)
 
-    # Expected: Host, Domain, NetConn, IP(src), IP(answer) at minimum.
+    # Expected: Host, Domain, IP(answer) at minimum (v2 has no NetConn nodes).
     node_types = {n.ntype for n in nodes}
     assert models.NodeType.HOST in node_types
     assert models.NodeType.DOMAIN in node_types
-    assert models.NodeType.NETCON in node_types
     assert models.NodeType.IP in node_types
 
     rtypes = [e.rtype for e in edges]
-    assert models.RelType.RESOLVED in rtypes
+    assert models.RelType.DNS_QUERY in rtypes
     assert models.RelType.RESOLVES_TO in rtypes
+
+
+def test_ecs_event_to_graph_canonical_finding_dns_creates_alarm_dns_query_edge() -> None:
+    event = {
+        "@timestamp": "2026-01-12T03:25:05.000Z",
+        "event": {
+            "id": "calrt-001",
+            "kind": "alert",
+            "dataset": "finding.canonical",
+            "category": ["network"],
+            "type": ["info"],
+            "action": "dns_tunnel_suspected",
+            "severity": 70,
+        },
+        "host": {"id": "h-001", "name": "sensor-01"},
+        "dns": {"question": {"name": "evil-c2.com", "type": "TXT"}},
+        "custom": {"evidence": {"event_ids": ["evt-dns-001"]}},
+        "rule": {"id": "R-DNS-001", "name": "DNS Tunnel Suspected", "ruleset": "suricata"},
+        "threat": {
+            "framework": "MITRE ATT&CK",
+            "tactic": {"id": "TA0011", "name": "Command and Control"},
+            "technique": {"id": "T1071", "name": "Application Layer Protocol"},
+        },
+    }
+    nodes, edges = ecs_event_to_graph(event)
+
+    assert any(n.ntype == models.NodeType.DOMAIN for n in nodes)
+    alarm_dns_edges = [e for e in edges if e.rtype == models.RelType.DNS_QUERY]
+    assert len(alarm_dns_edges) == 1
+    assert alarm_dns_edges[0].props.get("is_alarm") is True
+    assert alarm_dns_edges[0].props.get("custom.evidence.event_ids") == ["evt-dns-001"]
 
 
 def test_ecs_get_in_supports_dotted_fallback_for_event_kind() -> None:

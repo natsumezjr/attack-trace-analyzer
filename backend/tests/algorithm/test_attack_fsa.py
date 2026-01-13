@@ -39,7 +39,7 @@ def create_test_edge(
     dst_uid: str = "Host:h-002",
     attack_tag: str | None = None,
     timestamp: str | float | None = None,
-    rtype: RelType = RelType.CONNECTED,
+    rtype: RelType = RelType.NET_CONNECT,
     **props
 ) -> GraphEdge:
     """
@@ -93,7 +93,7 @@ class TestEdgeNode:
         
         assert node.src_uid == "Host:h-001"
         assert node.dst_uid == "Host:h-002"
-        assert node.rtype == RelType.CONNECTED
+        assert node.rtype == RelType.NET_CONNECT
         assert node.edge == edge
         assert node.props == edge.props
     
