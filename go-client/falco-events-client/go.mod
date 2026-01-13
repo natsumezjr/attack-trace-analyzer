@@ -1,4 +1,4 @@
-module go-client
+module falco-events-client
 
 go 1.25.3
 
