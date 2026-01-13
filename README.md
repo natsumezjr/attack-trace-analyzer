@@ -27,7 +27,7 @@
 
 ### 核心特性
 
-- **多源数据采集**: 集成 Wazuh、Falco、Suricata 三大传感器
+- **多源数据采集**: 集成 Filebeat（主机系统日志采集 + Sigma 规则检测）、Falco、Suricata 三大传感器
 - **统一数据范式**: 基于 ECS (Elastic Common Schema) v9.2.0 的字段规范
 - **智能关联分析**: 时间窗聚合 + 实体关系图 + Neo4j 图算法
 - **攻击链重建**: 基于 ATT&CK 框架的攻击阶段识别与路径重建
@@ -47,7 +47,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Step 1️⃣  采集层                                                             │
-│   Wazuh (主机日志) / Falco (主机行为) / Suricata (网络流量)                  │
+│   Filebeat+Sigma (主机系统日志与异常检测) / Falco (主机行为) / Suricata (网络流量) │
 │   → 各自格式的 JSON 事件 + 告警                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
@@ -208,7 +208,7 @@ npm run dev
 
 | 层级 | 技术 | 作用 |
 |------|------|------|
-| **采集** | Wazuh / Falco / Suricata | 主机日志、主机行为、网络流量 |
+| **采集** | Filebeat(+Sigma) / Falco / Suricata | 主机系统日志、主机行为、网络流量 |
 | **客户端后端** | Go + SQLite | ECS 归一化、本地缓冲、注册拉取 |
 | **中心机后端** | Python FastAPI + uv | API、注册表、轮询器、入库路由、算法触发 |
 | **中心机前端** | Next.js + React | 页面展示、可视化、报告导出 |
@@ -224,7 +224,7 @@ npm run dev
 - **图谱与图算法**: Neo4j + Neo4j GDS (加权最短路｜路径重建)
 - **中心机后端**: Python FastAPI + uv (API、注册表、轮询器)
 - **中心机前端**: Next.js + React (页面展示、可视化)
-- **主机侧**: Wazuh (主机日志) + Falco (主机行为告警)
+- **主机侧**: Filebeat (主机系统日志) + Sigma (规则检测) + Falco (主机行为告警)
 - **网络侧**: Suricata (统一作为网络流量数据源,EVE JSON 同时产出事实与告警)
 - **统一范式**: ECS v9.2.0 + 自定义字段 `custom.*`
 - **TTP 知识库**: 离线 ATT&CK Enterprise CTI（STIX 2.1｜attack-stix-data｜固定路径：`backend/app/services/ttp_similarity/cti/enterprise-attack.json`）
@@ -272,7 +272,7 @@ npm run dev
 | ---- | ---- | ---- |
 | 董容嘉 | 数据获取 | 主机行为: Falco |
 | 马民泽 | 数据获取 | 网络流量: Suricata |
-| 姜乐 | 数据获取 | 主机日志: Wazuh |
+| 姜乐 | 数据获取 | 主机系统日志: Filebeat + Sigma |
 | 田炎烁 | 数据湖构建 | OpenSearch Security Analytics |
 | 吕梓杰 | 数据湖构建 | OpenSearch → Neo4j 实体转化 |
 | 伍万圣 | 客户机、中心机后端 | FastAPI + Go,包括后端 API |

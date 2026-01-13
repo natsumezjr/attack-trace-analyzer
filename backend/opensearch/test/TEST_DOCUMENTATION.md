@@ -439,12 +439,12 @@
 **测试目的**：验证从 rule.id 推断 provider
 
 **测试步骤**：
-1. 创建包含 rule.id 的 finding（如 "wazuh-rule-001"）
+1. 创建包含 rule.id 的 finding（如 "sigma-rule-001"）
 2. 调用 `extract_provider()` 提取 provider
 3. 验证返回结果
 
 **预期结果**：
-- 根据 rule.id 推断出正确的 provider（如 "wazuh"）
+- 根据 rule.id 推断出正确的 provider（如 "sigma"）
 
 **实际结果**：✅ 通过
 

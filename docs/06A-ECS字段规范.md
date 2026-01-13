@@ -160,8 +160,8 @@
 | `event.dataset`  | `keyword`   |  ✅  | 数据集名称                                | `hostlog.auth`, `netflow.dns`               |
 | `host.id`        | `keyword`   |  ✅  | 主机唯一标识（见 0.3）                    | `h-a1b2c3d4e5f6a7b8c`                         |
 | `host.name`      | `keyword`   |  ✅  | 主机名（演示/检索更友好）                 | `victim-01`, `sensor-01`                    |
-| `agent.name`     | `keyword`   |  ✅  | 采集器名称                                | `wazuh-agent`, `suricata`                   |
-| `agent.version`  | `keyword`   |  ✅  | 采集器版本                                | `4.0.0`, `7.0.0`                            |
+| `agent.name`     | `keyword`   |  ✅  | 采集器名称                                | `filebeat`, `suricata`                      |
+| `agent.version`  | `keyword`   |  ✅  | 采集器版本                                | `8.11.0`, `7.0.0`                           |
 
 **约束**：
 
@@ -195,9 +195,9 @@
 
 ## 2. Telemetry：主机日志（Host Logs，`hostlog.*`）
 
-> **数据源**：Wazuh（本项目主机日志采集只使用 Wazuh）。
+> **数据源**：Filebeat（本项目主机系统日志采集使用 Filebeat）。
 >
-> **说明**：Wazuh 侧输出的事件/告警需在归一化层映射为 ECS 子集字段（本文口径），再进入 OpenSearch 与后续关联/串链。
+> **说明**：Filebeat 输出的日志事件需在归一化层映射为 ECS 子集字段（本文口径），再进入 OpenSearch 与后续关联/串链。
 >
 > **Dataset 划分**：
 >
@@ -667,7 +667,7 @@
   "user": { "name": "alice" },
   "source": { "ip": "10.0.0.8" },
   "session": { "id": "sess-0123456789abcdef0123456789abcdef" },
-  "agent": { "name": "wazuh-agent", "version": "4.0.0" }
+  "agent": { "name": "filebeat", "version": "8.11.0" }
 }
 ```
 

@@ -1193,7 +1193,7 @@ Raw Findings 索引的字段映射，用于存储原始告警。
 - `custom.finding.*`: 自定义告警信息
 
 **使用场景：**
-- 存储从各种检测引擎（Wazuh、Falco、Suricata 等）产生的原始告警
+- 存储从各种检测引擎（Filebeat+Sigma、Falco、Suricata 等）产生的原始告警
 - 作为告警融合去重的输入
 
 ---
@@ -1240,7 +1240,7 @@ Client Registry 索引的字段映射，用于存储客户端注册信息。
 - `client.listen_url`: 监听地址
 - `client.version`: 客户端版本
 - `client.host.*`: 客户端主机信息
-- `client.capabilities.*`: 客户端能力（wazuh、falco 等）
+- `client.capabilities.*`: 客户端能力（filebeat、falco 等）
 - `client.token_hash`: Token 哈希
 - `poll.*`: 轮询状态信息
 
