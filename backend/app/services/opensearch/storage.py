@@ -52,7 +52,7 @@ def _extract_timestamp(doc: dict[str, Any]) -> str | None:
 
 def _normalize_three_timestamps(doc: dict[str, Any], *, ingested_now: str) -> dict[str, Any] | None:
     """
-    Enforce docs/06A-ECS字段规范.md 三时间字段：
+    Enforce docs/51-ECS字段规范.md 三时间字段：
     - @timestamp: 主时间轴（必须可推导；否则丢弃）
     - event.created: 观察时间（缺失则回填为 @timestamp）
     - event.ingested: 中心侧入库时间（总是覆盖为 now）

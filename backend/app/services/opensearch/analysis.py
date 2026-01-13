@@ -43,7 +43,7 @@ def fingerprint_id_from_key(fingerprint_key: str) -> str:
     """
     将用于分组/融合的“原始指纹 key”转换为 docs 约定的 custom.finding.fingerprint。
 
-    docs/06A-ECS字段规范.md 约定（简化表达）：
+    docs/51-ECS字段规范.md 约定（简化表达）：
     fingerprint = sha1(technique_id + host + entity + time_bucket)
 
     当前实现中，generate_fingerprint() 返回的是可读的 key：
