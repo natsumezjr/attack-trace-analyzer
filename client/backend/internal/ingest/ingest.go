@@ -7,8 +7,8 @@ import (
 
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/collectors"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/collectors/falco"
+	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/collectors/filebeat"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/collectors/suricata"
-	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/collectors/wazuh"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/config"
 	"github.com/natsumezjr/attack-trace-analyzer/client/backend/internal/storage"
 )
@@ -59,24 +59,11 @@ func (i *Ingestor) Start(ctx context.Context) {
 		}()
 	}
 
-	if i.cfg.WazuhAlertsJSON != "" {
+	if i.cfg.FilebeatEventsJSON != "" {
 		go func() {
-			slog.Info("tail wazuh alerts", "path", i.cfg.WazuhAlertsJSON)
-			_ = collectors.TailFile(ctx, i.cfg.WazuhAlertsJSON, opt, func(line []byte) error {
-				ev, err := wazuh.NormalizeAlertLine(i.cfg, line)
-				if err != nil {
-					return err
-				}
-				return i.store.InsertEvent(ctx, ev)
-			})
-		}()
-	}
-
-	if i.cfg.WazuhArchivesJSON != "" {
-		go func() {
-			slog.Info("tail wazuh archives", "path", i.cfg.WazuhArchivesJSON)
-			_ = collectors.TailFile(ctx, i.cfg.WazuhArchivesJSON, opt, func(line []byte) error {
-				ev, err := wazuh.NormalizeArchiveLine(i.cfg, line)
+			slog.Info("tail filebeat events", "path", i.cfg.FilebeatEventsJSON)
+			_ = collectors.TailFile(ctx, i.cfg.FilebeatEventsJSON, opt, func(line []byte) error {
+				ev, err := filebeat.NormalizeLine(i.cfg, line)
 				if err != nil {
 					return err
 				}

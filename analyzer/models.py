@@ -14,7 +14,7 @@ class Event:
     """统一事件模型（ECS 子集思想），尽量只保留关联所需字段。"""
     event_id: str
     ts: datetime
-    source: str                # wazuh / falco / suricata / security-analytics ...
+    source: str                # filebeat / falco / suricata / security-analytics ...
     etype: str                 # process_create / dns / net_conn / file / alert ...
     host: str                  # host.name（主机名或唯一ID）
     session_id: Optional[str] = None
@@ -39,5 +39,4 @@ class Event:
 
     # 原始事件（便于回溯、截图、证据链接）
     raw: Dict[str, Any] = field(default_factory=dict)
-
 

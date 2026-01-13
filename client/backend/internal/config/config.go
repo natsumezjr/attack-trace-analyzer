@@ -24,8 +24,7 @@ type Config struct {
 	AuthDisable     bool
 	RegisterDisable bool
 
-	WazuhAlertsJSON   string
-	WazuhArchivesJSON string
+	FilebeatEventsJSON string
 
 	FalcoEventsJSON   string
 	SuricataEveJSON   string
@@ -68,14 +67,13 @@ func LoadFromEnv() (Config, error) {
 	cfg.AuthDisable = parseBool(os.Getenv("CLIENT_AUTH_DISABLE"))
 	cfg.RegisterDisable = parseBool(os.Getenv("CLIENT_REGISTER_DISABLE"))
 
-	cfg.WazuhAlertsJSON = strings.TrimSpace(os.Getenv("ATA_WAZUH_ALERTS_JSON"))
-	cfg.WazuhArchivesJSON = strings.TrimSpace(os.Getenv("ATA_WAZUH_ARCHIVES_JSON"))
+	cfg.FilebeatEventsJSON = strings.TrimSpace(os.Getenv("ATA_FILEBEAT_EVENTS_JSON"))
 	cfg.FalcoEventsJSON = strings.TrimSpace(os.Getenv("ATA_FALCO_EVENTS_JSON"))
 	cfg.SuricataEveJSON = strings.TrimSpace(os.Getenv("ATA_SURICATA_EVE_JSON"))
 	cfg.SuricataFastLog = strings.TrimSpace(os.Getenv("ATA_SURICATA_FAST_LOG"))
 	cfg.SuricataStatsJSON = strings.TrimSpace(os.Getenv("ATA_SURICATA_STATS_JSON"))
 
-	cfg.CapFilebeat = cfg.WazuhAlertsJSON != "" || cfg.WazuhArchivesJSON != ""
+	cfg.CapFilebeat = cfg.FilebeatEventsJSON != ""
 	cfg.CapFalco = cfg.FalcoEventsJSON != ""
 	cfg.CapSuricata = cfg.SuricataEveJSON != "" || cfg.SuricataFastLog != "" || cfg.SuricataStatsJSON != ""
 
