@@ -10,7 +10,7 @@
 
 **使用方法**：
 ```bash
-cd backend/opensearch/scripts
+cd backend/app/services/opensearch/scripts
 
 # 查看可用的规则类别
 python import_sigma_rules.py --list
@@ -36,7 +36,7 @@ python import_sigma_rules.py --category dns --dry-run
 
 **使用方法**：
 ```bash
-cd backend/opensearch/scripts
+cd backend/app/services/opensearch/scripts
 python setup_security_analytics.py
 ```
 
@@ -57,7 +57,7 @@ python setup_security_analytics.py
 
 **使用方法**：
 ```bash
-cd backend/opensearch/scripts
+cd backend/app/services/opensearch/scripts
 python test_import_rules.py
 ```
 

@@ -32,7 +32,7 @@ def opensearch_client():
     """
     获取 OpenSearch 客户端（会话级别，所有测试共享）
     """
-    from opensearch import get_client
+    from .. import get_client
     return get_client()
 
 
@@ -41,7 +41,7 @@ def clean_test_indices(opensearch_client):
     """
     清理测试索引（每个测试函数执行前后）
     """
-    from opensearch import INDEX_PATTERNS, get_index_name
+    from ..index import INDEX_PATTERNS, get_index_name
     
     today = datetime.now()
     test_indices = [
@@ -75,7 +75,7 @@ def initialized_indices(clean_test_indices):
     """
     初始化所有测试需要的索引
     """
-    from opensearch import initialize_indices
+    from .. import initialize_indices
     initialize_indices()
     yield
     # 清理在 clean_test_indices 中处理

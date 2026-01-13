@@ -21,10 +21,10 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent
+backend_dir = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import (
+from app.services.opensearch import (
     initialize_indices,
     run_security_analytics,
     deduplicate_findings,

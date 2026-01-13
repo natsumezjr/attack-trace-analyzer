@@ -41,17 +41,20 @@ docker compose -f backend/opensearch/docker-compose.yml up -d
 
 1) 使用 OpenSearch 拉取 ECS 并导入 Neo4j（默认）
 ```bash
-python backend/graph/load.py
+cd backend
+python -m app.services.graph.load
 ```
 
 2) 使用本地样例 `testExample.json` 导入
 ```bash
-python backend/graph/load.py --file
+cd backend
+python -m app.services.graph.load --file
 ```
 
 3) 模块测试（基于 `testExample.json`）
 ```bash
-python backend/graph/test.py
+cd backend
+python -m app.services.graph.test
 ```
 
 ### 环境变量

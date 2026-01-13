@@ -5,7 +5,7 @@
 ## 📁 文件结构
 
 ```
-backend/opensearch/
+backend/app/services/opensearch/
 ├── __init__.py              # 统一对外接口（唯一导入入口）
 ├── client.py                # 客户端配置和基础操作
 ├── storage.py               # 存储功能（数据路由、批量存储、去重）
@@ -205,17 +205,17 @@ git clone --recurse-submodules <repository-url>
 git submodule update --init --recursive
 
 # 更新规则库
-cd backend/opensearch/sigma-rules
+cd backend/app/services/opensearch/sigma-rules
 git pull origin master
 ```
 
 **常用操作**：
 ```bash
 # 更新规则库
-cd backend/opensearch/sigma-rules
+cd backend/app/services/opensearch/sigma-rules
 git pull origin master
 cd ../../..
-git add backend/opensearch/sigma-rules
+git add backend/app/services/opensearch/sigma-rules
 git commit -m "更新sigma规则库"
 ```
 

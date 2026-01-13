@@ -12,12 +12,9 @@ from neo4j.exceptions import Neo4jError
 
 # Optional: ECS ingest integration (legacy compatibility)
 try:
-    from backend.graph.ecs_ingest import ecs_event_to_graph  # type: ignore
+    from .ecs_ingest import ecs_event_to_graph  # type: ignore
 except Exception:
-    try:
-        from graph.ecs_ingest import ecs_event_to_graph  # type: ignore
-    except Exception:
-        ecs_event_to_graph = None  # type: ignore
+    ecs_event_to_graph = None  # type: ignore
 
 from .models import (
     GraphEdge,
@@ -631,7 +628,7 @@ def ingest_from_opensearch(
     date: datetime | None = None,
 ) -> tuple[int, int, int]:
     # 使用 OpenSearch API 拉取 ECS 事件并写入 Neo4j
-    from opensearch import INDEX_PATTERNS, get_index_name, index_exists, search
+    from ..opensearch import INDEX_PATTERNS, get_index_name, index_exists, search
 
     query_body = dict(query) if query is not None else {"match_all": {}}
     index_names: list[str] = []

@@ -42,14 +42,14 @@ if sys.stdout.isatty():
     sys.stdout.reconfigure(line_buffering=True)
 
 # 添加 backend 目录到路径（仅在需要时导入）
-backend_dir = Path(__file__).parent.parent
+backend_dir = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 # 延迟导入 opensearch 模块（仅在需要时）
 def get_client():
     """延迟导入 get_client"""
     try:
-        from opensearch import get_client as _get_client
+        from app.services.opensearch import get_client as _get_client
         return _get_client()
     except ImportError as e:
         print("\n[ERROR] 无法导入 opensearch 模块")

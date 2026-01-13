@@ -14,7 +14,7 @@ if sys.platform == 'win32':
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client, get_index_name, INDEX_PATTERNS
+from .. import get_client, get_index_name, INDEX_PATTERNS
 from datetime import datetime
 
 print("=" * 60)
