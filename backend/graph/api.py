@@ -21,6 +21,7 @@ _SCHEMA_READY = False
 
 
 def _get_driver():
+    # 获取并缓存 Neo4j 驱动
     global _DRIVER
     if _DRIVER is None:
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -31,6 +32,7 @@ def _get_driver():
 
 
 def _get_session():
+    # 创建数据库会话（支持指定数据库名）
     driver = _get_driver()
     database = os.getenv("NEO4J_DATABASE")
     if database:
@@ -39,32 +41,38 @@ def _get_session():
 
 
 def _execute_write(session, func, *args, **kwargs):
+    # 兼容不同版本驱动的写事务调用
     if hasattr(session, "execute_write"):
         return session.execute_write(func, *args, **kwargs)
     return session.write_transaction(func, *args, **kwargs)
 
 
 def _execute_read(session, func, *args, **kwargs):
+    # 兼容不同版本驱动的读事务调用
     if hasattr(session, "execute_read"):
         return session.execute_read(func, *args, **kwargs)
     return session.read_transaction(func, *args, **kwargs)
 
 
 def _param_key(name: str) -> str:
+    # 将属性名转为可用于 Cypher 参数的安全键
     safe = "".join(ch if ch.isalnum() else "_" for ch in name)
     return f"key_{safe}"
 
 
 def _cypher_prop(name: str) -> str:
+    # 处理包含特殊字符的属性名（如点号）
     escaped = name.replace("`", "``")
     return f"`{escaped}`"
 
 
 def _name_suffix(name: str) -> str:
+    # 将属性名转换为索引/约束名后缀
     return "".join(ch if ch.isalnum() else "_" for ch in name)
 
 
 def ensure_schema() -> None:
+    # 确保图数据库约束和索引已创建
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
@@ -74,6 +82,7 @@ def ensure_schema() -> None:
 
 
 def _create_schema(tx) -> None:
+    # 创建节点唯一约束与常用索引
     constraints = [
         ("Host", "host.id"),
         ("User", "user.name"),
@@ -103,12 +112,14 @@ def _create_schema(tx) -> None:
 
 
 def add_node(node: GraphNode) -> None:
+    # 写入/合并节点
     ensure_schema()
     with _get_session() as session:
         _execute_write(session, _merge_node, node)
 
 
 def _merge_node(tx, node: GraphNode) -> None:
+    # 以唯一键合并节点并更新属性
     label = node.ntype.value
     key_props = node.key
     merged_props = node.merged_props()
@@ -123,12 +134,14 @@ def _merge_node(tx, node: GraphNode) -> None:
 
 
 def add_edge(edge: GraphEdge) -> None:
+    # 写入关系边
     ensure_schema()
     with _get_session() as session:
         _execute_write(session, _create_edge, edge)
 
 
 def _create_edge(tx, edge: GraphEdge) -> None:
+    # 合并起止节点并创建关系
     src_label, src_key = parse_uid(edge.src_uid)
     dst_label, dst_key = parse_uid(edge.dst_uid)
     params: dict[str, Any] = {"props": edge.props}
@@ -157,6 +170,7 @@ def _create_edge(tx, edge: GraphEdge) -> None:
 
 
 def get_node(uid: str) -> GraphNode | None:
+    # 按 UID 查询节点
     label, key = parse_uid(uid)
     with _get_session() as session:
         props = _execute_read(session, _fetch_node, label, key)
@@ -169,6 +183,7 @@ def get_node(uid: str) -> GraphNode | None:
 
 
 def _fetch_node(tx, label: NodeType, key: dict[str, Any]) -> dict[str, Any] | None:
+    # 事务内按唯一键读取节点属性
     params: dict[str, Any] = {}
     clause_parts = []
     for k, v in key.items():
@@ -184,6 +199,7 @@ def _fetch_node(tx, label: NodeType, key: dict[str, Any]) -> dict[str, Any] | No
 
 
 def get_edges(node: GraphNode) -> list[GraphEdge]:
+    # 获取节点的所有相邻关系
     with _get_session() as session:
         rows = _execute_read(session, _fetch_edges, node)
     edges: list[GraphEdge] = []
@@ -201,6 +217,7 @@ def get_edges(node: GraphNode) -> list[GraphEdge]:
 
 
 def _fetch_edges(tx, node: GraphNode) -> list[dict[str, Any]]:
+    # 事务内查询节点的关系及其两端节点属性
     params: dict[str, Any] = {}
     clause_parts = []
     for k, v in node.key.items():
@@ -218,6 +235,7 @@ def _fetch_edges(tx, node: GraphNode) -> list[dict[str, Any]]:
 
 
 def get_alarm_edges() -> list[GraphEdge]:
+    # 获取标记为告警的关系边
     with _get_session() as session:
         rows = _execute_read(session, _fetch_alarm_edges)
     edges: list[GraphEdge] = []
@@ -235,6 +253,7 @@ def get_alarm_edges() -> list[GraphEdge]:
 
 
 def _fetch_alarm_edges(tx) -> list[dict[str, Any]]:
+    # 事务内查询告警边
     cypher = (
         "MATCH ()-[r]->() "
         "WHERE coalesce(r.is_alarm, false) = true "
@@ -246,6 +265,7 @@ def _fetch_alarm_edges(tx) -> list[dict[str, Any]]:
 
 
 def _node_uid_from_record(labels: Iterable[str], props: dict[str, Any]) -> str | None:
+    # 根据记录中的标签与属性推断节点 UID
     ntype = _label_to_ntype(labels)
     if ntype is None:
         return None
@@ -259,6 +279,7 @@ def _node_uid_from_record(labels: Iterable[str], props: dict[str, Any]) -> str |
 
 
 def _label_to_ntype(labels: Iterable[str]) -> NodeType | None:
+    # 将 Neo4j label 映射为节点类型枚举
     for label in labels:
         try:
             return NodeType(label)
@@ -268,6 +289,7 @@ def _label_to_ntype(labels: Iterable[str]) -> NodeType | None:
 
 
 def _fallback_key(ntype: NodeType, props: dict[str, Any]) -> dict[str, Any] | None:
+    # 当唯一键缺失时的回退键选择
     fallback_fields = {
         NodeType.HOST: ["host.id", "host.name"],
         NodeType.USER: ["user.name", "user.id"],
@@ -284,6 +306,7 @@ def _fallback_key(ntype: NodeType, props: dict[str, Any]) -> dict[str, Any] | No
 
 
 def close() -> None:
+    # 关闭 Neo4j 驱动
     global _DRIVER
     if _DRIVER is None:
         return
@@ -292,6 +315,7 @@ def close() -> None:
 
 
 def ingest_ecs_event(event: Mapping[str, Any]) -> tuple[int, int]:
+    # 将单条 ECS 事件写入图数据库
     nodes, edges = ecs_event_to_graph(event)
     for node in nodes:
         add_node(node)
@@ -301,6 +325,7 @@ def ingest_ecs_event(event: Mapping[str, Any]) -> tuple[int, int]:
 
 
 def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> tuple[int, int]:
+    # 批量写入 ECS 事件
     total_nodes = 0
     total_edges = 0
     for event in events:

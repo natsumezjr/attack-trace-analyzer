@@ -10,6 +10,7 @@ from graph import api as graph_api
 
 
 def main() -> None:
+    # 读取样例事件并写入 Neo4j，输出统计信息
     data = json.loads((ROOT_DIR / "graph" / "testExample.json").read_text(encoding="utf-8"))
     events = data.get("events", [])
     node_count, edge_count = graph_api.ingest_ecs_events(events)

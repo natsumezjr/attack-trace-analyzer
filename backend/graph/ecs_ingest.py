@@ -9,6 +9,7 @@ _MISSING = object()
 
 
 def _get_in(data: Mapping[str, Any], path: Iterable[str]) -> Any | None:
+    # 同时支持嵌套路径和点号路径的字段获取
     parts = list(path)
     cur: Any = data
     for key in parts:
@@ -25,12 +26,14 @@ def _get_in(data: Mapping[str, Any], path: Iterable[str]) -> Any | None:
 
 
 def _basename(path: str | None) -> str | None:
+    # 获取路径的文件名部分
     if not path:
         return None
     return path.replace("\\", "/").split("/")[-1]
 
 
 def _as_list(value: Any) -> list[Any]:
+    # 将值统一为列表形式，便于统一处理
     if value is None:
         return []
     if isinstance(value, list):
@@ -38,7 +41,17 @@ def _as_list(value: Any) -> list[Any]:
     return [value]
 
 
+def _norm_set(values: Any) -> set[str]:
+    # 标准化字符串集合（小写化）
+    result: set[str] = set()
+    for item in _as_list(values):
+        if isinstance(item, str) and item:
+            result.add(item.lower())
+    return result
+
+
 def _extract_dns_answer_ips(event: Mapping[str, Any]) -> list[str]:
+    # 从 DNS 结果中抽取解析出的 IP 列表
     answers = _as_list(_get_in(event, ["dns", "answers"]))
     ips: list[str] = []
     for ans in answers:
@@ -56,6 +69,7 @@ def _extract_dns_answer_ips(event: Mapping[str, Any]) -> list[str]:
 
 
 def _map_file_op(action: str | None) -> str | None:
+    # 将事件动作映射为文件操作类型
     if not action:
         return None
     lower = action.lower()
@@ -69,33 +83,36 @@ def _map_file_op(action: str | None) -> str | None:
 
 
 def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode], list[models.GraphEdge]]:
+    # 将 ECS 事件转换为图节点与关系边
     nodes_by_uid: dict[str, models.GraphNode] = {}
     edges: list[models.GraphEdge] = []
 
     event_kind = _get_in(event, ["event", "kind"])
-    if isinstance(event_kind, str):
-        event_kind = event_kind.lower()
-    dataset_raw = _get_in(event, ["event", "dataset"])
-    dataset = dataset_raw if isinstance(dataset_raw, str) else ""
-    event_action = _get_in(event, ["event", "action"])
-    event_category = _as_list(_get_in(event, ["event", "category"]))
-    event_type = _as_list(_get_in(event, ["event", "type"]))
-    ts = event.get("@timestamp")
-    event_id = _get_in(event, ["event", "id"])
-
-    if not event_kind:
-        if isinstance(dataset, str) and dataset.startswith("finding."):
-            event_kind = "alert"
-        elif dataset:
-            event_kind = "event"
-
+    if not isinstance(event_kind, str):
+        return [], []
+    event_kind = event_kind.lower()
     if event_kind not in ("event", "alert"):
         return [], []
 
+    dataset_raw = _get_in(event, ["event", "dataset"])
+    dataset = dataset_raw if isinstance(dataset_raw, str) else ""
+    event_action = _get_in(event, ["event", "action"])
+    event_category_raw = _as_list(_get_in(event, ["event", "category"]))
+    event_type_raw = _as_list(_get_in(event, ["event", "type"]))
+    event_category = _norm_set(event_category_raw)
+    event_type = _norm_set(event_type_raw)
+    ts = event.get("@timestamp")
+    event_id = _get_in(event, ["event", "id"])
+    event_severity = _get_in(event, ["event", "severity"])
+    event_outcome = _get_in(event, ["event", "outcome"])
+    event_code = _get_in(event, ["event", "code"])
+    session_id = _get_in(event, ["session", "id"])
+
     evidence_ids: list[str] | None = None
     if event_kind == "alert":
-        evidence_ids = _get_in(event, ["custom", "evidence", "event_ids"])
-    if not evidence_ids and event_id:
+        raw_ids = _get_in(event, ["custom", "evidence", "event_ids"])
+        evidence_ids = _as_list(raw_ids) if raw_ids else None
+    elif event_id:
         evidence_ids = [event_id]
 
     is_alarm = event_kind == "alert"
@@ -109,10 +126,37 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         base_edge_props["event.dataset"] = dataset
     if event_action:
         base_edge_props["event.action"] = event_action
-    if event_category:
-        base_edge_props["event.category"] = event_category
-    if event_type:
-        base_edge_props["event.type"] = event_type
+    if event_category_raw:
+        base_edge_props["event.category"] = event_category_raw
+    if event_type_raw:
+        base_edge_props["event.type"] = event_type_raw
+    if event_severity is not None:
+        base_edge_props["event.severity"] = event_severity
+    if event_outcome:
+        base_edge_props["event.outcome"] = event_outcome
+    if event_code:
+        base_edge_props["event.code"] = event_code
+    if session_id:
+        base_edge_props["session.id"] = session_id
+    if event_kind == "alert":
+        alert_fields = {
+            "rule.id": _get_in(event, ["rule", "id"]),
+            "rule.name": _get_in(event, ["rule", "name"]),
+            "rule.ruleset": _get_in(event, ["rule", "ruleset"]),
+            "threat.framework": _get_in(event, ["threat", "framework"]),
+            "threat.tactic.id": _get_in(event, ["threat", "tactic", "id"]),
+            "threat.tactic.name": _get_in(event, ["threat", "tactic", "name"]),
+            "threat.technique.id": _get_in(event, ["threat", "technique", "id"]),
+            "threat.technique.name": _get_in(event, ["threat", "technique", "name"]),
+            "threat.technique.subtechnique.id": _get_in(event, ["threat", "technique", "subtechnique", "id"]),
+            "custom.finding.stage": _get_in(event, ["custom", "finding", "stage"]),
+            "custom.finding.providers": _get_in(event, ["custom", "finding", "providers"]),
+            "custom.finding.fingerprint": _get_in(event, ["custom", "finding", "fingerprint"]),
+            "custom.confidence": _get_in(event, ["custom", "confidence"]),
+        }
+        for key, value in alert_fields.items():
+            if value is not None:
+                base_edge_props[key] = value
 
     def add_node(node: models.GraphNode | None) -> models.GraphNode | None:
         if node is None:
@@ -222,10 +266,17 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         else None
     )
 
+    is_auth = "authentication" in event_category or dataset.startswith("hostlog.auth")
+    is_process = "process" in event_category or dataset.startswith("hostlog.process")
+    is_file = "file" in event_category or dataset.startswith("hostbehavior.file") or dataset.startswith("hostlog.file_registry")
+    is_network = "network" in event_category or dataset.startswith("netflow.")
+
     dns_name = _get_in(event, ["dns", "question", "name"])
+    dns_action = event_action.lower() if isinstance(event_action, str) else ""
+    is_dns = bool(dns_name) or "dns" in dns_action or dataset.startswith("netflow.dns")
     url_domain = _get_in(event, ["url", "domain"])
     domain_name = dns_name or url_domain
-    domain_node = add_node(models.domain_node(dns_name=dns_name, url_domain=url_domain)) if domain_name else None
+    domain_node = add_node(models.domain_node(dns_name=dns_name, url_domain=url_domain)) if (is_dns and domain_name) else None
 
     src_ip = _get_in(event, ["source", "ip"])
     src_port = _get_in(event, ["source", "port"])
@@ -235,7 +286,8 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     net_protocol = _get_in(event, ["network", "protocol"])
     flow_id = _get_in(event, ["flow", "id"])
     community_id = _get_in(event, ["network", "community_id"])
-    ip_node = add_node(models.ip_node(dst_ip)) if dst_ip else None
+
+    ip_node = add_node(models.ip_node(dst_ip)) if (is_network and dst_ip) else None
     netcon_node = (
         add_node(
             models.netcon_node(
@@ -249,22 +301,22 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
                 protocol=net_protocol,
             )
         )
-        if flow_id or community_id
+        if (is_network and (flow_id or community_id))
         else None
     )
 
-    if dataset.startswith("hostlog.auth") or "authentication" in event_category:
+    if is_auth:
         add_edge(models.RelType.LOGON, user_node, host_node)
 
-    if proc_node and parent_node and (dataset.startswith("hostlog.process") or "process" in event_category):
+    if proc_node and parent_node and is_process:
         add_edge(models.RelType.SPAWNED, parent_node, proc_node)
 
-    if proc_node and file_node:
+    if proc_node and file_node and is_file:
         op = _map_file_op(event_action)
-        props = {"event.action": op} if op else {}
+        props = {"op": op} if op else {}
         add_edge(models.RelType.ACCESSED, proc_node, file_node, props=props)
 
-    if netcon_node is not None:
+    if is_network and netcon_node is not None:
         if proc_node:
             add_edge(models.RelType.CONNECTED, proc_node, netcon_node)
         elif host_node:
@@ -274,11 +326,14 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
             if dst_port is not None:
                 props["destination.port"] = dst_port
             add_edge(models.RelType.CONNECTED, netcon_node, ip_node, props=props)
-    elif proc_node and ip_node and dst_ip:
+    elif is_network and ip_node and dst_ip:
         props = {"destination.port": dst_port} if dst_port is not None else {}
-        add_edge(models.RelType.CONNECTED, proc_node, ip_node, props=props)
+        if proc_node:
+            add_edge(models.RelType.CONNECTED, proc_node, ip_node, props=props)
+        elif host_node:
+            add_edge(models.RelType.CONNECTED, host_node, ip_node, props=props)
 
-    if host_node and domain_node and (dataset.startswith("netflow.dns") or "dns" in event_type):
+    if host_node and domain_node and is_dns and (is_network or dataset.startswith("netflow.dns")):
         add_edge(models.RelType.RESOLVED, host_node, domain_node)
         for ans_ip in _extract_dns_answer_ips(event):
             ans_ip_node = add_node(models.ip_node(ans_ip))

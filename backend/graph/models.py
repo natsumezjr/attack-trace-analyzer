@@ -120,9 +120,11 @@ class GraphNode:
     key: dict[str, Any]
     props: dict[str, Any] = field(default_factory=dict)
 
+    # 返回节点 UID
     @property
     def uid(self) -> str:
         return build_uid(self.ntype, self.key)
+    # 合并唯一键与属性字段
     def merged_props(self) -> dict[str, Any]:
         merged = dict(self.props)
         for k, v in self.key.items():
@@ -143,15 +145,19 @@ class GraphEdge:
     rtype: RelType
     props: dict[str, Any] = field(default_factory=dict)
 
+    # 获取边的时间戳
     def get_ts(self) -> str | None:
         return self.props.get("@timestamp") or self.props.get("ts")
 
+    # 获取起点 UID
     def get_src_uid(self) -> str:
         return self.src_uid
 
+    # 获取终点 UID
     def get_dst_uid(self) -> str:
         return self.dst_uid
 
+    # 获取关系类型
     def get_rtype(self) -> RelType:
         return self.rtype
 
@@ -427,5 +433,3 @@ def resolved(host: GraphNode, domain: GraphNode, **kw: Any) -> GraphEdge:
 # 域名解析到IP
 def resolves_to(domain: GraphNode, ip: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(domain, ip, RelType.RESOLVES_TO, **kw)
-
-
