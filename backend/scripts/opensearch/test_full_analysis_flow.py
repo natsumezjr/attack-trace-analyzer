@@ -1,24 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试完整流程（检测+去重）
+OpenSearch 完整分析流程测试工具
+
+功能说明：
+    测试完整的安全分析流程，包括检测和去重两个步骤。
+    此工具用于验证从事件到 canonical findings 的完整流程。
+
+测试内容：
+    1. 运行 Security Analytics 检测，生成 raw-findings
+    2. 运行告警去重，生成 canonical-findings
+    3. 统计和验证所有索引的数据
+
+使用场景：
+    - 验证完整分析流程
+    - 端到端测试
+    - 验证数据流转是否正常
+
+环境要求：
+    - OpenSearch 服务运行中
+    - 已配置环境变量（OPENSEARCH_URL等）
+    - Security Analytics 已配置
+    - 事件数据已存在
+
+运行方式：
+    cd backend
+    uv run python scripts/opensearch/test_full_analysis_flow.py
 """
 import sys
 import io
 from pathlib import Path
 
+# Windows UTF-8 兼容
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# 添加 backend 目录到 Python 路径
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from .. import run_data_analysis, get_client, get_index_name, INDEX_PATTERNS
+from app.services.opensearch import run_data_analysis, get_client, get_index_name, INDEX_PATTERNS
 from datetime import datetime
 
 print("=" * 60)
-print("测试完整流程（检测+去重）")
+print("OpenSearch 完整分析流程测试")
 print("=" * 60)
 
 try:

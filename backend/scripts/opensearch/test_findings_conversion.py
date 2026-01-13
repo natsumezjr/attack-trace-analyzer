@@ -1,23 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试findings转换和存储
+OpenSearch Findings 转换和存储测试工具
+
+功能说明：
+    测试 findings 的转换和存储功能。
+    此工具用于验证从 Security Analytics检测结果到存储的完整流程。
+
+测试内容：
+    - 运行 Security Analytics 检测
+    - 转换检测结果为 ECS 格式
+    - 存储到 raw-findings 索引
+    - 显示转换和存储结果统计
+
+使用场景：
+    - 验证 findings 转换功能
+    - 验证 findings 存储功能
+    - 调试转换和存储问题
+
+环境要求：
+    - OpenSearch 服务运行中
+    - 已配置环境变量（OPENSEARCH_URL等）
+    - Security Analytics 已配置
+    - 事件数据已存在
+
+运行方式：
+    cd backend
+    uv run python scripts/opensearch/test_findings_conversion.py
 """
 import sys
 import io
 from pathlib import Path
 
+# Windows UTF-8 兼容
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# 添加 backend 目录到 Python 路径
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from .. import run_security_analytics
+from app.services.opensearch import run_security_analytics
 
 print("=" * 60)
-print("测试Findings转换和存储")
+print("OpenSearch Findings 转换和存储测试")
 print("=" * 60)
 
 try:

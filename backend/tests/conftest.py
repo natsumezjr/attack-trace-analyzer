@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 
-BACKEND_ROOT = Path(__file__).resolve().parents[3]
+# backend/tests/conftest.py -> backend/
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     # Ensure `import app...` works even when running the `pytest` entrypoint script
     # (e.g., `uv run pytest`), where sys.path[0] may point to the venv bin dir.

@@ -1,27 +1,54 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试 Sigma 规则导入和 Security Analytics 检测
+OpenSearch Security Analytics 完整测试流程
+
+功能说明：
+    完整测试 Security Analytics 流程，包括索引、规则、detector、检测和去重。
+    这是最全面的 Security Analytics 测试脚本。
 
 完整测试流程：
-1. 检查索引、规则、detector
-2. 运行 Security Analytics 检测
-3. 验证 findings
-4. 运行告警去重
-5. 显示结果统计
+    1. 检查索引是否创建
+    2. 检查 Sigma 规则是否导入
+    3. 检查 detector 是否配置
+    4. 运行 Security Analytics 检测
+    5. 运行告警去重
+    6. 验证 findings 索引
+    7. 显示测试总结
+
+使用场景：
+    - 完整验证 Security Analytics 功能
+    - 端到端测试安全检测流程
+    - 验证规则导入和检测配置
+
+环境要求：
+    - OpenSearch 服务运行中
+    - 已配置环境变量（OPENSEARCH_URL等）
+    - Security Analytics 插件已安装
+    - Sigma 规则已导入
+    - Detector 已创建
+    - 事件数据已存在
+
+运行方式：
+    cd backend
+    uv run python scripts/opensearch/test_security_analytics_flow.py
+
+相关脚本：
+    - generate_security_test_events.py: 生成测试事件
+    - clear_findings_data.py: 清除 findings 数据
 """
 
 import sys
 import io
 from pathlib import Path
 
-# 设置UTF-8输出（Windows兼容）
+# Windows UTF-8 兼容
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent.parent
+backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from app.services.opensearch import (

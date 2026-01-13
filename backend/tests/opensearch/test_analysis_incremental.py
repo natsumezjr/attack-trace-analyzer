@@ -5,20 +5,12 @@ Analysis模块增量处理功能测试
 """
 
 import pytest
-import sys
-from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
-# 添加父目录到路径
-test_dir = Path(__file__).parent
-parent_dir = test_dir.parent  # backend/opensearch
-backend_dir = parent_dir.parent  # backend
-sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
-sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
-sys.path.insert(0, str(test_dir))  # 添加test目录
+pytestmark = pytest.mark.requires_opensearch
 
-from test_utils import create_test_finding
+from .test_utils import create_test_finding
 
 
 @pytest.mark.unit
@@ -27,7 +19,7 @@ class TestAnalysisHelperFunctions:
     
     def test_get_detector_id(self, opensearch_client):
         """测试获取detector ID"""
-        from opensearch.analysis import _get_detector_id
+        from app.services.opensearch.analysis import _get_detector_id
         
         detector_id = _get_detector_id(opensearch_client)
         # 如果没有detector，返回None是正常的
@@ -35,7 +27,7 @@ class TestAnalysisHelperFunctions:
     
     def test_get_detector_details(self, opensearch_client):
         """测试获取detector详情"""
-        from opensearch.analysis import _get_detector_id, _get_detector_details
+        from app.services.opensearch.analysis import _get_detector_details, _get_detector_id
         
         detector_id = _get_detector_id(opensearch_client)
         if detector_id:
@@ -46,7 +38,7 @@ class TestAnalysisHelperFunctions:
     
     def test_should_trigger_scan(self):
         """测试判断是否需要触发扫描"""
-        from opensearch.analysis import _should_trigger_scan
+        from app.services.opensearch.analysis import _should_trigger_scan
         
         # 需要触发：trigger_scan=True 且 baseline_count=0
         assert _should_trigger_scan(True, 0) is True
@@ -59,7 +51,7 @@ class TestAnalysisHelperFunctions:
     
     def test_filter_new_findings_no_last_timestamp(self):
         """测试过滤新findings（没有上次处理时间）"""
-        from opensearch.analysis import _filter_new_findings
+        from app.services.opensearch.analysis import _filter_new_findings
         
         findings = [
             create_test_finding("f1", timestamp=datetime.now().isoformat()),
@@ -72,7 +64,7 @@ class TestAnalysisHelperFunctions:
     
     def test_filter_new_findings_with_timestamp(self):
         """测试过滤新findings（有上次处理时间）"""
-        from opensearch.analysis import _filter_new_findings
+        from app.services.opensearch.analysis import _filter_new_findings
         
         base_time = datetime.now()
         last_timestamp = base_time - timedelta(hours=1)
@@ -100,7 +92,7 @@ class TestAnalysisHelperFunctions:
     
     def test_get_last_processed_timestamp_empty(self, initialized_indices):
         """测试获取上次处理时间戳（空索引）"""
-        from opensearch.analysis import _get_last_processed_timestamp
+        from app.services.opensearch.analysis import _get_last_processed_timestamp
         
         # 空索引应该返回None
         timestamp = _get_last_processed_timestamp(
@@ -111,8 +103,8 @@ class TestAnalysisHelperFunctions:
     
     def test_get_last_processed_timestamp_with_findings(self, initialized_indices):
         """测试获取上次处理时间戳（有findings）"""
-        from opensearch import store_events
-        from opensearch.analysis import _get_last_processed_timestamp
+        from app.services.opensearch import store_events
+        from app.services.opensearch.analysis import _get_last_processed_timestamp
         
         detector_id = "test-detector-001"
         
@@ -149,8 +141,8 @@ class TestIncrementalProcessing:
     
     def test_fetch_and_store_findings_incremental(self, initialized_indices):
         """测试增量查询和存储findings"""
-        from opensearch import store_events
-        from opensearch.analysis import _fetch_and_store_findings
+        from app.services.opensearch import store_events
+        from app.services.opensearch.analysis import _fetch_and_store_findings
         
         detector_id = "test-detector-incremental"
         
@@ -179,7 +171,7 @@ class TestIncrementalProcessing:
         assert result["success"] == 1
         
         # 验证增量处理逻辑（通过_get_last_processed_timestamp）
-        from opensearch.analysis import _get_last_processed_timestamp, _filter_new_findings
+        from app.services.opensearch.analysis import _filter_new_findings, _get_last_processed_timestamp
         
         last_timestamp = _get_last_processed_timestamp(
             initialized_indices,
@@ -204,7 +196,7 @@ class TestAnalysisRefactoredFunctions:
     
     def test_enable_detector_if_needed(self, opensearch_client):
         """测试启用detector（如果未启用）"""
-        from opensearch.analysis import (
+        from app.services.opensearch.analysis import (
             _get_detector_id,
             _get_detector_details,
             _enable_detector_if_needed
@@ -227,7 +219,7 @@ class TestAnalysisRefactoredFunctions:
     
     def test_temporarily_shorten_schedule(self, opensearch_client):
         """测试临时缩短schedule"""
-        from opensearch.analysis import (
+        from app.services.opensearch.analysis import (
             _get_detector_id,
             _get_detector_details,
             _temporarily_shorten_schedule
@@ -263,7 +255,7 @@ class TestAnalysisRefactoredFunctions:
     
     def test_poll_for_scan_completion(self, opensearch_client):
         """测试轮询扫描完成"""
-        from opensearch.analysis import (
+        from app.services.opensearch.analysis import (
             _get_detector_id,
             _poll_for_scan_completion
         )
