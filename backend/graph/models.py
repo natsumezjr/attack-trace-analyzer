@@ -179,7 +179,7 @@ def host_node(
 
 # 用户节点
     # user_name 用户名称
-    # user_id 用户ID# 用户节点定义
+    # user_id 用户ID
 def user_node(
     user_name: str | None = None,
     user_id: str | None = None,
@@ -217,6 +217,13 @@ def user_node(
     )
 
 # 进程节点定义
+    # process_entity_id 进程实体ID
+    # pid 进程ID
+    # executable 可执行文件路径
+    # command_line 命令行
+    # name 进程名称
+    # host_id 主机ID
+    # start_time 进程启动时间
 def process_node(
     process_entity_id: str | None = None,
     *,
@@ -355,7 +362,7 @@ def _ntype_of(x: NodeOrUid) -> NodeType | None:
 # 强制执行图谱的Schema规则，避免边连接不合法的节点
 def _validate_edge_types(rtype: RelType, src: NodeOrUid, dst: NodeOrUid) -> None:
     src_t = _ntype_of(src)
-    dst_t = _ntype_of(dst)
+    dst_t = _ntype_of(dst)  
     if src_t is None or dst_t is None:
         return
     rules = EDGE_TYPE_RULES.get(rtype)
