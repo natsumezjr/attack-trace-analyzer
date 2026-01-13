@@ -5,28 +5,32 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple, Iterable
 from datetime import datetime, timezone
-
+from backend.graph.models import GraphEdge
+from backend.graph.utils import _parse_ts_to_float
 
 # =========================
 # 1) 非可选 ATT&CK tactic 状态定义
 # =========================
 
 class AttackState(str, Enum):
-    """
-    只保留非可选状态（你们要求）：
-      - InitialAccess
-      - Execution
-      - PrivilegeEscalation
-      - LateralMovement
-      - CommandAndControl
-      - Exfiltration
-    """
-    INITIAL_ACCESS = "InitialAccess"
-    EXECUTION = "Execution"
-    PRIVILEGE_ESCALATION = "PrivilegeEscalation"
-    LATERAL_MOVEMENT = "LateralMovement"
-    COMMAND_AND_CONTROL = "CommandAndControl"
+# MITRE ATT&CK 标准战术名称（带空格格式，用于字符串比对）
+    # 核心6个状态的标准格式
+    INITIAL_ACCESS = "Initial Access"
+    PRIVILEGE_ESCALATION = "Privilege Escalation"
+    LATERAL_MOVEMENT = "Lateral Movement"
+    COMMAND_AND_CONTROL = "Command and Control"
     EXFILTRATION = "Exfiltration"
+    EXECUTION = "Execution"
+    
+    # 其他 MITRE ATT&CK 战术（映射到最接近的核心状态）
+    PERSISTENCE = "Persistence"
+    DEFENSE_EVASION = "Defense Evasion"
+    CREDENTIAL_ACCESS = "Credential Access"
+    DISCOVERY = "Discovery"
+    COLLECTION = "Collection"
+    IMPACT = "Impact"
+    RECONNAISSANCE = "Reconnaissance"
+    RESOURCE_DEVELOPMENT = "Resource Development"
 
 
 # =========================
@@ -84,11 +88,17 @@ ALLOW_SELF_LOOP: bool = True
 # 3) GraphEdge 的最小“鸭子类型”接口（避免强依赖你们的文件结构）
 # =========================
 class _EdgeLike:
-    def get_attack_tag(self) -> Optional[str]:
-        raise NotImplementedError
+    def get_attack_tag(self, edge: GraphEdge) -> Optional[str]:
+        if hasattr(edge, "get_attack_tag"):
+            return edge.get_attack_tag()
+        else:
+            raise NotImplementedError
 
-    def get_ts(self) -> Optional[str]:
-        raise NotImplementedError
+    def get_ts(self, edge: GraphEdge) -> Optional[str]:
+        if hasattr(edge, "get_ts"):
+            return edge.get_ts()
+        else:
+            raise NotImplementedError
 
 
 # =========================
@@ -118,36 +128,6 @@ class AttackPath:
         return self.steps[-1].state if self.steps else None
 
 
-# =========================
-# 5) 工具：时间解析（用于排序）
-# =========================
-def _parse_ts(ts: Optional[str]) -> Optional[datetime]:
-    if not ts:
-        return None
-    # 常见 ISO: "2026-01-13T12:34:56Z"
-    s = ts.strip()
-    try:
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    except Exception:
-        return None
-
-
-def _edge_sort_key(e: _EdgeLike) -> Tuple[int, str]:
-    """
-    返回 (是否成功解析时间, 原始字符串) 作为排序键。
-    若能解析则按解析后的 epoch 排序，否则按字符串排序兜底。
-    """
-    ts = e.get_ts() or ""
-    dt = _parse_ts(ts)
-    if dt is None:
-        return (1, ts)  # 解析失败排后面
-    # 用 ISO 字符串仍可排序，但这里更稳
-    return (0, dt.isoformat())
 
 
 # =========================
@@ -193,7 +173,7 @@ class AttackFSA:
     def __init__(
         self,
         accept_states: Optional[Set[AttackState]] = None,
-        max_backtrack: int = 3,
+        max_backtrack: int = 10,
     ) -> None:
         self.current_state: Optional[AttackState] = None
         self.accept_states: Set[AttackState] = accept_states or {AttackState.EXFILTRATION}
@@ -251,7 +231,7 @@ class AttackFSA:
           4) 只有当路径到达 accept_states 才输出 AttackPath
              输出后重置当前路径（开始找下一条攻击链）
         """
-        edges = sorted(error_edge_list, key=_edge_sort_key)
+        edges = sorted(error_edge_list, key=lambda e: _parse_ts_to_float(e.get_ts()))
 
         accepted: List[AttackPath] = []
         steps: List[TransitionStep] = []
