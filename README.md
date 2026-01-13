@@ -60,11 +60,12 @@
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Step 3️⃣  中心机后端 (Next.js)                                              │
+│ Step 3️⃣  中心机后端 (Python FastAPI)                                       │
 │   → 接收注册,维护注册表(OpenSearch: client-registry-*)                       │
 │   → 轮询拉取客户端数据(每 5 秒,带抖动)                                        │
 │   → 写入 OpenSearch (3个索引: ecs-events-*, raw-findings-*,                  │
 │                      canonical-findings-*)                                  │
+│   → 触发关联分析算法                                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -85,8 +86,8 @@
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Step 6️⃣  展示层 (Next.js + React)                                          │
-│   → 从 OpenSearch + Neo4j 读取数据                                           │
+│ Step 6️⃣  展示层 (Next.js + React 前端)                                      │
+│   → 从中心机后端 API 获取数据                                                │
 │   → 展示时间线 / 关系图 / 攻击链                                              │
 │   → 导出报告(PDF)和证据包(ATT&CK Navigator layer)                            │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -169,13 +170,20 @@
 - Node.js 18+
 - Go 1.21+
 - Python 3.10+
+- uv (Python 包管理器)
 
-### 启动中心机 UI
+### 启动中心机
 
-UI 开发与页面联调在 `server/` 目录下进行:
-
+**启动后端 (FastAPI)**:
 ```bash
-cd server
+cd backend
+uv sync
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**启动前端 (Next.js)**:
+```bash
+cd frontend
 npm ci
 npm run dev
 ```
@@ -187,7 +195,8 @@ npm run dev
 | 目录 | 技术栈 | 作用 |
 |------|--------|------|
 | `client/` | Go + SQLite | **客户端侧**(采集层编排 + ECS 归一化 + 本地缓冲 + 注册/拉取接口) |
-| `server/` | Next.js + TypeScript | **中心机全栈**(页面 + API,承载注册表/轮询器/展示) |
+| `backend/` | Python FastAPI + uv | **中心机后端**(API、注册表、轮询器、入库路由) |
+| `frontend/` | Next.js + TypeScript | **中心机前端**(页面展示、可视化、报告导出) |
 | `analyzer/` | Python | 关联/溯源相关的**模型与算法**(逐步落地) |
 | `graph/` | Python + Neo4j | 图谱试验代码与数据样例 |
 | `docs/` | Markdown | 全部可交付文档(需求/规格/字段/接口/存储/调研) |
@@ -202,19 +211,20 @@ npm run dev
 |------|------|------|
 | **采集** | Wazuh / Falco / Suricata | 主机日志、主机行为、网络流量 |
 | **客户端后端** | Go + SQLite | ECS 归一化、本地缓冲、注册拉取 |
-| **中心机后端** | Next.js | API、注册表、轮询器 |
+| **中心机后端** | Python FastAPI + uv | API、注册表、轮询器、入库路由、算法触发 |
+| **中心机前端** | Next.js + React | 页面展示、可视化、报告导出 |
 | **存储** | OpenSearch | 3 个索引( events/raw-findings/canonical-findings) |
 | **检测** | Security Analytics + Sigma | Store-first 检测 |
 | **分析** | Python + Neo4j GDS + YARA + 离线 ATT&CK CTI | 告警融合、攻击链重建、APT 相似度、攻击者指纹 |
 | **图谱** | Neo4j + GDS | 实体关系图、加权最短路、相似度检索 |
-| **展示** | Next.js + React | UI、报告导出 |
 
 ### 最终选型(已拍板)
 
 - **存储/检索**: OpenSearch
 - **库内检测**: OpenSearch Security Analytics (Sigma 规则)
 - **图谱与图算法**: Neo4j + Neo4j GDS (加权最短路、相似度检索)
-- **中心机全栈**: Next.js (页面 + API)
+- **中心机后端**: Python FastAPI + uv (API、注册表、轮询器)
+- **中心机前端**: Next.js + React (页面展示、可视化)
 - **主机侧**: Wazuh (主机日志) + Falco (主机行为告警)
 - **网络侧**: Suricata (统一作为网络流量数据源,EVE JSON 同时产出事实与告警)
 - **统一范式**: ECS v9.2.0 + 自定义字段 `custom.*`
@@ -222,6 +232,7 @@ npm run dev
 - **TTP 知识库**: 离线 ATT&CK CTI (STIX) 数据包
 - **攻击复现**: Atomic Red Team
 - **输出导出**: ATT&CK Navigator layer
+- **Python 包管理**: uv (快速、可靠的 Python 包管理器)
 
 ---
 
@@ -266,11 +277,11 @@ npm run dev
 | 姜乐 | 数据获取 | 主机日志: Wazuh |
 | 田炎烁 | 数据湖构建 | OpenSearch Security Analytics |
 | 吕梓杰 | 数据湖构建 | OpenSearch → Neo4j 实体转化 |
-| 伍万圣 | 客户机、中心机全栈 | 包括了前端展示 |
+| 伍万圣 | 客户机、中心机后端 | FastAPI + Go,包括后端 API |
+| 张天华 | 中心机前端、项目教练 | Next.js 前端展示 |
 | 范玉彬 | 关联溯源算法 | |
 | 曾靖然 | 关联溯源算法 | |
 | 王一安 | 靶场环境 | 能部署靶机,并发起模拟 APT 攻击 |
-| 张天华 | 项目教练 | |
 
 ---
 
