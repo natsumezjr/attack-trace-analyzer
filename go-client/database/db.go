@@ -1,7 +1,7 @@
 package database
 
 import (
-	"falco-events-client/model"
+	"go-client/model"
 	"log"
 
 	"gorm.io/driver/sqlite"
