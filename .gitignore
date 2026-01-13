@@ -62,3 +62,18 @@ coverage.xml
 
 # Local scratch
 .context/
+
+# --- Node.js / Next.js ---
+node_modules/
+.next/
+out/
+build/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.env*.local
+.vercel
+.turbo
