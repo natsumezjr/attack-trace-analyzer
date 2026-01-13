@@ -1,20 +1,91 @@
-# sensors/suricata
+# Network Traffic Analysis & Export Module (Suricata)
 
-Suricata 的部署与输出约定（v1）。
+This module only handles traffic capture/analysis and exports ECS-formatted ndjson via HTTP.
+It does not contain any central/server-side logic.
 
-你已确认：靶机 Linux 且允许高权限，因此推荐 **Docker（privileged）+ host network** 在每台客户机落地。
+## Quick Start (PCAP Mode)
 
-后续需要明确：
-- EVE JSON 的启用与输出路径
-- 抓包接口/网卡选择（靶场内网环境）
-- 哪些协议事件纳入 v1（flow/dns/http/tls…）
+```bash
+docker compose up --build
+```
 
-## 推荐输出（给客户端后端消费）
+This uses `SURICATA_MODE=pcap` by default in the sample compose file and reads:
 
-v1 推荐只要保证 EVE JSON 落盘即可，客户端后端直接读取：
+```
+./data/pcap/sample.pcap
+```
 
-- `eve.json`：例如 `client/deploy/compose/data/suricata/eve.json`
+After startup, the exporter writes:
 
-模板配置在：
-- `client/deploy/compose/suricata/suricata.yaml`
+- `/data/output/events.db` (SQLite, all events in one table)
 
+on the host at:
+
+- `./data/output/events.db`
+
+## Live Capture Mode
+
+Suricata needs capture privileges inside the container:
+
+- `cap_add: NET_ADMIN, NET_RAW`
+- recommended: `network_mode: host` for full interface visibility
+
+Update `docker-compose.yml` for live mode:
+
+```yaml
+services:
+  suricata:
+    environment:
+      SURICATA_MODE: live
+      SURICATA_IFACE: eth0
+    network_mode: host
+```
+
+## API
+
+- `GET /healthz`
+- `GET /export/networksql`
+
+Each export returns unexported rows from SQLite as `application/x-ndjson` and then
+marks them exported on successful completion.
+
+## PCAP Placement
+
+Place pcaps in:
+
+```
+./data/pcap
+```
+
+Set `SURICATA_MODE=pcap` and `PCAP_FILE=/data/pcap/your.pcap`.
+
+## Data Persistence
+
+All runtime data lives under `./data`, mounted to `/data` in containers:
+
+- `/data/eve.json`
+- `/data/output/events.db` (table: `data`)
+- `/data/state/offset.json`
+
+## Minimal Demo
+
+1. Start services:
+
+```bash
+docker compose up --build
+```
+
+2. Wait for database:
+
+```
+./data/output/events.db
+```
+
+3. Export:
+
+```bash
+curl http://localhost:8080/export/raw
+curl http://localhost:8080/export/alerts
+```
+
+4. Verify rows are marked exported in SQLite (optional).
