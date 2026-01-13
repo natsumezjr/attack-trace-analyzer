@@ -112,7 +112,7 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
 
     user_id = _get_in(event, ["user", "id"])
     user_name = _get_in(event, ["user", "name"])
-    user_node = add_node(models.user_node(user_id=user_id, user_name=user_name)) if user_id or user_name else None
+    user_node = add_node(models.user_node(user_id=user_id, user_name=user_name, host_id=host_id)) if user_id or user_name else None
 
     proc_entity_id = _get_in(event, ["process", "entity_id"])
     proc_pid = _get_in(event, ["process", "pid"])
