@@ -227,7 +227,7 @@ npm run dev
 - **主机侧**: Filebeat (主机系统日志) + Sigma (规则检测) + Falco (主机行为告警)
 - **网络侧**: Suricata (统一作为网络流量数据源,EVE JSON 同时产出事实与告警)
 - **统一范式**: ECS v9.2.0 + 自定义字段 `custom.*`
-- **TTP 知识库**: 离线 ATT&CK Enterprise CTI（STIX 2.1｜attack-stix-data｜固定路径：`backend/app/services/ttp_similarity/cti/enterprise-attack.json`）
+- **TTP 知识库**: 离线 ATT&CK Enterprise CTI（STIX 2.1｜attack-stix-data｜默认路径：`backend/app/services/ttp_similarity/cti/enterprise-attack.json`，可用 `ATTACK_CTI_PATH` 覆盖）。数据文件较大，默认不提交到 Git；可用 `./scripts/fetch_attack_cti.sh` 一键下载。
 - **攻击复现**: Atomic Red Team
 - **输出导出**: ATT&CK Navigator layer
 - **Python 包管理**: uv (快速、可靠的 Python 包管理器)
