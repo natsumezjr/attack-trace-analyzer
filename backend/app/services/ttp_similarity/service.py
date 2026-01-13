@@ -11,7 +11,7 @@ from typing import Any, Iterable
 
 import os
 
-from opensearch import INDEX_PATTERNS, search
+from app.services.opensearch import INDEX_PATTERNS, search
 
 
 _TECHNIQUE_ID_RE = re.compile(r"^T\d{4}(?:\.\d{3})?$")

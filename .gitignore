@@ -66,6 +66,10 @@ coverage.xml
 # Local scratch
 .context/
 
+# --- Offline CTI data (large; fetched locally) ---
+backend/app/services/ttp_similarity/cti/enterprise-attack.json
+backend/app/services/ttp_similarity/cti/enterprise-attack.json.tmp
+
 # --- OpenSearch ---
 # Sigma规则库（使用git submodule管理，不直接提交）
 # backend/opensearch/sigma-rules/
