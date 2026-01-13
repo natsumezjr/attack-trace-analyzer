@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/xinghanxu/mcsm:ubuntu22.04
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y suricata && \

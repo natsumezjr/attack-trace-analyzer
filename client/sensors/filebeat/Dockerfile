@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/xinghanxu/mcsm:ubuntu22.04
 
 # 设置非交互式安装
 ENV DEBIAN_FRONTEND=noninteractive
