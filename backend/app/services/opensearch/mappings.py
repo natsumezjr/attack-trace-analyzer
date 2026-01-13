@@ -170,7 +170,7 @@ client_registry_mapping = {
         "client.version": {"type": "keyword"},
         "client.host.id": {"type": "keyword"},
         "client.host.name": {"type": "keyword"},
-        "client.capabilities.wazuh": {"type": "boolean"},
+        "client.capabilities.filebeat": {"type": "boolean"},
         "client.capabilities.falco": {"type": "boolean"},
         "client.capabilities.suricata": {"type": "boolean"},
         "client.token_hash": {"type": "keyword"},

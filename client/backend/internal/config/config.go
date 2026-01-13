@@ -32,7 +32,7 @@ type Config struct {
 	SuricataFastLog   string
 	SuricataStatsJSON string
 
-	CapWazuh    bool
+	CapFilebeat bool
 	CapFalco    bool
 	CapSuricata bool
 }
@@ -75,7 +75,7 @@ func LoadFromEnv() (Config, error) {
 	cfg.SuricataFastLog = strings.TrimSpace(os.Getenv("ATA_SURICATA_FAST_LOG"))
 	cfg.SuricataStatsJSON = strings.TrimSpace(os.Getenv("ATA_SURICATA_STATS_JSON"))
 
-	cfg.CapWazuh = cfg.WazuhAlertsJSON != "" || cfg.WazuhArchivesJSON != ""
+	cfg.CapFilebeat = cfg.WazuhAlertsJSON != "" || cfg.WazuhArchivesJSON != ""
 	cfg.CapFalco = cfg.FalcoEventsJSON != ""
 	cfg.CapSuricata = cfg.SuricataEveJSON != "" || cfg.SuricataFastLog != "" || cfg.SuricataStatsJSON != ""
 

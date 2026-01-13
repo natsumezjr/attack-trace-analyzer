@@ -25,7 +25,7 @@ type registerRequest struct {
 		Name string `json:"name"`
 	} `json:"host"`
 	Capabilities struct {
-		Wazuh    bool `json:"wazuh"`
+		Filebeat bool `json:"filebeat"`
 		Falco    bool `json:"falco"`
 		Suricata bool `json:"suricata"`
 	} `json:"capabilities"`
@@ -80,7 +80,7 @@ func registerOnce(ctx context.Context, cfg config.Config, st *state.Manager) err
 	req.ListenURL = cfg.ListenURL
 	req.Host.ID = cfg.HostID
 	req.Host.Name = cfg.HostName
-	req.Capabilities.Wazuh = cfg.CapWazuh
+	req.Capabilities.Filebeat = cfg.CapFilebeat
 	req.Capabilities.Falco = cfg.CapFalco
 	req.Capabilities.Suricata = cfg.CapSuricata
 
