@@ -1,21 +1,4 @@
-// 初始化脚本：在应用启动时初始化OpenSearch索引
+// 初始化脚本：在应用启动时执行初始化操作
 
-import { initializeIndices } from './opensearch';
-
-let initialized = false;
-
-export async function initializeOpenSearch() {
-  if (initialized) {
-    return;
-  }
-  
-  try {
-    console.log('开始初始化OpenSearch索引...');
-    await initializeIndices();
-    initialized = true;
-    console.log('OpenSearch索引初始化完成');
-  } catch (error) {
-    console.error('OpenSearch索引初始化失败:', error);
-    throw error;
-  }
-}
+// OpenSearch 初始化已迁移到 Python 后端 (opensearch 模块)
+// 如需初始化，请在 FastAPI 后端调用 opensearch.initialize_indices()
