@@ -59,7 +59,7 @@ class RegisterHost(BaseModel):
 
 
 class RegisterCapabilities(BaseModel):
-    wazuh: bool
+    filebeat: bool
     falco: bool
     suricata: bool
 
@@ -120,7 +120,7 @@ def register_client(req: RegisterClientRequest):
             "version": req.client_version,
             "host": {"id": req.host.id, "name": req.host.name},
             "capabilities": {
-                "wazuh": req.capabilities.wazuh,
+                "filebeat": req.capabilities.filebeat,
                 "falco": req.capabilities.falco,
                 "suricata": req.capabilities.suricata,
             },
@@ -215,4 +215,3 @@ def list_clients(limit: int = 200):
         clients=[_as_client_item(d) for d in docs],
         server_time=utc_now_rfc3339(),
     )
-
