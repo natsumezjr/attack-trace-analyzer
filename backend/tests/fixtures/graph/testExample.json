@@ -33,8 +33,8 @@
       "id": "sess-b274ea402cea1ec0"
     },
     "agent": {
-      "name": "wazuh-agent",
-      "version": "4.0.0"
+      "name": "filebeat",
+      "version": "8.11.0"
     },
     "message": "User alice logged in from 10.0.0.8"
   },
@@ -78,8 +78,8 @@
       }
     },
     "agent": {
-      "name": "wazuh-agent",
-      "version": "4.0.0"
+      "name": "filebeat",
+      "version": "8.11.0"
     }
   },
   {
@@ -116,8 +116,8 @@
       "name": "id_rsa"
     },
     "agent": {
-      "name": "wazuh-agent",
-      "version": "4.0.0"
+      "name": "filebeat",
+      "version": "8.11.0"
     }
   },
   {
@@ -466,8 +466,8 @@
       "id": "sess-b274ea402cea1ec0"
     },
     "agent": {
-      "name": "wazuh-agent",
-      "version": "4.0.0"
+      "name": "filebeat",
+      "version": "8.11.0"
     }
   }
 ]

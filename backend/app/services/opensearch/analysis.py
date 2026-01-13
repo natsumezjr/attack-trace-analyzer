@@ -128,8 +128,8 @@ def extract_provider(finding: dict[str, Any]) -> str:
     rule_id = finding.get("rule", {}).get("id") or finding.get("rule.id")
     if rule_id:
         rule_id_lower = rule_id.lower()
-        if "wazuh" in rule_id_lower:
-            return "wazuh"
+        if "filebeat" in rule_id_lower:
+            return "filebeat"
         if "falco" in rule_id_lower:
             return "falco"
         if "suricata" in rule_id_lower:

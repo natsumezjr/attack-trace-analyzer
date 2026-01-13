@@ -279,23 +279,23 @@ class TestAnalysisOperations:
         from app.services.opensearch.analysis import extract_provider
         
         finding = create_test_finding("finding-005")
-        finding["custom"]["finding"]["providers"] = ["wazuh", "falco"]
+        finding["custom"]["finding"]["providers"] = ["filebeat", "falco"]
         
         provider = extract_provider(finding)
-        assert provider == "wazuh"  # 应该取第一个
+        assert provider == "filebeat"  # 应该取第一个
     
     def test_extract_provider_from_rule_id(self):
         """测试从rule.id推断provider"""
         from app.services.opensearch.analysis import extract_provider
         
         finding = create_test_finding("finding-006")
-        finding["rule"]["id"] = "wazuh-rule-001"
+        finding["rule"]["id"] = "filebeat-rule-001"
         # 移除 custom.finding.providers，确保从 rule.id 推断
         if "custom" in finding and "finding" in finding["custom"]:
             finding["custom"]["finding"].pop("providers", None)
         
         provider = extract_provider(finding)
-        assert provider == "wazuh"
+        assert provider == "filebeat"
     
     def test_merge_findings_single(self):
         """测试合并单个finding（应该直接转换）"""
@@ -312,7 +312,7 @@ class TestAnalysisOperations:
         from app.services.opensearch.analysis import merge_findings
         
         findings = [
-            create_test_finding("finding-008", provider="wazuh"),
+            create_test_finding("finding-008", provider="filebeat"),
             create_test_finding("finding-009", provider="falco"),
         ]
         # 设置相同的technique和host，使它们可以合并
