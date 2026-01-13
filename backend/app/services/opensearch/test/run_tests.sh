@@ -26,18 +26,19 @@ if curl -k -s -u admin:OpenSearch@2024!Dev https://localhost:9200 > /dev/null 2>
 else
     echo -e "${RED}✗ OpenSearch服务不可用${NC}"
     echo "请先启动OpenSearch服务："
-    echo "  docker-compose up -d opensearch"
+    echo "  cd backend && docker compose up -d opensearch"
     exit 1
 fi
 
-# 进入项目目录
-cd "$PROJECT_ROOT/backend"
+# 进入 backend 目录（仓库根目录下的 backend/）
+REPO_ROOT="$( cd "$SCRIPT_DIR/../../../../.." && pwd )"
+cd "$REPO_ROOT/backend"
 
 # 运行单元测试
 echo ""
 echo -e "${YELLOW}运行单元测试...${NC}"
-uv run pytest opensearch/test/test_unit_opensearch.py \
-    opensearch/test/test_analysis_incremental.py \
+uv run pytest app/services/opensearch/test/test_unit_opensearch.py \
+    app/services/opensearch/test/test_analysis_incremental.py \
     -v --tb=short -m "unit" || {
     echo -e "${RED}单元测试失败${NC}"
     exit 1
@@ -46,8 +47,8 @@ uv run pytest opensearch/test/test_unit_opensearch.py \
 # 运行集成测试
 echo ""
 echo -e "${YELLOW}运行集成测试...${NC}"
-uv run pytest opensearch/test/test_system_opensearch.py \
-    opensearch/test/test_integration_full.py \
+uv run pytest app/services/opensearch/test/test_system_opensearch.py \
+    app/services/opensearch/test/test_integration_full.py \
     -v --tb=short -m "integration" || {
     echo -e "${RED}集成测试失败${NC}"
     exit 1
@@ -56,7 +57,7 @@ uv run pytest opensearch/test/test_system_opensearch.py \
 # 生成测试报告
 echo ""
 echo -e "${YELLOW}生成测试报告...${NC}"
-uv run pytest opensearch/test/ \
+uv run pytest app/services/opensearch/test/ \
     --html=test_report.html \
     --self-contained-html \
     --cov=opensearch \

@@ -57,7 +57,8 @@ pytest opensearch/test/test_system_opensearch.py -v
 
 1. **启动OpenSearch服务**
    ```bash
-   docker-compose up -d opensearch
+   cd backend
+   docker compose up -d opensearch
    ```
 
 2. **安装测试依赖**
@@ -80,14 +81,14 @@ pytest opensearch/test/test_system_opensearch.py -v
 
 **Linux/macOS**：
 ```bash
-cd backend/opensearch/test
+cd backend/app/services/opensearch/test
 chmod +x run_tests.sh
 ./run_tests.sh
 ```
 
 **Windows**：
 ```powershell
-cd backend\opensearch\test
+cd backend\app\services\opensearch\test
 .\run_tests.ps1
 ```
 
@@ -320,11 +321,11 @@ jobs:
           pip install uv
           cd backend && uv sync
       - name: Start OpenSearch
-        run: docker-compose up -d opensearch
+        run: cd backend && docker compose up -d opensearch
       - name: Run tests
         run: |
           cd backend
-          uv run pytest opensearch/test/ -v --cov=opensearch --cov-report=xml
+          uv run pytest app/services/opensearch/test/ -v --cov=opensearch --cov-report=xml
       - name: Upload coverage
         uses: codecov/codecov-action@v2
 ```

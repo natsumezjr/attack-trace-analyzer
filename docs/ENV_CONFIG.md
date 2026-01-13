@@ -12,7 +12,8 @@
 
 1. **复制环境变量模板**：
    ```bash
-   cp .env.example .env
+   # Backend Docker Compose 环境变量（推荐）
+   cp backend/.env.example backend/.env
    ```
 
 2. **编辑 `.env` 文件**，根据你的实际环境修改配置
@@ -27,11 +28,11 @@
 
 | 变量名 | 说明 | 默认值 | 使用位置 |
 |--------|------|--------|----------|
-| `OPENSEARCH_NODE` | OpenSearch 节点地址 | `http://localhost:9200` | `backend/app/services/opensearch/client.py` |
+| `OPENSEARCH_NODE` | OpenSearch 节点地址 | `https://localhost:9200` | `backend/app/services/opensearch/client.py` |
 | `OPENSEARCH_USERNAME` | OpenSearch 用户名 | `admin` | `backend/app/services/opensearch/client.py` |
-| `OPENSEARCH_PASSWORD` | OpenSearch 密码 | `OpenSearch@2024!Dev` | `backend/app/services/opensearch/client.py`, `docker-compose.yml` |
-| `OPENSEARCH_INITIAL_ADMIN_PASSWORD` | 容器初始化密码 | `OpenSearch@2024!Dev` | `docker-compose.yml` |
-| `OPENSEARCH_JAVA_OPTS` | JVM 内存配置 | `-Xms512m -Xmx512m` | `docker-compose.yml` |
+| `OPENSEARCH_PASSWORD` | OpenSearch 密码 | `OpenSearch@2024!Dev` | `backend/app/services/opensearch/client.py` |
+| `OPENSEARCH_INITIAL_ADMIN_PASSWORD` | 容器初始化密码 | `OpenSearch@2024!Dev` | `backend/docker-compose.yml` |
+| `OPENSEARCH_JAVA_OPTS` | JVM 内存配置 | `-Xms512m -Xmx512m` | `backend/docker-compose.yml` |
 
 ### Neo4j 配置
 
@@ -39,10 +40,10 @@
 |--------|------|--------|----------|
 | `NEO4J_URI` | Neo4j 连接 URI | `bolt://localhost:7687` | `backend/app/services/graph/api.py` |
 | `NEO4J_USER` | Neo4j 用户名 | `neo4j` | `backend/app/services/graph/api.py` |
-| `NEO4J_PASSWORD` | Neo4j 密码 | `password` | `backend/app/services/graph/api.py`, `docker-compose.yml` |
+| `NEO4J_PASSWORD` | Neo4j 密码 | `password` | `backend/app/services/graph/api.py` |
 | `NEO4J_DATABASE` | Neo4j 数据库名称 | (可选) | `backend/app/services/graph/api.py` |
-| `NEO4J_AUTH` | Neo4j 认证（格式: 用户名/密码） | `neo4j/password` | `docker-compose.yml` |
-| `NEO4J_server_memory_*` | Neo4j 内存配置 | `1G` | `docker-compose.yml` |
+| `NEO4J_AUTH` | Neo4j 认证（格式: 用户名/密码） | `neo4j/password` | `backend/docker-compose.yml` |
+| `NEO4J_server_memory_*` | Neo4j 内存配置 | `1G` | `backend/docker-compose.yml` |
 
 ### Backend 应用配置
 
@@ -92,13 +93,13 @@ node_url = os.getenv("OPENSEARCH_NODE", "http://localhost:9200")
 
 ## Docker Compose 使用
 
-`docker-compose.yml` 已配置为自动加载 `.env` 文件：
+Backend 侧的 Docker Compose 统一入口为：`backend/docker-compose.yml`。
+
+在 `backend/` 目录下，Docker Compose 会自动读取同目录的 `.env`（用于变量替换），你也可以不创建 `.env` 直接使用默认值。
 
 ```yaml
 services:
   opensearch:
-    env_file:
-      - .env
     environment:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}
 ```
@@ -112,7 +113,7 @@ services:
    - 开发环境：`.env`
    - 生产环境：`.env.prod`（需要手动创建）
 3. **敏感信息**：生产环境请使用强密码，不要使用默认密码
-4. **Docker Compose**：确保在运行 `docker-compose up` 之前，`.env` 文件存在于项目根目录
+4. **Docker Compose**：确保在运行 `docker compose up` 之前，`.env` 文件位于 `backend/` 目录（或使用默认值不创建 `.env`）
 
 ## 代码中的环境变量使用情况
 
