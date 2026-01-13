@@ -1,0 +1,25 @@
+title: SSH Tunneling Activity
+id: 5c6d7e8f-9012-3456-5c6d-7e8f90123456
+status: stable
+description: Detects SSH tunneling and port forwarding
+references:
+  - https://attack.mitre.org/techniques/T1572/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    - message|contains: 'ssh -L'
+    - message|contains: 'ssh -R'
+    - message|contains: 'ssh -D'
+    - message|contains: 'LocalForward'
+    - message|contains: 'RemoteForward'
+  condition: selection
+falsepositives:
+  - Legitimate SSH tunneling for administrative purposes
+level: medium
+tags:
+  - attack.command_and_control
+  - attack.t1572

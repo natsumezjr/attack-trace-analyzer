@@ -1,0 +1,23 @@
+title: Hidden File or Directory Creation
+id: 0123456a-b789-cd01-ef23-456789abcdef
+status: stable
+description: Detects creation of hidden files or directories (starting with dot)
+references:
+  - https://attack.mitre.org/techniques/T1564/001/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'mkdir .'
+    - message|contains: 'touch .'
+    - message|contains: 'mv '
+  condition: selection
+falsepositives:
+  - Normal use of hidden files
+level: low
+tags:
+  - attack.defense_evasion
+  - attack.t1564.001

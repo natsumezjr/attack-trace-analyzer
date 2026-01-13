@@ -1,0 +1,29 @@
+title: Suspicious Sudo to Root
+id: 3c4d5e6f-7a8b-9012-3c4d-5e6f7a8b9012
+status: stable
+description: Detects sudo commands executed as root that may indicate privilege escalation
+references:
+  - https://attack.mitre.org/techniques/T1548/003/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    - message|contains|all:
+        - 'sudo'
+        - 'USER=root'
+    - message|contains|all:
+        - 'sudo'
+        - '/bin/bash -i'
+    - message|contains|all:
+        - 'sudo'
+        - '/bin/sh -i'
+  condition: selection
+falsepositives:
+  - Legitimate administrative activities
+level: high
+tags:
+  - attack.privilege_escalation
+  - attack.t1548.003

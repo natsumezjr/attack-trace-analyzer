@@ -1,0 +1,23 @@
+title: Multiple Authentication Methods Used
+id: 1f2e3d4c-5b6a-7980-1e2f-3a4b5c6d7e8f
+status: stable
+description: Detects use of multiple authentication methods (SSH keys, passwords) which may indicate credential testing
+references:
+  - https://attack.mitre.org/techniques/T1078/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    - message|contains: 'publickey'
+    - message|contains: 'keyboard-interactive'
+    - message|contains: 'Accepted password'
+  condition: selection
+falsepositives:
+  - Normal authentication flows
+level: low
+tags:
+  - attack.credential_access
+  - attack.t1078

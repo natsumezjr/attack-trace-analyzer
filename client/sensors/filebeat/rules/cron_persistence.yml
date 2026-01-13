@@ -1,0 +1,25 @@
+title: Cron Job Creation or Modification
+id: 6f7a8b9c-0d1e-2345-6f7a-8b9c0d1e2345
+status: stable
+description: Detects creation or modification of cron jobs which can be used for persistence
+references:
+  - https://attack.mitre.org/techniques/T1053/003/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'crontab'
+    - message|contains: '/etc/cron'
+    - message|contains|all:
+        - 'CRON'
+        - 'CMD'
+  condition: selection
+falsepositives:
+  - Legitimate scheduled tasks
+level: medium
+tags:
+  - attack.persistence
+  - attack.t1053.003

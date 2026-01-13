@@ -563,7 +563,7 @@
 | `event.severity`                   | `long`      |  ✅  | 严重程度（0-100）                             | `70` (高危), `30` (低危)                               |
 | `rule.id`                          | `keyword`   |  ✅  | 规则唯一 ID                                   | `R-DNS-001`, `T1055-001`                               |
 | `rule.name`                        | `keyword`   |  ✅  | 规则名称（人类可读）                          | `DNS Tunnel Suspected`                                   |
-| `rule.ruleset`                     | `keyword`   |  ⭐  | 规则集/引擎                                   | `suricata`, `falco`, `opensearch-security`, `yara` |
+| `rule.ruleset`                     | `keyword`   |  ⭐  | 规则集/引擎                                   | `suricata`, `falco`, `opensearch-security` |
 | `risk.score`                       | `float`     |  ⭐  | 风险分（0-100，可与 `event.severity` 映射） | `80.5`                                                   |
 | `tags`                             | `keyword[]` |  ⭐  | 标签（建议包含 ATT&CK）                       | `["attack.t1055", "attack.ta0005"]`                      |
 | `threat.framework`                 | `keyword`   |  ✅  | 固定为 `MITRE ATT&CK`                       | `MITRE ATT&CK`                                           |
@@ -591,8 +591,6 @@
 | `custom.finding.providers`   | `keyword[]` |  ✅  | 告警来源（检测引擎）                           | `["suricata"]`, `["falco", "security-analytics"]` |
 | `custom.finding.fingerprint` | `keyword`   |  ⭐  | 融合指纹（raw→canonical 去重）                | `fp-a1b2c3d4e5f6a7b8`                               |
 | `custom.evidence.event_ids`  | `keyword[]` |  ⭐  | 证据事件列表（指向 Telemetry 的 `event.id`） | `["evt-123", "evt-456"]`                            |
-| `custom.yara.rule_names`     | `keyword[]` |  ⭐  | YARA 命中规则名列表（指纹证据）                | `["APT29_Dropper", "WebShell_Generic"]`             |
-| `custom.fingerprint.labels`  | `keyword[]` |  ⭐  | 指纹标签（家族/工具/特征）                     | `["APT29", "COZYBEAR"]`                             |
 
 **字段详解**：
 

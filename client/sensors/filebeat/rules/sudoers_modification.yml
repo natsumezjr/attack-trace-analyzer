@@ -1,0 +1,23 @@
+title: Sudoers File Modification
+id: 4d5e6f7a-8b9c-0123-4d5e-6f7a8b9c0123
+status: stable
+description: Detects modifications to sudoers file which controls sudo permissions
+references:
+  - https://attack.mitre.org/techniques/T1548/003/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: '/etc/sudoers'
+    - message|contains: 'visudo'
+    - message|contains: 'sudoers.d'
+  condition: selection
+falsepositives:
+  - Legitimate sudo configuration changes
+level: high
+tags:
+  - attack.privilege_escalation
+  - attack.t1548.003
