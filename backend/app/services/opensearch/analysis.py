@@ -9,7 +9,7 @@ OpenSearch 数据分析模块
 
 import hashlib
 from typing import Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .client import get_client, search, bulk_index, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
@@ -33,6 +33,26 @@ FINDINGS_CACHE_WINDOW_SECONDS = 300  # 5分钟
 # 默认超时设置
 DEFAULT_SCAN_TIMEOUT_SECONDS = 60  # 扫描超时时间（秒）
 DEFAULT_POLL_INTERVAL_SECONDS = 2  # 轮询间隔（秒）
+
+
+def _utc_now_rfc3339() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def fingerprint_id_from_key(fingerprint_key: str) -> str:
+    """
+    将用于分组/融合的“原始指纹 key”转换为 docs 约定的 custom.finding.fingerprint。
+
+    docs/06A-ECS字段规范.md 约定（简化表达）：
+    fingerprint = sha1(technique_id + host + entity + time_bucket)
+
+    当前实现中，generate_fingerprint() 返回的是可读的 key：
+    {technique_id}|{host_id}|{entity_id}|{time_bucket}
+
+    这里按文档语义对其做 sha1，再加上 fp- 前缀，得到可存储/可查询/可展示的 fingerprint。
+    """
+    digest = hashlib.sha1(fingerprint_key.encode("utf-8")).hexdigest()
+    return f"fp-{digest}"
 
 
 def generate_fingerprint(finding: dict[str, Any]) -> str:
@@ -196,6 +216,7 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
 
     # 生成新的 event.id（基于指纹）
     fingerprint = generate_fingerprint(base)
+    base["custom"]["finding"]["fingerprint"] = fingerprint_id_from_key(fingerprint)
     hash_value = hashlib.sha256(fingerprint.encode()).hexdigest()[:16]
     if "event" not in base:
         base["event"] = {}
@@ -215,6 +236,8 @@ def deduplicate_findings() -> dict[str, Any]:
     canonical_index_name = get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today)
 
     try:
+        canonical_ingested_now = _utc_now_rfc3339()
+
         # 查询所有 Raw Findings
         raw_findings = search(
             raw_index_name,
@@ -255,6 +278,7 @@ def deduplicate_findings() -> dict[str, Any]:
                 single["custom"]["finding"]["stage"] = "canonical"
                 if "providers" not in single["custom"]["finding"]:
                     single["custom"]["finding"]["providers"] = [extract_provider(single)]
+                single["custom"]["finding"]["fingerprint"] = fingerprint_id_from_key(fingerprint)
 
                 if "event" in single:
                     single["event"]["dataset"] = "finding.canonical"
@@ -265,14 +289,40 @@ def deduplicate_findings() -> dict[str, Any]:
 
                 canonical_findings.append(single)
 
+        # Canonical Finding 是中心侧生成的“新文档”，入库时间应为生成时刻。
+        # 同时确保三时间字段存在：缺少主时间轴（@timestamp 或可推导字段）则丢弃该 canonical。
+        normalized_canonicals: list[dict[str, Any]] = []
+        for f in canonical_findings:
+            ts = f.get("@timestamp")
+            if not ts:
+                event_obj = f.get("event") if isinstance(f.get("event"), dict) else {}
+                ts = event_obj.get("created") or f.get("event.created")
+            if not ts:
+                continue
+
+            f["@timestamp"] = ts
+
+            event_obj = f.get("event")
+            if not isinstance(event_obj, dict):
+                event_obj = {}
+                f["event"] = event_obj
+
+            if not event_obj.get("created"):
+                event_obj["created"] = ts
+
+            # Decision: canonical 的入库时间为生成时刻（中心侧覆盖）。
+            event_obj["ingested"] = canonical_ingested_now
+
+            normalized_canonicals.append(f)
+
         # 批量写入 Canonical Findings
-        if len(canonical_findings) > 0:
+        if len(normalized_canonicals) > 0:
             documents = [
                 {
                     "id": f.get("event", {}).get("id") or f.get("event.id"),
                     "document": f,
                 }
-                for f in canonical_findings
+                for f in normalized_canonicals
             ]
 
             result = bulk_index(canonical_index_name, documents)
@@ -283,7 +333,7 @@ def deduplicate_findings() -> dict[str, Any]:
             return {
                 "total": len(raw_findings),
                 "merged": merged_count,
-                "canonical": len(canonical_findings),
+                "canonical": len(normalized_canonicals),
                 "errors": result.get("failed", 0),
             }
 
@@ -423,6 +473,13 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
         ecs_finding["custom"]["evidence"] = {
             "event_ids": related_events
         }
+
+    # 为 raw finding 也生成 fingerprint（便于排障与融合去重可观测）
+    try:
+        fp_key = generate_fingerprint(ecs_finding)
+        ecs_finding["custom"]["finding"]["fingerprint"] = fingerprint_id_from_key(fp_key)
+    except Exception:
+        pass
     
     return ecs_finding
 

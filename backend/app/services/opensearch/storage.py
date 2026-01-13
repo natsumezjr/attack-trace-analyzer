@@ -1,10 +1,84 @@
 # OpenSearch 存储相关功能（数据路由、批量存储、去重）
 
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .client import bulk_index, get_document, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
+
+
+def _utc_now_rfc3339() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _to_rfc3339(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        return s.replace("+00:00", "Z")
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    if isinstance(value, (int, float)):
+        # Heuristic: milliseconds if value is large enough.
+        if value > 1e12:
+            ts = datetime.fromtimestamp(float(value) / 1000.0, tz=timezone.utc)
+        else:
+            ts = datetime.fromtimestamp(float(value), tz=timezone.utc)
+        return ts.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return None
+
+
+def _extract_timestamp(doc: dict[str, Any]) -> str | None:
+    ts = _to_rfc3339(doc.get("@timestamp"))
+    if ts:
+        return ts
+
+    event_obj = doc.get("event")
+    if isinstance(event_obj, dict):
+        ts = _to_rfc3339(event_obj.get("created"))
+        if ts:
+            return ts
+
+    # Legacy/alternate: flattened keys.
+    ts = _to_rfc3339(doc.get("event.created"))
+    if ts:
+        return ts
+
+    return None
+
+
+def _normalize_three_timestamps(doc: dict[str, Any], *, ingested_now: str) -> dict[str, Any] | None:
+    """
+    Enforce docs/06A-ECS字段规范.md 三时间字段：
+    - @timestamp: 主时间轴（必须可推导；否则丢弃）
+    - event.created: 观察时间（缺失则回填为 @timestamp）
+    - event.ingested: 中心侧入库时间（总是覆盖为 now）
+    """
+    ts = _extract_timestamp(doc)
+    if not ts:
+        return None
+
+    doc["@timestamp"] = ts
+
+    # Normalize legacy flattened keys into the nested event object.
+    legacy_created = _to_rfc3339(doc.pop("event.created", None))
+    doc.pop("event.ingested", None)
+
+    event_obj = doc.get("event")
+    if not isinstance(event_obj, dict):
+        event_obj = {}
+        doc["event"] = event_obj
+
+    created = _to_rfc3339(event_obj.get("created")) or legacy_created or ts
+    event_obj["created"] = created
+
+    # Decision: center always overwrites event.ingested.
+    event_obj["ingested"] = ingested_now
+
+    return doc
 
 
 def route_to_index(item: dict[str, Any]) -> str:
@@ -65,13 +139,19 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         }
     """
     if len(events) == 0:
-        return {"total": 0, "success": 0, "failed": 0, "duplicated": 0, "details": {}}
+        return {"total": 0, "success": 0, "failed": 0, "duplicated": 0, "dropped": 0, "details": {}}
 
     # 按索引分组，并去重
     index_groups: dict[str, list[dict[str, Any]]] = {}
     total_duplicated = 0
+    total_dropped = 0
+    ingested_now = _utc_now_rfc3339()
 
     for event in events:
+        if _normalize_three_timestamps(event, ingested_now=ingested_now) is None:
+            total_dropped += 1
+            continue
+
         index_name = route_to_index(event)
         event_id = _get_event_id(event)
 
@@ -119,5 +199,6 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "success": total_success,
         "failed": total_failed,
         "duplicated": total_duplicated,
+        "dropped": total_dropped,
         "details": details,
     }
