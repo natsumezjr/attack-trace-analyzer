@@ -1,88 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Tuple
+from typing import Any, List, Sequence, Tuple
 from collections import defaultdict
 from graph.models import GraphNode, GraphEdge, RelType
-
-# ==========================================
-# 中间态数据结构
-# ==========================================
-
-# 连通子图容器:先把要用的节点和边一次性拉到内存里，在内存里建立索引，实现快速查询（空间换时间）
-@dataclass
-class Subgraph:
-    nodes: dict[str, GraphNode] = field(default_factory=dict)
-    edges: list[GraphEdge] = field(default_factory=list)
-    
-    # 邻接表索引：加速查询
-    # key: dst_uid, value: list[GraphEdge] (指向该节点的所有边，即入边)
-    _incoming_index: dict[str, list[GraphEdge]] = field(default_factory=lambda: defaultdict(list))
-
-    def add_node(self, node: GraphNode) -> None:
-        self.nodes[node.uid] = node
-
-    def add_edge(self, edge: GraphEdge) -> None:
-        self.edges.append(edge)
-        self._incoming_index[edge.dst_uid].append(edge)
-
-    def get_node(self, uid: str) -> GraphNode | None:
-        return self.nodes.get(uid)
-
-    def get_incoming_edges(self, node_uid: str) -> list[GraphEdge]:
-        """获取指向该节点的所有边 (用于回溯)"""
-        return self._incoming_index[node_uid]
-
-#    [重构后的KillChain] 纯数据类，只负责存储最终的攻击路径。
-@dataclass
-class CallChain:
-    # 存储结构：直接存由边组成的有序列表，节点信息隐含在边中
-    chain: list[GraphEdge] = field(default_factory=list)
-    @property
-    def length(self) -> int:
-        return len(self.chain)
-
-
-# ==========================================
-# 分析流水线实现 (Pipeline Implementation)
-# ==========================================
-
-#### 1. 数据获取
-def fetch_edges_from_db() -> tuple[list[GraphEdge], list[GraphEdge]]:
-    return [], []
-
-#### 2. 状态机 (构建初步子图)
-def behavior_state_machine(
-    normal_edges: list[GraphEdge], 
-    abnormal_edges: list[GraphEdge]
-) -> list[Subgraph]:
-    """
-    逻辑：根据时序和实体关联，将边聚合成一个个 Subgraph 对象。
-    """
-    subgraphs: list[Subgraph] = []
-    
-    # 示例逻辑
-    for edge in abnormal_edges:
-        sg = Subgraph()
-        sg.add_edge(edge)
-        # 注意：这里也需要 fetch 节点信息并 add_node，暂略
-        subgraphs.append(sg)
-        
-    return subgraphs
-
-#### 3. 子图补全
-def expand_to_complete_subgraph(subgraph: Subgraph) -> Subgraph:
-    """
-    逻辑：拿到 subgraph 里的所有 node uid，去数据库查它们之间漏掉的边，
-    加回到 subgraph 对象中，使其“完全连通”。
-    """
-    # 模拟：此处应该调用 database API 查找更多关联边
-    # new_edges = db.find_edges_between(subgraph.nodes.keys())
-    # for e in new_edges: subgraph.add_edge(e)
-    return subgraph
-
-#### 4. 溯源分析
-
-# 辅助配置与工具
+from backend.graph import api as graph_api
+from backend.graph.models import GraphEdge, RelType
+from backend.graph.utils import _parse_ts_to_float
+from backend.data.attack_fsa import FSAGraph, KillChainEdgeNode
 
 # 1. 基础威胁权重表 (Base Risk Weights)
 BASE_RISK_WEIGHTS: dict[RelType, float] = {
