@@ -42,7 +42,30 @@ def get_client() -> OpenSearch:
     """获取OpenSearch客户端单例"""
     global _opensearch_client
     if _opensearch_client is None:
-        _opensearch_client = OpenSearch(**_get_opensearch_config())
+        config = _get_opensearch_config()
+        # 添加超时设置
+        config["timeout"] = 30  # 总超时30秒（包括连接和读取）
+        config["max_retries"] = 2  # 最多重试2次
+        config["retry_on_timeout"] = True  # 超时时重试
+        config["retry_on_status"] = [502, 503, 504]  # 这些状态码时重试
+        
+        try:
+            _opensearch_client = OpenSearch(**config)
+            # 测试连接
+            _opensearch_client.info()
+        except Exception as e:
+            error_msg = str(e)
+            if 'connection' in error_msg.lower() or 'connect' in error_msg.lower():
+                node_url = os.getenv("OPENSEARCH_NODE", "https://localhost:9200")
+                raise ConnectionError(
+                    f"无法连接到 OpenSearch ({node_url}): {error_msg}\n"
+                    f"请检查：\n"
+                    f"  1. OpenSearch 服务是否运行\n"
+                    f"  2. OPENSEARCH_NODE 环境变量是否正确\n"
+                    f"  3. 网络连接是否正常\n"
+                    f"  4. 防火墙/SSL证书配置"
+                ) from e
+            raise
     return _opensearch_client
 
 

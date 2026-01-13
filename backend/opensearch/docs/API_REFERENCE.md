@@ -4,20 +4,294 @@
 
 ## 📚 目录
 
+- [🚀 前端调用者快速指南](#前端调用者快速指南) ⭐ **推荐从这里开始**
 - [客户端操作](#客户端操作)
 - [索引管理](#索引管理)
 - [存储功能](#存储功能)
 - [数据分析](#数据分析)
 - [索引映射](#索引映射)
 
-（1）前端需要调用的函数
-1. store_events() — 存储事件/告警
-- 接收事件列表，自动路由到对应索引
-- 自动去重（基于 event.id）
-- 返回存储统计
-2. run_data_analysis() — 执行数据分析
-- 告警融合去重（Raw Findings → Canonical Findings）
-- 返回分析结果
+---
+
+## 🚀 前端调用者快速指南
+
+如果你是前端开发者，只需要调用**两个核心函数**即可完成存储和分析功能。
+
+### 核心流程：存储 → 分析
+
+```python
+from opensearch import store_events, run_data_analysis
+
+# 步骤1：存储事件
+events = [
+    {
+        "event": {
+            "id": "evt-001",
+            "kind": "event",  # 普通事件
+            "created": "2026-01-13T10:00:00Z",
+        },
+        "host": {"name": "server-01"},
+        "message": "用户登录",
+        # ... 其他字段
+    },
+    # ... 更多事件
+]
+
+# 存储事件（自动路由和去重）
+storage_result = store_events(events)
+print(f"存储成功: {storage_result['success']} 个")
+print(f"重复跳过: {storage_result['duplicated']} 个")
+
+# 步骤2：执行分析（检测 + 去重）
+analysis_result = run_data_analysis(trigger_scan=True)
+print(f"检测成功: {analysis_result['detection']['success']}")
+print(f"原始告警: {analysis_result['deduplication']['total']} 个")
+print(f"规范告警: {analysis_result['deduplication']['canonical']} 个")
+```
+
+### 函数1：`store_events()` - 存储事件
+
+**作用**：存储事件到OpenSearch，自动路由到对应索引并去重
+
+**参数**：
+- `events`: 事件列表（每个事件是字典）
+
+**返回值**：
+```python
+{
+    "total": 10,           # 总事件数
+    "success": 8,           # 成功存储数（去重后）
+    "failed": 0,            # 失败数
+    "duplicated": 2,        # 重复数（被丢弃的）
+    "details": {            # 每个索引的详细统计
+        "ecs-events-2026-01-13": {
+            "success": 5,
+            "failed": 0,
+            "duplicated": 0
+        }
+    }
+}
+```
+
+**自动路由规则**：
+- `event.kind == "event"` → `ecs-events-*` 索引
+- `event.kind == "alert"` + `event.dataset == "finding.canonical"` → `canonical-findings-*` 索引
+- `event.kind == "alert"` + 其他 → `raw-findings-*` 索引
+
+**自动去重**：
+- 根据 `event.id` 检查是否已存在
+- 如果已存在，自动跳过（不报错）
+- `duplicated` 字段会告诉你跳过了多少重复事件
+
+**完整示例**：
+```python
+from opensearch import store_events
+from datetime import datetime
+
+events = [
+    {
+        "ecs": {"version": "9.2.0"},
+        "@timestamp": datetime.now().isoformat() + "Z",
+        "event": {
+            "id": "evt-001",
+            "kind": "event",
+            "created": datetime.now().isoformat() + "Z",
+            "category": ["network"],
+            "type": ["info"],
+        },
+        "host": {
+            "id": "h-001",
+            "name": "server-01"
+        },
+        "message": "DNS查询",
+        "dns": {
+            "question": {
+                "name": "example.com",
+                "type": "A"
+            }
+        }
+    }
+]
+
+result = store_events(events)
+if result['success'] > 0:
+    print(f"✅ 成功存储 {result['success']} 个事件")
+if result['duplicated'] > 0:
+    print(f"ℹ️  跳过 {result['duplicated']} 个重复事件")
+```
+
+### 函数2：`run_data_analysis()` - 执行分析
+
+**作用**：执行完整的数据分析流程，包括：
+1. Security Analytics 检测（扫描事件，生成原始告警）
+2. 告警融合去重（将相似的告警合并成规范告警）
+
+**参数**：
+- `trigger_scan`: 是否触发Security Analytics扫描（默认 `True`）
+  - `True`: 立即触发扫描，生成新的findings
+  - `False`: 只执行去重，不触发新扫描（使用已有findings）
+
+**返回值**：
+```python
+{
+    "detection": {
+        "success": True,
+        "findings_count": 36,      # 检测到的findings数量
+        "stored": 36,               # 存储到raw-findings的数量
+        "converted_count": 36,      # 转换为ECS格式的数量
+        "duplicated": 0,            # 重复跳过的数量
+        "scan_requested": True,      # 是否请求了扫描
+        "scan_completed": True,      # 扫描是否完成
+        "scan_wait_ms": 1234,       # 等待扫描完成的时间（毫秒）
+        "source": "triggered_scan"  # 数据来源：triggered_scan / cached_findings
+    },
+    "deduplication": {
+        "total": 36,                # Raw Findings总数
+        "merged": 36,                # 被合并的告警数
+        "canonical": 1,              # 生成的Canonical Findings数量
+        "errors": 0                  # 错误数量
+    }
+}
+```
+
+**工作流程**：
+1. **检测阶段**：
+   - 触发Security Analytics扫描（如果 `trigger_scan=True`）
+   - 等待扫描完成（自动轮询）
+   - 获取findings并转换为ECS格式
+   - 存储到 `raw-findings-*` 索引
+
+2. **去重阶段**：
+   - 从 `raw-findings-*` 读取所有告警
+   - 根据指纹算法识别相似告警（相同攻击技术、相同主机、相同实体、相同时间窗口）
+   - 合并相似告警为一条Canonical Finding
+   - 存储到 `canonical-findings-*` 索引
+
+**完整示例**：
+```python
+from opensearch import run_data_analysis
+
+# 执行完整分析（检测 + 去重）
+result = run_data_analysis(trigger_scan=True)
+
+# 检查检测结果
+detection = result['detection']
+if detection['success']:
+    print(f"✅ 检测成功")
+    print(f"   Findings数量: {detection['findings_count']}")
+    print(f"   存储成功: {detection['stored']} 个")
+    print(f"   扫描耗时: {detection['scan_wait_ms']} 毫秒")
+else:
+    print(f"❌ 检测失败: {detection.get('message', '未知错误')}")
+
+# 检查去重结果
+dedup = result['deduplication']
+print(f"\n📊 去重结果:")
+print(f"   原始告警: {dedup['total']} 个")
+print(f"   合并数: {dedup['merged']} 个")
+print(f"   规范告警: {dedup['canonical']} 个")
+```
+
+### 查询结果
+
+存储和分析完成后，可以查询结果：
+
+```python
+from opensearch import search, get_index_name, INDEX_PATTERNS
+from datetime import datetime
+
+today = datetime.now()
+
+# 查询规范告警（最终结果）
+canonical_index = get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today)
+canonical_findings = search(canonical_index, {"match_all": {}}, size=100)
+
+for finding in canonical_findings:
+    print(f"告警: {finding.get('rule', {}).get('name', 'Unknown')}")
+    print(f"  严重程度: {finding.get('event', {}).get('severity', 'N/A')}")
+    print(f"  来源: {finding.get('custom', {}).get('finding', {}).get('providers', [])}")
+```
+
+### 常见问题
+
+**Q: 什么时候调用 `store_events()`？**
+- 当你有新的事件数据需要存储时（比如从客户端收集到的日志、告警等）
+
+**Q: 什么时候调用 `run_data_analysis()`？**
+- 存储完事件后，需要进行分析时
+- 可以定期调用（比如每分钟、每5分钟）
+- 前端触发分析按钮时
+
+**Q: `trigger_scan=True` 和 `False` 的区别？**
+- `True`: 立即触发Security Analytics扫描，生成新的findings（推荐）
+- `False`: 只执行去重，不触发新扫描（如果findings已经存在且较新，可以使用这个）
+
+**Q: 如何知道分析是否成功？**
+- 检查 `result['detection']['success']` 和 `result['deduplication']['canonical'] > 0`
+
+**Q: 重复事件会被存储吗？**
+- 不会，`store_events()` 会自动去重，重复的事件会被跳过（`duplicated` 字段会告诉你跳过了多少）
+
+---
+
+## 📋 部署指南
+
+如果你是第一次部署项目，需要先完成以下步骤：
+
+### 1. 初始化索引
+
+```python
+from opensearch import initialize_indices
+
+# 创建所有需要的索引
+initialize_indices()
+```
+
+### 2. 导入Sigma规则（可选）
+
+如果需要使用Security Analytics检测，需要先导入规则：
+
+```bash
+cd backend/opensearch
+python import_sigma_rules.py --category dns
+python import_sigma_rules.py --category windows
+# ... 根据需要导入其他类别
+```
+
+### 3. 创建Detector（可选）
+
+如果需要使用Security Analytics检测，需要创建detector：
+
+```bash
+cd backend/opensearch
+python setup_security_analytics.py
+```
+
+### 4. 验证部署
+
+```python
+from opensearch import store_events, run_data_analysis
+
+# 测试存储
+test_events = [{
+    "event": {
+        "id": "test-001",
+        "kind": "event",
+        "created": "2026-01-13T10:00:00Z",
+    },
+    "host": {"name": "test"},
+}]
+result = store_events(test_events)
+print(f"存储测试: {result['success']} 个成功")
+
+# 测试分析
+result = run_data_analysis(trigger_scan=True)
+print(f"分析测试: {result['deduplication']['canonical']} 个规范告警")
+```
+
+---
+
+**详细部署步骤请参考：[部署指南](./DEPLOYMENT.md)**
 
 
 （2）函数索引
@@ -203,6 +477,21 @@ events = search(index_name, {
         "must": [
             {"term": {"event.kind": "event"}},
             {"term": {"host.name": "test-host"}}
+        ]
+    }
+})
+
+# 5. 只查询 Canonical Findings（规范告警）
+canonical_index = get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"])
+canonical_findings = search(canonical_index, {"match_all": {}}, size=100)
+
+# 或者通过字段过滤查询 Canonical Findings
+canonical_findings = search(index_name, {
+    "bool": {
+        "must": [
+            {"term": {"event.dataset": "finding.canonical"}},
+            # 或者使用 custom.finding.stage
+            # {"term": {"custom.finding.stage": "canonical"}}
         ]
     }
 })
@@ -683,12 +972,12 @@ index = route_to_index(alert)
 
 ## 数据分析
 
-### `run_data_analysis() -> dict`
+### `run_data_analysis(trigger_scan: bool = True) -> dict`
 
 **这个函数是干什么的？**
 
 执行完整的数据分析流程，包括：
-1. Security Analytics 检测（当前为 MVP 版本）
+1. Security Analytics 检测（扫描事件，生成原始告警）
 2. 告警融合去重（Raw Findings → Canonical Findings）
 
 **为什么需要这个？**
@@ -696,41 +985,83 @@ index = route_to_index(alert)
 - 一键执行所有分析任务
 - 自动化处理流程
 - 适合定时任务或批量处理
+- 前端调用者只需要调用这一个函数即可完成分析
+
+**参数：**
+- `trigger_scan`: 是否触发Security Analytics扫描（默认 `True`）
+  - `True`: 立即触发扫描，生成新的findings（推荐）
+  - `False`: 只执行去重，不触发新扫描（使用已有findings）
 
 **返回值：**
 ```python
 {
     "detection": {
-        "success": True,
-        "message": "Security Analytics 检测需要先配置 detector（当前为 MVP 版本）"
+        "success": True,                    # 是否成功
+        "findings_count": 36,               # 检测到的findings数量
+        "stored": 36,                       # 存储到raw-findings的数量
+        "converted_count": 36,              # 转换为ECS格式的数量
+        "duplicated": 0,                    # 重复跳过的数量
+        "scan_requested": True,             # 是否请求了扫描
+        "scan_completed": True,             # 扫描是否完成
+        "scan_wait_ms": 1234,               # 等待扫描完成的时间（毫秒）
+        "source": "triggered_scan"          # 数据来源：triggered_scan / cached_findings
     },
     "deduplication": {
-        "total": 10,        # Raw Findings 总数
-        "merged": 8,        # 被合并的告警数
-        "canonical": 5,     # 生成的 Canonical Findings 数量
-        "errors": 0         # 错误数量
+        "total": 36,                        # Raw Findings 总数
+        "merged": 36,                       # 被合并的告警数
+        "canonical": 1,                     # 生成的 Canonical Findings 数量
+        "errors": 0                         # 错误数量
     }
 }
 ```
+
+**工作流程：**
+
+1. **检测阶段**（如果 `trigger_scan=True`）：
+   - 触发Security Analytics扫描（通过workflow执行）
+   - 等待扫描完成（自动轮询findings数量变化）
+   - 获取findings并转换为ECS格式
+   - 存储到 `raw-findings-*` 索引
+
+2. **去重阶段**：
+   - 从 `raw-findings-*` 读取所有告警
+   - 根据指纹算法识别相似告警（相同攻击技术、相同主机、相同实体、相同时间窗口）
+   - 合并相似告警为一条Canonical Finding
+   - 存储到 `canonical-findings-*` 索引
 
 **示例：**
 
 ```python
 from opensearch import run_data_analysis
 
-# 执行完整的数据分析
-result = run_data_analysis()
+# 执行完整的数据分析（触发扫描）
+result = run_data_analysis(trigger_scan=True)
 
-print("检测阶段:", result["detection"]["success"])
-print("去重阶段:")
-print(f"  原始告警: {result['deduplication']['total']}")
-print(f"  合并数: {result['deduplication']['merged']}")
-print(f"  规范告警: {result['deduplication']['canonical']}")
+# 检查检测结果
+detection = result["detection"]
+if detection["success"]:
+    print(f"✅ 检测成功")
+    print(f"   Findings数量: {detection['findings_count']}")
+    print(f"   存储成功: {detection['stored']} 个")
+    print(f"   扫描耗时: {detection['scan_wait_ms']} 毫秒")
+else:
+    print(f"❌ 检测失败: {detection.get('message', '未知错误')}")
+
+# 检查去重结果
+dedup = result["deduplication"]
+print(f"\n📊 去重结果:")
+print(f"   原始告警: {dedup['total']} 个")
+print(f"   合并数: {dedup['merged']} 个")
+print(f"   规范告警: {dedup['canonical']} 个")
+
+# 只执行去重，不触发新扫描（如果findings已存在）
+result = run_data_analysis(trigger_scan=False)
 ```
 
 **注意：**
-- Security Analytics 检测当前为 MVP 版本，需要手动配置 detector
-- 主要功能是告警融合去重
+- 需要先配置Detector（参考[部署指南](./DEPLOYMENT.md)）
+- 如果findings较新（<5分钟），会自动使用已有findings，避免重复扫描
+- 扫描会自动等待完成，无需手动轮询
 
 ---
 

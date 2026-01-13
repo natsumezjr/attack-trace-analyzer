@@ -934,7 +934,7 @@ export OPENSEARCH_PASSWORD=OpenSearch@2024!Dev
 ### 7.3 相关文档
 
 - [OpenSearch 模块 README](../README.md)
-- [OpenSearch API 参考](../API_REFERENCE.md)
+- [OpenSearch API 参考](../docs/API_REFERENCE.md)
 
 ---
 

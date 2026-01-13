@@ -185,7 +185,7 @@ pytest 配置文件，提供以下 fixtures：
 
 - [详细测试文档](./TEST_DOCUMENTATION.md) - 包含所有测试用例的详细说明
 - [OpenSearch 模块 README](../README.md) - 模块使用说明
-- [OpenSearch API 参考](../API_REFERENCE.md) - API 文档
+- [OpenSearch API 参考](../docs/API_REFERENCE.md) - API 文档
 
 ## 🎯 下一步
 

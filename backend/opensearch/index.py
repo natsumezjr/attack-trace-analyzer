@@ -24,10 +24,17 @@ INDEX_PATTERNS = {
 
 
 def get_index_name(pattern: str, date: Optional[datetime] = None) -> str:
-    """生成带日期的索引名（用于时间序列索引）"""
+    """
+    生成带日期的索引名（用于时间序列索引）
+    
+    重要：使用连字符而非点号，避免Security Analytics doc-level monitor的pattern检测
+    - 旧格式（有问题）：ecs-events-2026.01.13（包含点号，会被当作pattern）
+    - 新格式（正确）：ecs-events-2026-01-13（连字符，doc-level monitor接受）
+    """
     if date is None:
         date = datetime.now()
-    date_str = date.strftime("%Y.%m.%d")
+    # 使用连字符而非点号，避免doc-level monitor的pattern检测问题
+    date_str = date.strftime("%Y-%m-%d")
     return f"{pattern}-{date_str}"
 
 

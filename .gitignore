@@ -42,7 +42,10 @@ pip-wheel-metadata/
 venv/
 ENV/
 env/
+
+# Environment variables
 .env
+!.env.example
 
 # Testing / tooling caches
 .pytest_cache/
@@ -62,6 +65,10 @@ coverage.xml
 
 # Local scratch
 .context/
+
+# --- OpenSearch ---
+# Sigma规则库（使用git submodule管理，不直接提交）
+# backend/opensearch/sigma-rules/
 
 # --- Node.js / Next.js ---
 node_modules/
