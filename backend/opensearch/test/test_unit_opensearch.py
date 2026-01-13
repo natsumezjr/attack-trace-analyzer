@@ -18,8 +18,10 @@ from typing import Any
 
 # 添加父目录到路径，以便导入 opensearch 模块
 test_dir = Path(__file__).parent
-parent_dir = test_dir.parent
-sys.path.insert(0, str(parent_dir))
+parent_dir = test_dir.parent  # backend/opensearch
+backend_dir = parent_dir.parent  # backend
+sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
+sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
 
 # 添加 test 目录到路径，以便导入 test_utils
 sys.path.insert(0, str(test_dir))
@@ -86,26 +88,28 @@ class TestIndexManagement:
     
     def test_get_index_name(self):
         """测试生成索引名（带日期后缀）"""
-        from opensearch.index import get_index_name, INDEX_PATTERNS
+        from opensearch import get_index_name, INDEX_PATTERNS
         
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
         assert index_name.startswith("ecs-events-")
-        assert today.strftime("%Y.%m.%d") in index_name
+        # 检查日期格式（使用连字符）
+        assert today.strftime("%Y-%m-%d") in index_name
     
     def test_get_index_name_default_date(self):
         """测试生成索引名（使用默认日期）"""
-        from opensearch.index import get_index_name, INDEX_PATTERNS
+        from opensearch import get_index_name, INDEX_PATTERNS
         
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"])
         
         assert index_name.startswith("ecs-events-")
-        assert datetime.now().strftime("%Y.%m.%d") in index_name
+        # 检查日期格式（使用连字符）
+        assert datetime.now().strftime("%Y-%m-%d") in index_name
     
     def test_hash_token(self):
         """测试token哈希生成"""
-        from opensearch.index import hash_token
+        from opensearch import hash_token
         
         token = "test-token-123"
         hash1 = hash_token(token)
@@ -139,7 +143,7 @@ class TestStorageOperations:
     
     def test_route_to_index_event(self):
         """测试事件路由到ecs-events索引"""
-        from opensearch.storage import route_to_index
+        from opensearch import route_to_index
         
         event = create_test_event("evt-001", kind="event")
         index_name = route_to_index(event)
@@ -148,7 +152,7 @@ class TestStorageOperations:
     
     def test_route_to_index_raw_finding(self):
         """测试原始告警路由到raw-findings索引"""
-        from opensearch.storage import route_to_index
+        from opensearch import route_to_index
         
         finding = create_test_finding("finding-001")
         index_name = route_to_index(finding)
@@ -157,7 +161,7 @@ class TestStorageOperations:
     
     def test_route_to_index_canonical_finding(self):
         """测试规范告警路由到canonical-findings索引"""
-        from opensearch.storage import route_to_index
+        from opensearch import route_to_index
         
         finding = create_test_finding("finding-001")
         finding["event"]["dataset"] = "finding.canonical"

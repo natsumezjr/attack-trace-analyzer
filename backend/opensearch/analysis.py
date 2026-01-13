@@ -9,7 +9,7 @@ OpenSearch 数据分析模块
 
 import hashlib
 from typing import Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .client import get_client, search, bulk_index, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
@@ -499,6 +499,473 @@ def _get_latest_findings_count(client, detector_id: str) -> int:
         return 0
 
 
+# ========== 辅助函数：查询detector相关 ==========
+
+def _get_detector_id(client) -> Optional[str]:
+    """获取第一个detector的ID"""
+    try:
+        detector_resp = client.transport.perform_request(
+            'POST',
+            SA_DETECTORS_SEARCH_API,
+            body={"query": {"match_all": {}}, "size": 1}
+        )
+        detector_hits = detector_resp.get('hits', {}).get('hits', [])
+        return detector_hits[0].get('_id') if detector_hits else None
+    except Exception:
+        return None
+
+
+def _get_detector_details(client, detector_id: str) -> Optional[dict]:
+    """获取detector详情"""
+    try:
+        detector_resp = client.transport.perform_request(
+            'GET',
+            SA_DETECTOR_GET_API.format(detector_id=detector_id)
+        )
+        return detector_resp.get('detector', {})
+    except Exception:
+        return None
+
+
+def _should_trigger_scan(trigger_scan: bool, baseline_count: int) -> bool:
+    """判断是否需要触发新扫描"""
+    return trigger_scan and baseline_count == 0
+
+
+# ========== 辅助函数：触发扫描相关 ==========
+
+def _enable_detector_if_needed(client, detector_id: str, detector: dict) -> None:
+    """确保detector已启用"""
+    if detector.get('enabled', False):
+        return
+    
+    print(f"[INFO] 启用detector: {detector_id}")
+    try:
+        client.transport.perform_request(
+            'PUT',
+            SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
+            body={**detector, "enabled": True}
+        )
+    except Exception as enable_error:
+        print(f"[WARNING] 启用detector失败: {enable_error}")
+
+
+def _temporarily_shorten_schedule(client, detector_id: str, detector: dict) -> tuple[dict, bool]:
+    """
+    临时缩短schedule以触发扫描
+    
+    返回: (original_schedule, was_shortened)
+    """
+    schedule = detector.get('schedule', {})
+    original_schedule = schedule.copy()
+    original_interval = schedule.get('period', {}).get('interval', 24)
+    original_unit = schedule.get('period', {}).get('unit', 'HOURS')
+    
+    # 如果schedule间隔较长（>1小时），临时缩短为1分钟
+    if original_unit == 'HOURS' and original_interval >= 1:
+        print(f"[INFO] 临时缩短detector schedule以触发扫描...")
+        
+        temp_schedule = {"period": {"interval": 1, "unit": "MINUTES"}}
+        
+        try:
+            client.transport.perform_request(
+                'PUT',
+                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
+                body={**detector, "schedule": temp_schedule, "enabled": True}
+            )
+            print(f"[INFO] Schedule已临时设置为1分钟")
+            return original_schedule, True
+        except Exception as e:
+            print(f"[WARNING] 设置临时schedule失败: {e}")
+            return original_schedule, False
+    
+    return original_schedule, False
+
+
+def _restore_schedule(client, detector_id: str, original_schedule: dict) -> None:
+    """恢复原始schedule"""
+    try:
+        print(f"[INFO] 准备恢复schedule...")
+        # 重新获取detector最新状态（避免覆盖其他修改）
+        latest_resp = client.transport.perform_request(
+            'POST',
+            SA_DETECTORS_SEARCH_API,
+            body={"query": {"term": {"_id": detector_id}}, "size": 1}
+        )
+        latest_hits = latest_resp.get('hits', {}).get('hits', [])
+        
+        if not latest_hits:
+            print(f"[WARNING] 无法获取detector最新状态，schedule可能未恢复")
+            return
+        
+        latest_detector = latest_hits[0].get('_source', {})
+        original_interval = original_schedule.get('period', {}).get('interval', 24)
+        original_unit = original_schedule.get('period', {}).get('unit', 'HOURS')
+        
+        # 恢复原始schedule
+        client.transport.perform_request(
+            'PUT',
+            SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
+            body={**latest_detector, "schedule": original_schedule, "enabled": True}
+        )
+        print(f"[INFO] Schedule已恢复为{original_interval} {original_unit}")
+        
+    except Exception as restore_error:
+        print(f"[ERROR] 恢复schedule失败: {restore_error}")
+        print(f"[WARNING] Detector schedule可能仍为1分钟，需要手动检查")
+
+
+def _poll_for_scan_completion(
+    client, 
+    detector_id: str, 
+    baseline_count: int, 
+    max_wait_seconds: int
+) -> tuple[bool, int]:
+    """
+    轮询确认扫描完成
+    
+    返回: (scan_completed, scan_wait_ms)
+    """
+    import time
+    
+    start_time = time.time()
+    print(f"[INFO] 开始轮询确认扫描完成（最多等待{max_wait_seconds}秒）...")
+    
+    while (time.time() - start_time) < max_wait_seconds:
+        time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
+        
+        current_count = _get_latest_findings_count(client, detector_id)
+        
+        if current_count > baseline_count:
+            scan_wait_ms = int((time.time() - start_time) * 1000)
+            print(f"[INFO] 扫描完成！Findings更新: {baseline_count} -> {current_count}")
+            return True, scan_wait_ms
+        
+        elapsed = int(time.time() - start_time)
+        if elapsed % 10 == 0:
+            print(f"[INFO] 等待扫描完成... ({elapsed}/{max_wait_seconds}秒)")
+    
+    scan_wait_ms = int((time.time() - start_time) * 1000)
+    print(f"[WARNING] 扫描超时（{scan_wait_ms}ms），可能未完成")
+    return False, scan_wait_ms
+
+
+def _trigger_scan_with_lock(
+    client,
+    detector_id: str,
+    detector: dict,
+    baseline_count: int,
+    max_wait_seconds: int
+) -> dict[str, Any]:
+    """
+    使用锁机制触发扫描
+    
+    返回: {
+        "scan_requested": bool,
+        "scan_completed": bool,
+        "scan_wait_ms": int,
+        "source": str
+    }
+    """
+    import time
+    from .trigger_lock import get_detector_lock, register_trigger, complete_trigger
+    
+    # 单飞模式：检查是否有其他线程正在触发
+    is_leader, wait_event = register_trigger(detector_id, timeout_seconds=max_wait_seconds)
+    
+    if not is_leader:
+        print(f"[INFO] 其他线程正在触发detector，等待结果...")
+        wait_event.wait(timeout=max_wait_seconds)
+        print(f"[INFO] 等待完成，继续查询findings")
+        return {
+            "scan_requested": False,
+            "scan_completed": False,
+            "scan_wait_ms": 0,
+            "source": "cached_findings"
+        }
+    
+    print(f"[INFO] 当前线程负责触发detector: {detector_id}")
+    detector_lock = get_detector_lock(detector_id)
+    original_schedule = None
+    schedule_was_shortened = False
+    
+    try:
+        with detector_lock:
+            # 确保detector已启用
+            _enable_detector_if_needed(client, detector_id, detector)
+            
+            # 临时缩短schedule
+            original_schedule, schedule_was_shortened = _temporarily_shorten_schedule(
+                client, detector_id, detector
+            )
+            
+            if schedule_was_shortened:
+                # 轮询确认扫描完成
+                scan_completed, scan_wait_ms = _poll_for_scan_completion(
+                    client, detector_id, baseline_count, max_wait_seconds
+                )
+                source = "triggered_scan" if scan_completed else "cached_findings"
+            else:
+                print(f"[INFO] Detector schedule已较短，等待自动扫描...")
+                time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
+                scan_completed = False
+                scan_wait_ms = 0
+                source = "cached_findings"
+        
+        return {
+            "scan_requested": True,
+            "scan_completed": scan_completed,
+            "scan_wait_ms": scan_wait_ms,
+            "source": source
+        }
+    
+    finally:
+        # 确保恢复schedule
+        if schedule_was_shortened and original_schedule:
+            _restore_schedule(client, detector_id, original_schedule)
+        
+        # 标记触发完成
+        complete_trigger(detector_id)
+
+
+# ========== 辅助函数：增量处理状态管理 ==========
+
+def _get_last_processed_timestamp(client, detector_id: str) -> Optional[datetime]:
+    """
+    获取上次处理findings的时间戳
+    
+    参数：
+    - client: OpenSearch客户端
+    - detector_id: Detector ID
+    
+    返回：
+    - 上次处理的时间戳（如果不存在则返回None）
+    """
+    from .index import INDEX_PATTERNS, get_index_name
+    
+    try:
+        # 查询raw-findings索引中该detector的最新finding时间戳
+        index_pattern = INDEX_PATTERNS["RAW_FINDINGS"]
+        today = datetime.now()
+        
+        # 查询最近7天的索引（避免遗漏跨天数据）
+        latest_timestamp = None
+        for days_back in range(7):
+            check_date = datetime(today.year, today.month, today.day) - timedelta(days=days_back)
+            index_name = get_index_name(index_pattern, check_date)
+            
+            try:
+                # 查询该索引中该detector的最新finding
+                search_resp = client.transport.perform_request(
+                    'POST',
+                    f'/{index_name}/_search',
+                    body={
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {"term": {"custom.finding.detector_id": detector_id}},
+                                    {"exists": {"field": "@timestamp"}}
+                                ]
+                            }
+                        },
+                        "size": 1,
+                        "sort": [{"@timestamp": {"order": "desc"}}]
+                    }
+                )
+                
+                hits = search_resp.get('hits', {}).get('hits', [])
+                if hits:
+                    doc = hits[0].get('_source', {})
+                    timestamp_str = doc.get('@timestamp')
+                    if timestamp_str:
+                        if isinstance(timestamp_str, str):
+                            ts = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        elif isinstance(timestamp_str, datetime):
+                            ts = timestamp_str
+                        else:
+                            continue
+                        
+                        if latest_timestamp is None or ts > latest_timestamp:
+                            latest_timestamp = ts
+            except Exception:
+                # 索引可能不存在，继续查询下一个
+                continue
+        
+        return latest_timestamp
+    except Exception:
+        return None
+
+
+def _filter_new_findings(findings: list[dict[str, Any]], last_timestamp: Optional[datetime]) -> list[dict[str, Any]]:
+    """
+    过滤出新的findings（时间戳大于last_timestamp）
+    
+    参数：
+    - findings: findings列表
+    - last_timestamp: 上次处理的时间戳
+    
+    返回：
+    - 新的findings列表
+    """
+    if last_timestamp is None:
+        # 如果没有上次处理时间，返回所有findings
+        return findings
+    
+    new_findings = []
+    for finding in findings:
+        timestamp_value = finding.get('timestamp') or finding.get('@timestamp')
+        if not timestamp_value:
+            # 如果没有时间戳，保守处理：包含它
+            new_findings.append(finding)
+            continue
+        
+        # 解析时间戳
+        try:
+            if isinstance(timestamp_value, str):
+                finding_ts = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+            elif isinstance(timestamp_value, datetime):
+                finding_ts = timestamp_value
+            elif isinstance(timestamp_value, (int, float)):
+                # 假设是毫秒时间戳
+                if timestamp_value > 1e12:
+                    finding_ts = datetime.fromtimestamp(timestamp_value / 1000)
+                else:
+                    finding_ts = datetime.fromtimestamp(timestamp_value)
+            else:
+                # 无法解析，保守处理：包含它
+                new_findings.append(finding)
+                continue
+            
+            # 只包含时间戳大于上次处理时间的finding
+            # 使用微秒精度比较，避免边界问题
+            if finding_ts > last_timestamp:
+                new_findings.append(finding)
+        except Exception:
+            # 解析失败，保守处理：包含它
+            new_findings.append(finding)
+    
+    return new_findings
+
+
+# ========== 辅助函数：查询和存储findings ==========
+
+def _fetch_and_store_findings(client, detector_id: str, only_new: bool = True) -> dict[str, Any]:
+    """
+    查询findings并存储（支持增量处理）
+    
+    参数：
+    - client: OpenSearch客户端
+    - detector_id: Detector ID
+    - only_new: 是否只处理新的findings（默认True，避免重复处理）
+    
+    返回: {
+        "success": bool,
+        "findings_count": int,        # 查询到的findings总数
+        "new_findings_count": int,     # 新的findings数量（过滤后）
+        "stored": int,
+        "failed": int,
+        "duplicated": int,
+        "message": str
+    }
+    """
+    from .storage import store_events
+    
+    # 获取上次处理的时间戳
+    last_timestamp = None
+    if only_new:
+        last_timestamp = _get_last_processed_timestamp(client, detector_id)
+        if last_timestamp:
+            print(f"[INFO] 上次处理时间: {last_timestamp.isoformat()}，将只处理新findings")
+        else:
+            print(f"[INFO] 未找到上次处理时间，将处理所有findings")
+    
+    try:
+        findings_resp = client.transport.perform_request(
+            'GET',
+            SA_FINDINGS_SEARCH_API,
+            params={'detector_id': detector_id, 'size': 1000}
+        )
+        findings = findings_resp.get('findings', [])
+        print(f"[INFO] 从Security Analytics API获取到 {len(findings)} 个findings")
+        
+    except Exception as api_error:
+        error_msg = str(api_error)
+        if '404' in error_msg or 'not found' in error_msg.lower():
+            return {
+                "success": False,
+                "message": "Security Analytics 插件未安装或未启用",
+                "findings_count": 0,
+                "new_findings_count": 0,
+                "stored": 0,
+                "failed": 0,
+                "duplicated": 0
+            }
+        raise
+    
+    if not findings:
+        return {
+            "success": True,
+            "message": "没有findings",
+            "findings_count": 0,
+            "new_findings_count": 0,
+            "stored": 0,
+            "failed": 0,
+            "duplicated": 0
+        }
+    
+    # 过滤出新的findings（如果启用增量处理）
+    new_findings = findings
+    if only_new and last_timestamp:
+        new_findings = _filter_new_findings(findings, last_timestamp)
+        skipped_count = len(findings) - len(new_findings)
+        if skipped_count > 0:
+            print(f"[INFO] 跳过 {skipped_count} 个已处理的findings，剩余 {len(new_findings)} 个新findings")
+    
+    if not new_findings:
+        return {
+            "success": True,
+            "message": "没有新的findings需要处理",
+            "findings_count": len(findings),
+            "new_findings_count": 0,
+            "stored": 0,
+            "failed": 0,
+            "duplicated": 0
+        }
+    
+    # 转换为ECS格式并存储
+    converted_findings = []
+    for finding in new_findings:
+        try:
+            ecs_finding = _convert_security_analytics_finding_to_ecs(finding)
+            converted_findings.append(ecs_finding)
+        except Exception as convert_error:
+            print(f"[WARNING] 转换finding失败，跳过: {convert_error}")
+            continue
+    
+    if not converted_findings:
+        return {
+            "success": True,
+            "message": "没有可转换的findings",
+            "findings_count": len(findings),
+            "new_findings_count": len(new_findings),
+            "stored": 0,
+            "failed": 0,
+            "duplicated": 0
+        }
+    
+    result = store_events(converted_findings)
+    
+    return {
+        "success": True,
+        "message": f"成功读取并存储 {result['success']} 条findings（共查询到 {len(findings)} 条，其中 {len(new_findings)} 条为新findings）",
+        "findings_count": len(findings),
+        "new_findings_count": len(new_findings),
+        "stored": result['success'],
+        "failed": result.get('failed', 0),
+        "duplicated": result.get('duplicated', 0)
+    }
+
+
 def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60) -> dict[str, Any]:
     """
     运行 OpenSearch Security Analytics 检测并读取结果写入 raw-findings-*
@@ -509,6 +976,7 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
     3. **使用锁防止并发冲突**
     4. **轮询确认扫描完成**（而不是固定sleep）
     5. **确保schedule恢复**（try/finally）
+    6. **增量处理**：自动跳过已处理的findings，只处理新的（基于时间戳）
     
     参数：
     - trigger_scan: 是否允许触发新扫描（默认True）
@@ -516,37 +984,28 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
     
     返回：
     - success: 是否成功
-    - findings_count: findings数量
+    - findings_count: 查询到的findings总数
+    - new_findings_count: 新的findings数量（已过滤重复）
     - stored: 存储成功的数量
     - scan_requested: 是否请求了新扫描
     - scan_completed: 扫描是否完成（通过轮询确认）
     - scan_wait_ms: 实际等待时间（毫秒）
     - source: "fresh_scan" | "cached_findings" | "no_findings"
+    
+    增量处理说明：
+    - 函数会自动查询raw-findings索引中该detector的最新finding时间戳
+    - 只处理时间戳大于上次处理时间的findings
+    - 避免重复处理已分析的数据，提高效率
     """
-    from .storage import store_events
-    from .trigger_lock import get_detector_lock, register_trigger, complete_trigger
-    import time
+    from .trigger_lock import complete_trigger
     
     client = get_client()
-    scan_requested = False
-    scan_completed = False
-    scan_wait_ms = 0
-    source = "no_findings"
-    detector_id: Optional[str] = None
+    detector_id = None
     
     try:
-        # 步骤0: 先查询已有findings（策略2：默认路径）
-        # 获取detector ID
-        detector_resp = client.transport.perform_request(
-            'POST',
-            SA_DETECTORS_SEARCH_API,
-            body={
-                "query": {"match_all": {}},
-                "size": 1
-            }
-        )
-        detector_hits = detector_resp.get('hits', {}).get('hits', [])
-        if not detector_hits:
+        # 步骤1: 获取detector ID
+        detector_id = _get_detector_id(client)
+        if not detector_id:
             return {
                 "success": False,
                 "message": "未找到detector",
@@ -558,270 +1017,53 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
                 "source": "no_findings"
             }
         
-        detector_id = detector_hits[0].get('_id')
+        # 步骤2: 查询已有findings数量
         baseline_count = _get_latest_findings_count(client, detector_id)
-        
         if baseline_count > 0:
             print(f"[INFO] 发现已有findings: {baseline_count} 个")
         
-        # 步骤1: 判断是否需要触发新扫描
-        need_trigger = False
-        if trigger_scan:
-            if baseline_count == 0:
-                print(f"[INFO] 没有findings，需要触发新扫描")
-                need_trigger = True
-            else:
-                print(f"[INFO] 已有findings: {baseline_count} 个，使用已有findings")
-                source = "cached_findings"
+        # 步骤3: 判断是否需要触发新扫描
+        need_trigger = _should_trigger_scan(trigger_scan, baseline_count)
+        source = "cached_findings" if baseline_count > 0 else "no_findings"
         
-        # 步骤2: 如果需要触发，使用锁和单飞模式
         if need_trigger:
-            try:
-                # 获取detector ID（如果之前没有获取到）
-                if not detector_id:
-                    detector_resp = client.transport.perform_request(
-                        'POST',
-                        SA_DETECTORS_SEARCH_API,
-                        body={
-                            "query": {"match_all": {}},
-                            "size": 1
-                        }
+            print(f"[INFO] 没有findings，需要触发新扫描")
+        else:
+            print(f"[INFO] 已有findings: {baseline_count} 个，使用已有findings")
+        
+        # 步骤4: 如果需要触发，执行触发逻辑
+        scan_info = {
+            "scan_requested": False,
+            "scan_completed": False,
+            "scan_wait_ms": 0,
+            "source": source
+        }
+        
+        if need_trigger:
+            detector = _get_detector_details(client, detector_id)
+            if detector:
+                try:
+                    scan_info = _trigger_scan_with_lock(
+                        client, detector_id, detector, baseline_count, max_wait_seconds
                     )
-                    detector_hits = detector_resp.get('hits', {}).get('hits', [])
-                    if not detector_hits:
-                        print(f"[WARNING] 未找到detector，跳过触发")
-                        need_trigger = False
-                    else:
-                        detector_id = detector_hits[0].get('_id')
-                        detector = detector_hits[0].get('_source', {})
-                else:
-                    # 如果已有detector_id，获取detector详情
-                    try:
-                        detector_resp = client.transport.perform_request(
-                            'GET',
-                            SA_DETECTOR_GET_API.format(detector_id=detector_id)
-                        )
-                        detector = detector_resp.get('detector', {})
-                    except Exception:
-                        print(f"[WARNING] 获取detector详情失败，跳过触发")
-                        need_trigger = False
-                        detector = {}
-                
-                if need_trigger and detector:
-                    
-                    # 单飞模式：检查是否有其他线程正在触发
-                    is_leader, wait_event = register_trigger(detector_id, timeout_seconds=max_wait_seconds)
-                    
-                    if not is_leader:
-                        print(f"[INFO] 其他线程正在触发detector，等待结果...")
-                        wait_event.wait(timeout=max_wait_seconds)
-                        print(f"[INFO] 等待完成，继续查询findings")
-                        need_trigger = False
-                    else:
-                        print(f"[INFO] 当前线程负责触发detector: {detector_id}")
-                        scan_requested = True
-                        
-                        # 获取detector锁
-                        detector_lock = get_detector_lock(detector_id)
-                        
-                        with detector_lock:
-                            # 确保detector已启用
-                            if not detector.get('enabled', False):
-                                print(f"[INFO] 启用detector: {detector_id}")
-                                try:
-                                    client.transport.perform_request(
-                                        'PUT',
-                                        SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                                        body={
-                                            **detector,
-                                            "enabled": True
-                                        }
-                                    )
-                                except Exception as enable_error:
-                                    print(f"[WARNING] 启用detector失败: {enable_error}")
-                            
-                            # 保存原始schedule
-                            schedule = detector.get('schedule', {})
-                            original_schedule = schedule.copy()
-                            original_interval = schedule.get('period', {}).get('interval', 24)
-                            original_unit = schedule.get('period', {}).get('unit', 'HOURS')
-                            
-                            # 如果当前schedule间隔较长（>1小时），临时缩短为1分钟
-                            if original_unit == 'HOURS' and original_interval >= 1:
-                                print(f"[INFO] 临时缩短detector schedule以触发扫描...")
-                                
-                                temp_schedule = {
-                                    "period": {
-                                        "interval": 1,
-                                        "unit": "MINUTES"
-                                    }
-                                }
-                                
-                                try:
-                                    client.transport.perform_request(
-                                        'PUT',
-                                        SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                                        body={
-                                            **detector,
-                                            "schedule": temp_schedule,
-                                            "enabled": True
-                                        }
-                                    )
-                                    print(f"[INFO] Schedule已临时设置为1分钟")
-                                    
-                                    # 轮询确认扫描完成（而不是固定sleep）
-                                    start_time = time.time()
-                                    
-                                    print(f"[INFO] 开始轮询确认扫描完成（最多等待{max_wait_seconds}秒）...")
-                                    
-                                    while (time.time() - start_time) < max_wait_seconds:
-                                        time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
-                                        
-                                        # 检查findings是否有更新
-                                        current_count = _get_latest_findings_count(client, detector_id)
-                                        
-                                        # 如果findings数量增加，说明扫描完成
-                                        if current_count > baseline_count:
-                                            scan_completed = True
-                                            scan_wait_ms = int((time.time() - start_time) * 1000)
-                                            print(f"[INFO] 扫描完成！Findings更新: {baseline_count} -> {current_count}")
-                                            source = "triggered_scan"
-                                            break
-                                        
-                                        elapsed = int(time.time() - start_time)
-                                        if elapsed % 10 == 0:
-                                            print(f"[INFO] 等待扫描完成... ({elapsed}/{max_wait_seconds}秒)")
-                                    
-                                    if not scan_completed:
-                                        scan_wait_ms = int((time.time() - start_time) * 1000)
-                                        print(f"[WARNING] 扫描超时（{scan_wait_ms}ms），可能未完成")
-                                
-                                finally:
-                                    # 确保恢复schedule（try/finally保证，在轮询结束后执行）
-                                    try:
-                                        print(f"[INFO] 轮询结束，准备恢复schedule...")
-                                        # 重新获取detector最新状态（避免覆盖其他修改）
-                                        latest_resp = client.transport.perform_request(
-                                            'POST',
-                                            '/_plugins/_security_analytics/detectors/_search',
-                                            body={
-                                                "query": {"term": {"_id": detector_id}},
-                                                "size": 1
-                                            }
-                                        )
-                                        latest_hits = latest_resp.get('hits', {}).get('hits', [])
-                                        if latest_hits:
-                                            latest_detector = latest_hits[0].get('_source', {})
-                                            
-                                            # 恢复原始schedule
-                                            client.transport.perform_request(
-                                                'PUT',
-                                                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                                                body={
-                                                    **latest_detector,
-                                                    "schedule": original_schedule,
-                                                    "enabled": True
-                                                }
-                                            )
-                                            print(f"[INFO] Schedule已恢复为{original_interval} {original_unit}")
-                                        else:
-                                            print(f"[WARNING] 无法获取detector最新状态，schedule可能未恢复")
-                                    except Exception as restore_error:
-                                        print(f"[ERROR] 恢复schedule失败: {restore_error}")
-                                        print(f"[WARNING] Detector schedule可能仍为1分钟，需要手动检查")
-                            
-                            else:
-                                print(f"[INFO] Detector schedule已较短，等待自动扫描...")
-                                time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
-                        
-                        # 标记触发完成
-                        complete_trigger(detector_id)
-            
-            except Exception as trigger_error:
-                print(f"[WARNING] 触发检测时出错: {trigger_error}")
-                if detector_id:
+                except Exception as trigger_error:
+                    print(f"[WARNING] 触发检测时出错: {trigger_error}")
                     complete_trigger(detector_id)
-                need_trigger = False
+            else:
+                print(f"[WARNING] 无法获取detector详情，跳过触发")
         
-        # 1. 使用Security Analytics的findings API获取findings
-        try:
-            findings_resp = client.transport.perform_request(
-                'GET',
-                SA_FINDINGS_SEARCH_API,
-                params={
-                    'detector_id': detector_id,
-                    'size': 1000
-                }
-            )
-            
-            findings = findings_resp.get('findings', [])
-            print(f"[INFO] 从Security Analytics API获取到 {len(findings)} 个findings")
-            
-        except Exception as api_error:
-            # 如果 API 调用失败，可能是插件未安装或未配置
-            error_msg = str(api_error)
-            if '404' in error_msg or 'not found' in error_msg.lower():
-                return {
-                    "success": False,
-                    "message": "Security Analytics 插件未安装或未启用",
-                    "findings_count": 0,
-                    "stored": 0,
-                    "scan_requested": scan_requested,
-                    "scan_completed": scan_completed,
-                    "scan_wait_ms": scan_wait_ms,
-                    "source": source
-                }
-            raise
-        
-        # 步骤3: 查询findings
-        if not findings:
-            return {
-                "success": True,
-                "message": "没有findings",
-                "findings_count": 0,
-                "stored": 0,
-                "scan_requested": scan_requested,
-                "scan_completed": scan_completed,
-                "scan_wait_ms": scan_wait_ms,
-                "source": source
-            }
-        
-        # 步骤4: 转换为ECS格式并存储
-        converted_findings = []
-        for finding in findings:
-            try:
-                ecs_finding = _convert_security_analytics_finding_to_ecs(finding)
-                converted_findings.append(ecs_finding)
-            except Exception as convert_error:
-                print(f"[WARNING] 转换finding失败，跳过: {convert_error}")
-                continue
-        
-        if not converted_findings:
-            return {
-                "success": True,
-                "message": "没有可转换的findings",
-                "findings_count": len(findings),
-                "stored": 0,
-                "scan_requested": scan_requested,
-                "scan_completed": scan_completed,
-                "scan_wait_ms": scan_wait_ms,
-                "source": source
-            }
-        
-        result = store_events(converted_findings)
+        # 步骤5: 查询并存储findings（增量处理，自动跳过已处理的）
+        storage_result = _fetch_and_store_findings(client, detector_id, only_new=True)
         
         return {
-            "success": True,
-            "message": f"成功读取并存储 {result['success']} 条findings",
-            "findings_count": len(findings),
-            "converted_count": len(converted_findings),
-            "stored": result['success'],
-            "failed": result.get('failed', 0),
-            "duplicated": result.get('duplicated', 0),
-            "scan_requested": scan_requested,
-            "scan_completed": scan_completed,
-            "scan_wait_ms": scan_wait_ms,
-            "source": source
+            "success": storage_result["success"],
+            "message": storage_result["message"],
+            "findings_count": storage_result["findings_count"],
+            "new_findings_count": storage_result.get("new_findings_count", storage_result["findings_count"]),
+            "stored": storage_result["stored"],
+            "failed": storage_result.get("failed", 0),
+            "duplicated": storage_result.get("duplicated", 0),
+            **scan_info
         }
     
     except Exception as error:
@@ -837,10 +1079,10 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
             "message": f"Security Analytics检测失败: {error_msg}",
             "findings_count": 0,
             "stored": 0,
-            "scan_requested": scan_requested,
-            "scan_completed": scan_completed,
-            "scan_wait_ms": scan_wait_ms,
-            "source": source
+            "scan_requested": False,
+            "scan_completed": False,
+            "scan_wait_ms": 0,
+            "source": "no_findings"
         }
 
 

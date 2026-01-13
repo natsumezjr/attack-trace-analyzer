@@ -71,11 +71,16 @@ uv run pytest opensearch/test/ --html=test_report.html --self-contained-html
 test/
 ├── README.md                    # 本文件（快速开始指南）
 ├── TEST_DOCUMENTATION.md        # 详细测试文档
+├── TESTING_GUIDE.md            # 测试编写规范和最佳实践
 ├── pytest.ini                   # pytest 配置
 ├── conftest.py                  # pytest fixtures
 ├── test_utils.py                # 测试工具和辅助函数
-├── test_unit_opensearch.py      # 单元测试
-└── test_system_opensearch.py    # 系统测试
+├── test_unit_opensearch.py      # 单元测试（核心功能）
+├── test_analysis_incremental.py  # 增量处理功能单元测试
+├── test_system_opensearch.py    # 系统测试（端到端流程）
+├── test_integration_full.py     # 完整集成测试（包含增量处理）
+├── run_tests.sh                 # Linux/macOS测试运行脚本
+└── run_tests.ps1                # Windows测试运行脚本
 ```
 
 ## 📝 测试文件说明
@@ -94,13 +99,21 @@ test/
 
 ### test_unit_opensearch.py
 
-单元测试文件，包含以下测试类：
+核心单元测试文件，包含以下测试类：
 
 - `TestClientOperations` - 客户端操作测试
 - `TestIndexManagement` - 索引管理测试
 - `TestStorageOperations` - 存储功能测试
 - `TestAnalysisOperations` - 数据分析测试
 - `TestEdgeCases` - 边界条件测试
+
+### test_analysis_incremental.py
+
+增量处理功能单元测试，包含以下测试类：
+
+- `TestAnalysisHelperFunctions` - 辅助函数测试（重构后的函数）
+- `TestIncrementalProcessing` - 增量处理逻辑测试
+- `TestAnalysisRefactoredFunctions` - 重构后的函数测试
 
 ### test_system_opensearch.py
 
@@ -110,6 +123,13 @@ test/
 - `TestRealWorldScenarios` - 真实场景测试
 - `TestPerformanceAndScalability` - 性能和可扩展性测试
 - `TestErrorHandling` - 错误处理测试
+
+### test_integration_full.py
+
+完整集成测试文件，包含以下测试类：
+
+- `TestFullWorkflowWithIncremental` - 包含增量处理的完整工作流测试
+- `TestErrorHandling` - 错误处理集成测试
 
 ### conftest.py
 
@@ -183,6 +203,7 @@ pytest 配置文件，提供以下 fixtures：
 
 ## 📚 相关文档
 
+- [测试编写指南](./TESTING_GUIDE.md) - 测试规范和最佳实践 ⭐ **推荐阅读**
 - [详细测试文档](./TEST_DOCUMENTATION.md) - 包含所有测试用例的详细说明
 - [OpenSearch 模块 README](../README.md) - 模块使用说明
 - [OpenSearch API 参考](../docs/API_REFERENCE.md) - API 文档
@@ -196,6 +217,29 @@ pytest 配置文件，提供以下 fixtures：
 3. **性能测试**：添加性能基准测试
 4. **监控测试**：添加测试结果监控和报告
 
+## 🚀 快速运行测试
+
+### 使用测试脚本（推荐）
+
+**Linux/macOS**：
+```bash
+cd backend/opensearch/test
+chmod +x run_tests.sh
+./run_tests.sh
+```
+
+**Windows**：
+```powershell
+cd backend\opensearch\test
+.\run_tests.ps1
+```
+
+测试脚本会自动：
+1. 检查OpenSearch服务状态
+2. 运行单元测试
+3. 运行集成测试
+4. 生成测试报告和覆盖率报告
+
 ---
 
-**最后更新**：2024-12-19
+**最后更新**：2026-01-13

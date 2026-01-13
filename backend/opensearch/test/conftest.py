@@ -13,8 +13,10 @@ from datetime import datetime
 
 # 添加父目录到路径，以便导入 opensearch 模块
 test_dir = Path(__file__).parent
-parent_dir = test_dir.parent
-sys.path.insert(0, str(parent_dir))
+parent_dir = test_dir.parent  # backend/opensearch
+backend_dir = parent_dir.parent  # backend
+sys.path.insert(0, str(backend_dir))  # 确保backend目录在路径中
+sys.path.insert(0, str(parent_dir))  # 也添加opensearch目录
 
 # 设置测试环境变量（如果未设置）
 if not os.getenv("OPENSEARCH_NODE"):
@@ -39,7 +41,7 @@ def clean_test_indices(opensearch_client):
     """
     清理测试索引（每个测试函数执行前后）
     """
-    from opensearch.index import INDEX_PATTERNS, get_index_name
+    from opensearch import INDEX_PATTERNS, get_index_name
     
     today = datetime.now()
     test_indices = [
