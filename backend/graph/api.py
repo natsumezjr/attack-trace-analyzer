@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Iterable, Mapping
+import uuid
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from neo4j import GraphDatabase
+from neo4j.exceptions import Neo4jError
 
-from graph.ecs_ingest import ecs_event_to_graph
-from graph.models import (
+# Optional: ECS ingest integration (legacy compatibility)
+try:
+    from backend.graph.ecs_ingest import ecs_event_to_graph  # type: ignore
+except Exception:
+    try:
+        from graph.ecs_ingest import ecs_event_to_graph  # type: ignore
+    except Exception:
+        ecs_event_to_graph = None  # type: ignore
+
+from .models import (
     GraphEdge,
     GraphNode,
     NodeType,
@@ -15,13 +25,14 @@ from graph.models import (
     build_uid,
     parse_uid,
 )
+from .utils import _parse_ts_to_float
+
 
 _DRIVER = None
 _SCHEMA_READY = False
 
 
 def _get_driver():
-    # 获取并缓存 Neo4j 驱动
     global _DRIVER
     if _DRIVER is None:
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -32,7 +43,6 @@ def _get_driver():
 
 
 def _get_session():
-    # 创建数据库会话（支持指定数据库名）
     driver = _get_driver()
     database = os.getenv("NEO4J_DATABASE")
     if database:
@@ -41,38 +51,32 @@ def _get_session():
 
 
 def _execute_write(session, func, *args, **kwargs):
-    # 兼容不同版本驱动的写事务调用
     if hasattr(session, "execute_write"):
         return session.execute_write(func, *args, **kwargs)
     return session.write_transaction(func, *args, **kwargs)
 
 
 def _execute_read(session, func, *args, **kwargs):
-    # 兼容不同版本驱动的读事务调用
     if hasattr(session, "execute_read"):
         return session.execute_read(func, *args, **kwargs)
     return session.read_transaction(func, *args, **kwargs)
 
 
 def _param_key(name: str) -> str:
-    # 将属性名转为可用于 Cypher 参数的安全键
     safe = "".join(ch if ch.isalnum() else "_" for ch in name)
     return f"key_{safe}"
 
 
 def _cypher_prop(name: str) -> str:
-    # 处理包含特殊字符的属性名（如点号）
     escaped = name.replace("`", "``")
     return f"`{escaped}`"
 
 
 def _name_suffix(name: str) -> str:
-    # 将属性名转换为索引/约束名后缀
     return "".join(ch if ch.isalnum() else "_" for ch in name)
 
 
 def ensure_schema() -> None:
-    # 确保图数据库约束和索引已创建
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
@@ -82,7 +86,6 @@ def ensure_schema() -> None:
 
 
 def _create_schema(tx) -> None:
-    # 创建节点唯一约束与常用索引
     constraints = [
         ("Host", "host.id"),
         ("User", "user.name"),
@@ -108,43 +111,58 @@ def _create_schema(tx) -> None:
         )
     for label, prop in indexes:
         iname = f"{label.lower()}_{_name_suffix(prop)}_index"
-        tx.run(f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})")
+        tx.run(
+            f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})"
+        )
 
 
 def add_node(node: GraphNode) -> None:
-    # 写入/合并节点
     ensure_schema()
     with _get_session() as session:
         _execute_write(session, _merge_node, node)
 
 
 def _merge_node(tx, node: GraphNode) -> None:
-    # 以唯一键合并节点并更新属性
     label = node.ntype.value
     key_props = node.key
     merged_props = node.merged_props()
-    params: dict[str, Any] = {"props": merged_props}
+    params: Dict[str, Any] = {"props": merged_props}
+
     key_clause_parts = []
     for k, v in key_props.items():
         param = _param_key(k)
         key_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
         params[param] = v
     key_clause = ", ".join(key_clause_parts)
+
     tx.run(f"MERGE (n:{label} {{{key_clause}}}) SET n += $props", **params)
 
 
 def add_edge(edge: GraphEdge) -> None:
-    # 写入关系边
+    """Create an edge in Neo4j.
+
+    关键：为 Phase B 的窗口过滤和 GDS 投影，写入数值时间戳 r.ts_float。
+    """
     ensure_schema()
+
+    # Best-effort: store a numeric timestamp for window/GDS queries.
+    try:
+        if isinstance(getattr(edge, "props", None), dict) and "ts_float" not in edge.props:
+            ts = edge.get_ts() if hasattr(edge, "get_ts") else None
+            if ts is not None:
+                edge.props["ts_float"] = _parse_ts_to_float(ts)
+    except Exception:
+        pass
+
     with _get_session() as session:
         _execute_write(session, _create_edge, edge)
 
 
 def _create_edge(tx, edge: GraphEdge) -> None:
-    # 合并起止节点并创建关系
     src_label, src_key = parse_uid(edge.src_uid)
     dst_label, dst_key = parse_uid(edge.dst_uid)
-    params: dict[str, Any] = {"props": edge.props}
+
+    params: Dict[str, Any] = {"props": edge.props}
 
     src_clause_parts = []
     for k, v in src_key.items():
@@ -169,8 +187,7 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     tx.run(cypher, **params)
 
 
-def get_node(uid: str) -> GraphNode | None:
-    # 按 UID 查询节点
+def get_node(uid: str) -> Optional[GraphNode]:
     label, key = parse_uid(uid)
     with _get_session() as session:
         props = _execute_read(session, _fetch_node, label, key)
@@ -182,9 +199,8 @@ def get_node(uid: str) -> GraphNode | None:
     return GraphNode(ntype=label, key=key, props=node_props)
 
 
-def _fetch_node(tx, label: NodeType, key: dict[str, Any]) -> dict[str, Any] | None:
-    # 事务内按唯一键读取节点属性
-    params: dict[str, Any] = {}
+def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    params: Dict[str, Any] = {}
     clause_parts = []
     for k, v in key.items():
         param = _param_key(k)
@@ -198,11 +214,10 @@ def _fetch_node(tx, label: NodeType, key: dict[str, Any]) -> dict[str, Any] | No
     return record["props"]
 
 
-def get_edges(node: GraphNode) -> list[GraphEdge]:
-    # 获取节点的所有相邻关系
+def get_edges(node: GraphNode) -> List[GraphEdge]:
     with _get_session() as session:
         rows = _execute_read(session, _fetch_edges, node)
-    edges: list[GraphEdge] = []
+    edges: List[GraphEdge] = []
     for row in rows:
         src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
         dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
@@ -212,13 +227,12 @@ def get_edges(node: GraphNode) -> list[GraphEdge]:
             rtype = RelType(row["rtype"])
         except ValueError:
             continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=row["rprops"]))
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
     return edges
 
 
-def _fetch_edges(tx, node: GraphNode) -> list[dict[str, Any]]:
-    # 事务内查询节点的关系及其两端节点属性
-    params: dict[str, Any] = {}
+def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
+    params: Dict[str, Any] = {}
     clause_parts = []
     for k, v in node.key.items():
         param = _param_key(k)
@@ -234,11 +248,11 @@ def _fetch_edges(tx, node: GraphNode) -> list[dict[str, Any]]:
     return list(tx.run(cypher, **params))
 
 
-def get_alarm_edges() -> list[GraphEdge]:
-    # 获取标记为告警的关系边
+def get_alarm_edges() -> List[GraphEdge]:
+    """Return all edges labeled as alarms (r.is_alarm = true)."""
     with _get_session() as session:
         rows = _execute_read(session, _fetch_alarm_edges)
-    edges: list[GraphEdge] = []
+    edges: List[GraphEdge] = []
     for row in rows:
         src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
         dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
@@ -248,12 +262,11 @@ def get_alarm_edges() -> list[GraphEdge]:
             rtype = RelType(row["rtype"])
         except ValueError:
             continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=row["rprops"]))
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
     return edges
 
 
-def _fetch_alarm_edges(tx) -> list[dict[str, Any]]:
-    # 事务内查询告警边
+def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
     cypher = (
         "MATCH ()-[r]->() "
         "WHERE coalesce(r.is_alarm, false) = true "
@@ -264,8 +277,263 @@ def _fetch_alarm_edges(tx) -> list[dict[str, Any]]:
     return list(tx.run(cypher))
 
 
-def _node_uid_from_record(labels: Iterable[str], props: dict[str, Any]) -> str | None:
-    # 根据记录中的标签与属性推断节点 UID
+def get_edges_in_window(
+    t_min: float,
+    t_max: float,
+    *,
+    allowed_reltypes: Optional[Sequence[str]] = None,
+    only_alarm: bool = False,
+) -> List[GraphEdge]:
+    """Fetch edges with numeric timestamp within [t_min, t_max]."""
+    with _get_session() as session:
+        rows = _execute_read(session, _fetch_edges_in_window, t_min, t_max, allowed_reltypes, only_alarm)
+
+    edges: List[GraphEdge] = []
+    for row in rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+    return edges
+
+
+def _fetch_edges_in_window(
+    tx,
+    t_min: float,
+    t_max: float,
+    allowed_reltypes: Optional[Sequence[str]],
+    only_alarm: bool,
+) -> List[Dict[str, Any]]:
+    params: Dict[str, Any] = {
+        "t_min": float(t_min),
+        "t_max": float(t_max),
+        "allowed": list(allowed_reltypes) if allowed_reltypes else None,
+        "only_alarm": bool(only_alarm),
+    }
+
+    cypher = (
+        "MATCH ()-[r]->() "
+        "WHERE coalesce(r.ts_float, 0.0) >= $t_min AND coalesce(r.ts_float, 0.0) <= $t_max "
+        "AND ($allowed IS NULL OR type(r) IN $allowed) "
+        "AND (NOT $only_alarm OR coalesce(r.is_alarm, false) = true) "
+        "RETURN type(r) AS rtype, properties(r) AS rprops, "
+        "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
+        "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
+    )
+    return list(tx.run(cypher, **params))
+
+
+def gds_shortest_path_in_window(
+    src_uid: str,
+    dst_uid: str,
+    t_min: float,
+    t_max: float,
+    *,
+    risk_weights: Mapping[str, float],
+    min_risk: float = 0.0,
+    allowed_reltypes: Optional[Sequence[str]] = None,
+) -> Optional[Tuple[float, List[GraphEdge]]]:
+    """Compute weighted shortest path via Neo4j GDS on a time-window projected graph."""
+    if src_uid == dst_uid:
+        return 0.0, []
+
+    ensure_schema()
+    graph_name = f"kc_window_{uuid.uuid4().hex}"
+
+    with _get_session() as session:
+        return _execute_read(
+            session,
+            _gds_shortest_path_in_window_tx,
+            graph_name,
+            src_uid,
+            dst_uid,
+            float(t_min),
+            float(t_max),
+            dict(risk_weights),
+            float(min_risk),
+            list(allowed_reltypes) if allowed_reltypes else None,
+        )
+
+
+def _match_clause_for_uid(uid: str, alias: str, params: Dict[str, Any], prefix: str) -> str:
+    label, key = parse_uid(uid)
+    clause_parts = []
+    for k, v in key.items():
+        p = _param_key(f"{prefix}_{k}")
+        params[p] = v
+        clause_parts.append(f"{_cypher_prop(k)}: ${p}")
+    clause = ", ".join(clause_parts)
+    return f"MATCH ({alias}:{label.value} {{{clause}}})"
+
+
+def _gds_shortest_path_in_window_tx(
+    tx,
+    graph_name: str,
+    src_uid: str,
+    dst_uid: str,
+    t_min: float,
+    t_max: float,
+    risk_weights: Dict[str, float],
+    min_risk: float,
+    allowed_reltypes: Optional[List[str]],
+) -> Optional[Tuple[float, List[GraphEdge]]]:
+    params: Dict[str, Any] = {
+        "graph_name": graph_name,
+        "t_min": t_min,
+        "t_max": t_max,
+        "risk_map": risk_weights,
+        "default_risk": 1.0,
+        "min_risk": min_risk,
+        "allowed": allowed_reltypes,
+        "max_risk": max(risk_weights.values()) if risk_weights else 1.0,
+    }
+
+    match_source = _match_clause_for_uid(src_uid, "source", params, "src")
+    match_target = _match_clause_for_uid(dst_uid, "target", params, "dst")
+
+    rel_match = (
+        "MATCH (s)-[r]->(t) "
+        "WHERE coalesce(r.ts_float, 0.0) >= $t_min AND coalesce(r.ts_float, 0.0) <= $t_max "
+        "AND ($allowed IS NULL OR type(r) IN $allowed) "
+        "WITH s, r, t, coalesce($risk_map[type(r)], $default_risk) AS risk "
+        "WHERE risk >= $min_risk "
+    )
+
+    node_query = (
+        f"{rel_match} RETURN DISTINCT id(s) AS id "
+        "UNION "
+        f"{rel_match} RETURN DISTINCT id(t) AS id "
+        "UNION "
+        f"{match_source} RETURN id(source) AS id "
+        "UNION "
+        f"{match_target} RETURN id(target) AS id"
+    )
+
+    rel_query = (
+        f"{rel_match} "
+        "RETURN id(s) AS source, id(t) AS target, type(r) AS type, "
+        "($max_risk + 1.0 - risk) AS cost"
+    )
+
+    project_cypher = (
+        "CALL gds.graph.project.cypher($graph_name, $node_query, $rel_query, "
+        "{relationshipProperties: ['cost']}) "
+        "YIELD graphName"
+    )
+
+    try:
+        params_proj = dict(params)
+        params_proj["node_query"] = node_query
+        params_proj["rel_query"] = rel_query
+        tx.run(project_cypher, **params_proj).consume()
+
+        dijkstra_with_path = (
+            f"{match_source} "
+            f"{match_target} "
+            "CALL gds.shortestPath.dijkstra.stream($graph_name, {"
+            "sourceNode: id(source), targetNode: id(target), relationshipWeightProperty: 'cost'}) "
+            "YIELD totalCost, path "
+            "WITH totalCost, relationships(path) AS rels "
+            "UNWIND rels AS r "
+            "RETURN totalCost AS totalCost, "
+            "type(r) AS rtype, properties(r) AS rprops, "
+            "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
+            "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
+        )
+
+        rows: List[Dict[str, Any]] = []
+        total_cost: Optional[float] = None
+        try:
+            for rec in tx.run(dijkstra_with_path, **params):
+                if total_cost is None:
+                    total_cost = float(rec["totalCost"])
+                rows.append(rec)
+        except Neo4jError:
+            dijkstra_nodeids = (
+                f"{match_source} "
+                f"{match_target} "
+                "CALL gds.shortestPath.dijkstra.stream($graph_name, {"
+                "sourceNode: id(source), targetNode: id(target), relationshipWeightProperty: 'cost'}) "
+                "YIELD totalCost, nodeIds "
+                "RETURN totalCost AS totalCost, nodeIds AS nodeIds"
+            )
+            record = tx.run(dijkstra_nodeids, **params).single()
+            if record is None:
+                return None
+            total_cost = float(record["totalCost"])
+            node_ids = record.get("nodeIds") or []
+            if len(node_ids) < 2:
+                return None
+
+            edge_rows = tx.run(
+                _reconstruct_edges_between_node_ids_cypher(node_ids),
+                node_ids=node_ids,
+                t_min=t_min,
+                t_max=t_max,
+                allowed=allowed_reltypes,
+                risk_map=risk_weights,
+                default_risk=1.0,
+                min_risk=min_risk,
+                max_risk=params["max_risk"],
+            )
+            rows = list(edge_rows)
+
+        if total_cost is None:
+            return None
+        if not rows:
+            return None
+
+        edges: List[GraphEdge] = []
+        for row in rows:
+            src_uid2 = _node_uid_from_record(row["src_labels"], row["src_props"])
+            dst_uid2 = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+            if src_uid2 is None or dst_uid2 is None:
+                continue
+            try:
+                rtype = RelType(row["rtype"])
+            except ValueError:
+                continue
+            edges.append(GraphEdge(src_uid=src_uid2, dst_uid=dst_uid2, rtype=rtype, props=dict(row["rprops"])))
+
+        if not edges:
+            return None
+
+        return total_cost, edges
+
+    finally:
+        try:
+            tx.run("CALL gds.graph.drop($graph_name, false) YIELD graphName", graph_name=graph_name).consume()
+        except Exception:
+            pass
+
+
+def _reconstruct_edges_between_node_ids_cypher(node_ids: List[int]) -> str:
+    return (
+        "UNWIND range(0, size($node_ids)-2) AS i "
+        "WITH $node_ids[i] AS sid, $node_ids[i+1] AS tid "
+        "MATCH (s)-[r]->(t) "
+        "WHERE id(s) = sid AND id(t) = tid "
+        "AND coalesce(r.ts_float, 0.0) >= $t_min AND coalesce(r.ts_float, 0.0) <= $t_max "
+        "AND ($allowed IS NULL OR type(r) IN $allowed) "
+        "WITH s, r, t, coalesce($risk_map[type(r)], $default_risk) AS risk "
+        "WHERE risk >= $min_risk "
+        "WITH s, r, t, ($max_risk + 1.0 - risk) AS cost "
+        "ORDER BY cost ASC "
+        "WITH collect({rtype: type(r), rprops: properties(r), "
+        "src_labels: labels(s), src_props: properties(s), "
+        "dst_labels: labels(t), dst_props: properties(t)})[0] AS best "
+        "RETURN best.rtype AS rtype, best.rprops AS rprops, "
+        "best.src_labels AS src_labels, best.src_props AS src_props, "
+        "best.dst_labels AS dst_labels, best.dst_props AS dst_props"
+    )
+
+
+def _node_uid_from_record(labels: Iterable[str], props: Dict[str, Any]) -> Optional[str]:
     ntype = _label_to_ntype(labels)
     if ntype is None:
         return None
@@ -278,8 +546,7 @@ def _node_uid_from_record(labels: Iterable[str], props: dict[str, Any]) -> str |
     return None
 
 
-def _label_to_ntype(labels: Iterable[str]) -> NodeType | None:
-    # 将 Neo4j label 映射为节点类型枚举
+def _label_to_ntype(labels: Iterable[str]) -> Optional[NodeType]:
     for label in labels:
         try:
             return NodeType(label)
@@ -288,8 +555,7 @@ def _label_to_ntype(labels: Iterable[str]) -> NodeType | None:
     return None
 
 
-def _fallback_key(ntype: NodeType, props: dict[str, Any]) -> dict[str, Any] | None:
-    # 当唯一键缺失时的回退键选择
+def _fallback_key(ntype: NodeType, props: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     fallback_fields = {
         NodeType.HOST: ["host.id", "host.name"],
         NodeType.USER: ["user.name", "user.id"],
@@ -306,7 +572,6 @@ def _fallback_key(ntype: NodeType, props: dict[str, Any]) -> dict[str, Any] | No
 
 
 def close() -> None:
-    # 关闭 Neo4j 驱动
     global _DRIVER
     if _DRIVER is None:
         return
@@ -314,8 +579,11 @@ def close() -> None:
     _DRIVER = None
 
 
-def ingest_ecs_event(event: Mapping[str, Any]) -> tuple[int, int]:
-    # 将单条 ECS 事件写入图数据库
+def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
+    """Ingest a single ECS event by converting it into nodes/edges."""
+    if ecs_event_to_graph is None:
+        raise NotImplementedError("ecs_event_to_graph is not available")
+
     nodes, edges = ecs_event_to_graph(event)
     for node in nodes:
         add_node(node)
@@ -324,8 +592,11 @@ def ingest_ecs_event(event: Mapping[str, Any]) -> tuple[int, int]:
     return len(nodes), len(edges)
 
 
-def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> tuple[int, int]:
-    # 批量写入 ECS 事件
+def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
+    """Ingest multiple ECS events."""
+    if ecs_event_to_graph is None:
+        raise NotImplementedError("ecs_event_to_graph is not available")
+
     total_nodes = 0
     total_edges = 0
     for event in events:
