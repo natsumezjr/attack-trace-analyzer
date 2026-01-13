@@ -14,7 +14,8 @@ APP_VERSION = "0.1.0"
 EVE_FILE = os.getenv("EVE_FILE", "/data/eve.json")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/data/output")
 STATE_DIR = os.getenv("STATE_DIR", "/data/state")
-DB_FILE = os.getenv("DB_FILE", os.path.join(OUTPUT_DIR, "events.db"))
+DB_FILE = os.getenv("DB_FILE", "/data/data.db")
+TABLE_NAME = os.getenv("TABLE_NAME", "suricata")
 
 HOST_ID = os.getenv("HOST_ID", "sensor-01")
 HOST_NAME = os.getenv("HOST_NAME", "suricata-sensor")
@@ -44,6 +45,7 @@ def normalize_timestamp(ts: Optional[str]) -> str:
 def ensure_dirs() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(STATE_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
     init_db()
 
 
@@ -59,8 +61,8 @@ def init_db() -> None:
     with db_lock:
         conn = connect_db()
         conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS data (
+            f"""
+            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_json TEXT NOT NULL
             )
@@ -384,10 +386,8 @@ def insert_event(payload: Dict[str, Any]) -> None:
     with db_lock:
         conn = connect_db()
         conn.execute(
-            "INSERT INTO data (event_json) VALUES (?)",
-            (
-                line,
-            ),
+            f"INSERT INTO {TABLE_NAME} (event_json) VALUES (?)",
+            (line,),
         )
         conn.commit()
         conn.close()
@@ -466,7 +466,7 @@ def stream_events() -> Response:
         conn = connect_db()
         last_id = load_export_offset()
         rows = conn.execute(
-            "SELECT id, event_json FROM data WHERE id > ? ORDER BY id",
+            f"SELECT id, event_json FROM {TABLE_NAME} WHERE id > ? ORDER BY id",
             (last_id,),
         ).fetchall()
         conn.close()

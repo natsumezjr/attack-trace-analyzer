@@ -96,7 +96,12 @@ class AnomalyDetector:
         self.retention_period = timedelta(minutes=5)  # 保留 5 分钟内的记录
 
         # SQLite database
-        self.db_path = self.output_dir / 'detection_results.db'
+        db_path = os.getenv('DB_PATH')
+        if db_path:
+            self.db_path = Path(db_path)
+        else:
+            self.db_path = self.output_dir / 'data.db'
+        self.table_name = os.getenv('TABLE_NAME', 'filebeat')
         self.init_database()
 
     def load_rules(self):
@@ -121,12 +126,16 @@ class AnomalyDetector:
 
     def init_database(self):
         """Initialize SQLite database and create table if not exists"""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
         cursor = conn.cursor()
 
         # Create data table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS data (
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS {self.table_name} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_json TEXT NOT NULL
             )
@@ -139,16 +148,28 @@ class AnomalyDetector:
     def insert_log_entry(self, log_entry: Dict[str, Any]):
         """Insert a log entry into the database"""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA busy_timeout=30000;")
         cursor = conn.cursor()
 
-        # Convert log entry to JSON string
         event_json = json.dumps(log_entry)
 
-        # Insert into database
-        cursor.execute('INSERT INTO data (event_json) VALUES (?)', (event_json,))
+        for _ in range(5):
+            try:
+                cursor.execute(
+                    f'INSERT INTO {self.table_name} (event_json) VALUES (?)',
+                    (event_json,),
+                )
+                conn.commit()
+                conn.close()
+                return
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower():
+                    conn.close()
+                    raise
+                time.sleep(0.2)
 
-        conn.commit()
         conn.close()
+        raise sqlite3.OperationalError("database is locked")
 
     def cleanup_old_json_records(self):
         """清理 JSON 文件中 5 分钟之前的记录（数据库中已保存）"""

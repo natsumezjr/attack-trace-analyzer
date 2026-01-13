@@ -1,12 +1,12 @@
 # deploy/compose
 
-本目录提供**每台客户机一份**的 `docker-compose.yml`，用于编排采集层（Falco/Suricata）以及后续的客户端后端（Go + SQLite）。
+本目录不再维护 `docker-compose.yml`，统一入口已迁移到 `client/sensors/docker-compose.yml`。
 
 > 适用环境：**Linux 靶机**（Falco/Suricata 通常需要 `privileged` 与 host network；Docker Desktop/macOS 不适用）。
 
 ## 当前包含
 
-- `docker-compose.yml`：传感器编排（已包含 Falco/Suricata）；`client-backend` 先留占位（等你开始写 Go 再启用）
+- `client/sensors/docker-compose.yml`：传感器编排（已包含 Falco/Suricata/Filebeat）与 `client-backend`
 - `.env.example`：每台机器需要复制一份并改成自己的 `client_id/host/center` 配置
 - `falco/`：Falco 配置模板（JSON 输出 → 文件）
 - `suricata/`：Suricata 规则（`local.rules`），EVE JSON 由镜像内默认配置输出为 `eve.json`
@@ -16,7 +16,7 @@
 1) 进入目录并准备环境变量：
 
 ```bash
-cd client/deploy/compose
+cd client/sensors
 cp .env.example .env
 ```
 
@@ -39,9 +39,11 @@ docker compose up -d --build
 
 - Suricata：`./data/suricata/eve.json`
 - Falco：`./data/falco/events.json`
+- Filebeat：`./data/filebeat/ecs_logs_with_anomalies.json`（临时） + `./data/filebeat/anomalies.json`（临时）
+- SQLite：`./data/sqlite/data.db`（表：`suricata`/`falco`/`filebeat`）
 - Client Backend：监听 `CLIENT_BIND_ADDR`（默认 `0.0.0.0:18080`），提供 `/api/v1/health`
 
-> 说明：客户端后端（Go）后续会把这些原始输出读进来，统一映射为 ECS 子集并写入 SQLite，再由中心机轮询 `/pull` 拉取。
+> 说明：当前 Falco/Suricata/Filebeat 已写入同一个 SQLite（`data.db`），不同表区分来源；客户端后端后续可直接读取该库或继续做统一归并。
 
 ## 参考（官方/上游文档）
 

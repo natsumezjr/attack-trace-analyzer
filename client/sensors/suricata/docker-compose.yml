@@ -23,5 +23,7 @@ services:
     environment:
       HOST_ID: "sensor-01"
       HOST_NAME: "suricata-sensor"
+      DB_FILE: "/data/data.db"
+      TABLE_NAME: "suricata"
     volumes:
       - ./data:/data

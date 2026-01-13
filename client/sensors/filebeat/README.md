@@ -54,7 +54,7 @@ filebeat/
 │   └── ... （共 41 个规则）
 │
 └── output/                      # 检测输出目录（运行时自动创建）
-    ├── detection_results.db             # SQLite 数据库（永久存储）
+    ├── data.db                          # SQLite 数据库（永久存储）
     ├── ecs_logs_with_anomalies.json     # 临时缓存：所有日志（5 分钟）
     └── anomalies.json                   # 临时缓存：仅异常日志（5 分钟）
 ```
@@ -219,11 +219,11 @@ python3 detector.py
   - 退出时：清空所有 JSON 文件
 
 ### SQLite 数据库（永久）
-- **位置**：`output/detection_results.db`
+- **位置**：`output/data.db`（Docker 可挂载到 `/data/data.db`）
 - **用途**：永久存储所有日志数据（包括正常日志和异常日志）
 - **表结构**：
   ```sql
-  CREATE TABLE data (
+  CREATE TABLE filebeat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_json TEXT  -- 完整的 ECS 格式 JSON 字符串
   );
@@ -233,16 +233,16 @@ python3 detector.py
 
 ```bash
 # 打开数据库
-sqlite3 output/detection_results.db
+sqlite3 output/data.db
 
 # 统计总记录数
-SELECT COUNT(*) FROM data;
+SELECT COUNT(*) FROM filebeat;
 
 # 查看最近 10 条记录
 SELECT id,
        json_extract(event_json, '$.@timestamp') as timestamp,
        json_extract(event_json, '$.message') as message
-FROM data
+FROM filebeat
 ORDER BY id DESC
 LIMIT 10;
 
@@ -251,7 +251,7 @@ SELECT id,
        json_extract(event_json, '$.@timestamp') as timestamp,
        json_extract(event_json, '$.anomaly.matched_rules[0].rule_title') as rule_name,
        json_extract(event_json, '$.anomaly.matched_rules[0].severity') as severity
-FROM data
+FROM filebeat
 WHERE json_extract(event_json, '$.anomaly.detected') = 1;
 ```
 
@@ -282,7 +282,7 @@ cat /etc/shadow
 tail -f output/anomalies.json
 
 # 查询数据库中的异常记录
-sqlite3 output/detection_results.db "SELECT * FROM data WHERE json_extract(event_json, '$.anomaly.detected') = 1;"
+sqlite3 output/data.db "SELECT * FROM filebeat WHERE json_extract(event_json, '$.anomaly.detected') = 1;"
 ```
 
 ## 输出格式

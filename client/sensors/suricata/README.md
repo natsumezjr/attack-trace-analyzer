@@ -17,11 +17,11 @@ This uses `SURICATA_MODE=pcap` by default in the sample compose file and reads:
 
 After startup, the exporter writes:
 
-- `/data/output/events.db` (SQLite, all events in one table)
+- `/data/data.db` (SQLite, table: `suricata`)
 
 on the host at:
 
-- `./data/output/events.db`
+- `./data/data.db`
 
 ## Live Capture Mode
 
@@ -64,7 +64,7 @@ Set `SURICATA_MODE=pcap` and `PCAP_FILE=/data/pcap/your.pcap`.
 All runtime data lives under `./data`, mounted to `/data` in containers:
 
 - `/data/eve.json`
-- `/data/output/events.db` (table: `data`)
+- `/data/data.db` (table: `suricata`)
 - `/data/state/offset.json`
 
 ## Minimal Demo
@@ -78,7 +78,7 @@ docker compose up --build
 2. Wait for database:
 
 ```
-./data/output/events.db
+./data/data.db
 ```
 
 3. Export:

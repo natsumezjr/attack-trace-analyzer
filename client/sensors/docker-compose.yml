@@ -1,0 +1,160 @@
+name: ata-client
+
+services:
+  # --- Suricata: network flow + IDS alerts (EVE JSON) ---
+  suricata:
+    # Image docs (community-maintained by an OISF member):
+    # - https://github.com/jasonish/docker-suricata
+    image: jasonish/suricata:8.0.1
+    container_name: ata-suricata
+    restart: unless-stopped
+    network_mode: host
+    # Follow Suricata container recommendations: allow capturing packets and adjusting niceness.
+    # - https://docs.suricata.io/en/suricata-8.0.1/security.html#containers
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    command:
+      - -i
+      - ${SURICATA_INTERFACE:-eth0}
+      - -l
+      - /var/log/suricata
+      # Load extra rules in addition to those configured in suricata.yaml.
+      # - https://docs.suricata.io/en/suricata-8.0.1/command-line-options.html
+      - -s
+      - /var/lib/suricata/rules/local.rules
+    volumes:
+      - ./data/suricata:/var/log/suricata
+      - ./suricata/rules/local.rules:/var/lib/suricata/rules/local.rules:ro
+
+  # --- Suricata Exporter: EVE JSON -> SQLite (table: suricata) ---
+  suricata-exporter:
+    build:
+      context: ./suricata/exporter
+    container_name: ata-suricata-exporter
+    restart: unless-stopped
+    depends_on:
+      - suricata
+    environment:
+      HOST_ID: ${HOST_ID}
+      HOST_NAME: ${HOST_NAME}
+      EVE_FILE: /var/log/suricata/eve.json
+      DB_FILE: /data/data.db
+      TABLE_NAME: suricata
+    volumes:
+      - ./data/suricata:/var/log/suricata:ro
+      - ./data/sqlite:/data
+
+  # --- Falco: host behavior alerts (JSON) ---
+  falco:
+    # Official docs:
+    # - https://falco.org/docs/setup/container/
+    image: falcosecurity/falco:0.42.0
+    container_name: ata-falco
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    volumes:
+      # Align with Falco's official docker instructions (Modern eBPF, fully-privileged).
+      - /sys/kernel/tracing:/sys/kernel/tracing:ro
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - ./data/falco:/data
+    command:
+      - falco
+      - -o
+      - json_output=true
+      - -o
+      - file_output.enabled=true
+      - -o
+      - file_output.filename=/data/falco.jsonl
+
+  # --- Falco ECS: falco.jsonl -> SQLite (table: falco) ---
+  falco-ecs:
+    build:
+      context: ./falco/ecs-converter
+    container_name: ata-falco-ecs
+    restart: unless-stopped
+    depends_on:
+      - falco
+    environment:
+      TABLE_NAME: falco
+    command:
+      - --input
+      - /falco/falco.jsonl
+      - --follow
+      - --sqlite
+      - /data/data.db
+      - --no-json
+    volumes:
+      - ./data/falco:/falco:ro
+      - ./data/sqlite:/data
+
+  # --- Filebeat Detector: logs -> SQLite (table: filebeat) ---
+  filebeat:
+    build:
+      context: ./filebeat
+    container_name: ata-filebeat
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log/host:ro
+      - ./data/filebeat:/app/output
+      - ./data/sqlite:/data
+    environment:
+      - TZ=Asia/Shanghai
+      - DB_PATH=/data/data.db
+      - TABLE_NAME=filebeat
+
+  # --- Go Client: read SQLite and serve API on 8888 ---
+  go-client:
+    build:
+      context: ./go-client
+    container_name: ata-go-client
+    restart: unless-stopped
+    depends_on:
+      - suricata-exporter
+      - falco-ecs
+      - filebeat
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data/sqlite:/data:ro
+
+  # --- Client Backend (Go + SQLite): ECS normalize + buffer + register + /health + /pull ---
+  client-backend:
+    build:
+      context: ../../backend
+    container_name: ata-client-backend
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - falco
+      - suricata
+    environment:
+      # Identity
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_VERSION=0.1.0
+      - HOST_ID=${HOST_ID}
+      - HOST_NAME=${HOST_NAME}
+
+      # Center connectivity
+      - CENTER_BASE_URL=${CENTER_BASE_URL}
+      - CLIENT_LISTEN_URL=${CLIENT_LISTEN_URL}
+      - CLIENT_BIND_ADDR=${CLIENT_BIND_ADDR:-0.0.0.0:18080}
+
+      # Storage
+      - ATA_SQLITE_PATH=/var/lib/ata/buffer.sqlite
+
+      # Sensor inputs (container paths)
+      - ATA_WAZUH_ALERTS_JSON=/var/lib/wazuh/logs/alerts/alerts.json
+      - ATA_WAZUH_ARCHIVES_JSON=/var/lib/wazuh/logs/archives/archives.json
+      - ATA_FALCO_EVENTS_JSON=/var/log/falco/events.json
+      - ATA_SURICATA_EVE_JSON=/var/log/suricata/eve.json
+    volumes:
+      - ./data/client:/var/lib/ata
+      # Wazuh is installed on the host; mount its log directory so the backend can read JSON logs.
+      - /var/ossec/logs:/var/lib/wazuh/logs:ro
+      - ./data/suricata:/var/log/suricata:ro
+      - ./data/falco:/var/log/falco:ro

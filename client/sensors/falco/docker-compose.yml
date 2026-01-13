@@ -32,6 +32,8 @@ services:
     container_name: falco-ecs
     depends_on:
       - falco
+    environment:
+      TABLE_NAME: "falco"
     volumes:
       - ./data:/data
     command:
@@ -39,10 +41,8 @@ services:
       - /data/falco.jsonl
       - --follow
       - --sqlite
-      - /data/falco_events.db
+      - /data/data.db
       - --reset
       - --no-json
-
-
 
 

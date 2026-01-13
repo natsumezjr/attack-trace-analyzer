@@ -11,9 +11,13 @@ services:
       - /var/log:/var/log/host:ro
       # 挂载输出目录
       - ./output:/app/output
+      # 挂载共享数据库目录
+      - ./data:/data
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
+      - DB_PATH=/data/data.db
+      - TABLE_NAME=filebeat
     logging:
       driver: "json-file"
       options:

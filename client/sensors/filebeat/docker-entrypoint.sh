@@ -18,7 +18,7 @@ cleanup() {
         echo "✓ Filebeat 已停止"
     fi
 
-    echo "数据库已保存在: /app/output/detection_results.db"
+    echo "数据库已保存在: ${DB_PATH:-/app/output/data.db}"
     exit 0
 }
 

@@ -10,6 +10,8 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+TABLE_NAME = os.getenv("TABLE_NAME", "falco")
+
 PRIORITY_RANK = {
     "DEBUG": 1,
     "INFORMATIONAL": 2,
@@ -206,8 +208,8 @@ def init_db(db_path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA busy_timeout=30000;")
     conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS data (
+        f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_json TEXT
         )
@@ -222,8 +224,8 @@ def insert_event(conn: sqlite3.Connection, ecs: Dict):
     for _ in range(5):
         try:
             conn.execute(
-                """
-                INSERT INTO data (event_json)
+                f"""
+                INSERT INTO {TABLE_NAME} (event_json)
                 VALUES (?)
                 """,
                 payload,
@@ -334,7 +336,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
