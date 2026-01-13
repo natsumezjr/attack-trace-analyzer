@@ -5,7 +5,7 @@ from enum import Enum
 from hashlib import sha1
 from typing import Any, Mapping
 
-
+# 节点类型(主机节点、用户节点、进程节点、文件节点、IP节点、域名节点、网络连接节点)
 class NodeType(str, Enum):
     HOST = "Host"
     USER = "User"
@@ -15,7 +15,7 @@ class NodeType(str, Enum):
     DOMAIN = "Domain"
     NETCON = "NetConn"
 
-
+# 关系类型(登录关系、生成关系、访问关系、连接关系、解析关系、解析到关系)
 class RelType(str, Enum):
     LOGON = "LOGON"
     SPAWNED = "SPAWNED"
@@ -24,7 +24,10 @@ class RelType(str, Enum):
     RESOLVED = "RESOLVED"
     RESOLVES_TO = "RESOLVES_TO"
 
-
+# 每种节点类型的唯一键字段
+    # 这里的定义是为例parase时简写时正确解析
+    # uid = "Host:host.id=h-aaa" parse_uid(uid)
+    # uid = "Host:h-aaa" parse_uid(uid)简写
 NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.HOST: "host.id",
     NodeType.USER: "user.name",
@@ -35,7 +38,7 @@ NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.NETCON: "flow.id",
 }
 
-
+# 定义连接规则
 EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.LOGON: ({NodeType.USER}, {NodeType.HOST}),
     RelType.SPAWNED: ({NodeType.PROCESS}, {NodeType.PROCESS}),
@@ -49,16 +52,20 @@ EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
 def _sha1_hex(raw: str) -> str:
     return sha1(raw.encode("utf-8")).hexdigest()[:16]
 
-
+# host_id生成
 def make_host_id(host_name: str) -> str:
     return f"h-{_sha1_hex(host_name)}"
-
-
+# process_entity_id生成
 def make_process_entity_id(host_id: str, pid: int, start_ts: str, executable: str) -> str:
     raw = f"{host_id}:{pid}:{start_ts}:{executable}"
     return f"p-{_sha1_hex(raw)}"
 
 
+# UID 是一个字符串，格式固定："<Label>:key=value;k=v"
+# 前缀是节点类型（Host/User/Process/...）
+# 后面是若干个 k=v（key field = value），用来表达这个节点的唯一键
+
+# 构建 UID 字符串
 def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     items = [(k, v) for k, v in key.items() if v is not None]
     if not items:
@@ -70,7 +77,7 @@ def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     payload = ";".join(f"{k}={v}" for k, v in items)
     return f"{ntype.value}:{payload}"
 
-
+# 解析 UID 字符串，返回节点类型和唯一键字典
 def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     if ":" not in uid:
         raise ValueError(f"Invalid uid format: {uid}")
@@ -95,6 +102,11 @@ def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     return label, {key_field: rest}
 
 
+# GraphNode节点数据结构
+    # 节点类型ntype
+    # 唯一键key
+    # 其他属性props
+    # merged_props方法将key和props合并，key中的非None值优先级更高。
 @dataclass
 class GraphNode:
     ntype: NodeType
@@ -104,7 +116,6 @@ class GraphNode:
     @property
     def uid(self) -> str:
         return build_uid(self.ntype, self.key)
-
     def merged_props(self) -> dict[str, Any]:
         merged = dict(self.props)
         for k, v in self.key.items():
@@ -113,6 +124,11 @@ class GraphNode:
         return merged
 
 
+# GraphEdge边数据结构
+    # 源节点UID src_uid
+    # 目标节点UID dst_uid
+    # 关系类型rtype
+    # 其他属性props(其他攻击相关属性)
 @dataclass
 class GraphEdge:
     src_uid: str
@@ -132,7 +148,11 @@ class GraphEdge:
     def get_rtype(self) -> RelType:
         return self.rtype
 
-
+# 主机节点
+    # host_id 主机ID
+    # host_name 主机名称
+    # props 其他属性
+    # 这里是host_id若没有传则是以hostname生成的，假设系统内设置的主机名唯一
 def host_node(
     host_id: str | None = None,
     host_name: str | None = None,
@@ -147,21 +167,44 @@ def host_node(
         node_props.setdefault("host.name", host_name)
     return GraphNode(ntype=NodeType.HOST, key={"host.id": host_id}, props=node_props)
 
-
+# 用户节点
+    # user_name 用户名称
+    # user_id 用户ID
 def user_node(
     user_name: str | None = None,
     user_id: str | None = None,
+    *,
+    host_id: str | None = None,
     props: dict[str, Any] | None = None,
 ) -> GraphNode:
     if user_name is None and user_id is None:
         raise ValueError("user_name or user_id is required.")
     node_props = dict(props or {})
-    if user_name:
+    node_props = dict(props or {})
+
+    if user_name is not None:
         node_props.setdefault("user.name", user_name)
-    if user_id:
+    if user_id is not None:
         node_props.setdefault("user.id", user_id)
-    key = {"user.name": user_name} if user_name else {"user.id": user_id}
-    return GraphNode(ntype=NodeType.USER, key=key, props=node_props)
+    if host_id is not None:
+        node_props.setdefault("host.id", host_id)
+    if user_id:
+        return GraphNode(
+            ntype=NodeType.USER,
+            key={"user.id": user_id},
+            props=node_props,
+        )
+
+    if not user_name:
+        raise ValueError("user_name is required when user_id is missing.")
+    if not host_id:
+        raise ValueError("host_id is required when user_id is missing (to scope user_name).")
+
+    return GraphNode(
+        ntype=NodeType.USER,
+        key={"host.id": host_id, "user.name": user_name},
+        props=node_props,
+    )
 
 
 def process_node(
@@ -256,6 +299,7 @@ def netcon_node(
     protocol: str | None = None,
     props: dict[str, Any] | None = None,
 ) -> GraphNode:
+    # NetConn 使用 flow/community id 作为唯一键，对齐 ECS 的会话语义。
     if flow_id is None and community_id is None:
         raise ValueError("flow.id or network.community_id is required.")
     node_props = dict(props or {})
