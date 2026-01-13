@@ -5,7 +5,9 @@ from enum import Enum
 from hashlib import sha1
 from typing import Any, Mapping
 
+# 基础定义
 
+# 枚举图内实体类型
 class NodeType(str, Enum):
     HOST = "Host"
     USER = "User"
@@ -15,7 +17,7 @@ class NodeType(str, Enum):
     DOMAIN = "Domain"
     NETCON = "NetConn"
 
-
+# 枚举图内动作类型
 class RelType(str, Enum):
     LOGON = "LOGON"
     SPAWNED = "SPAWNED"
@@ -24,7 +26,7 @@ class RelType(str, Enum):
     RESOLVED = "RESOLVED"
     RESOLVES_TO = "RESOLVES_TO"
 
-
+# 定义各节点的key字段
 NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.HOST: "host.id",
     NodeType.USER: "user.name",
@@ -35,7 +37,7 @@ NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.NETCON: "flow.id",
 }
 
-
+# 定义边的类型规则(每种边允许的源节点类型和目标节点类型)
 EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.LOGON: ({NodeType.USER}, {NodeType.HOST}),
     RelType.SPAWNED: ({NodeType.PROCESS}, {NodeType.PROCESS}),
@@ -45,20 +47,22 @@ EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.RESOLVES_TO: ({NodeType.DOMAIN}, {NodeType.IP}),
 }
 
+# 去重逻辑：避免因为数据源不同导致同一结点重复定义
 
+# 辅助函数：生成唯一ID(hash前16位)
 def _sha1_hex(raw: str) -> str:
     return sha1(raw.encode("utf-8")).hexdigest()[:16]
 
-
+# 生成Host ID
 def make_host_id(host_name: str) -> str:
     return f"h-{_sha1_hex(host_name)}"
 
-
+# 生成进程 ID(主机+PID+启动时间+执行路径 定义)
 def make_process_entity_id(host_id: str, pid: int, start_ts: str, executable: str) -> str:
     raw = f"{host_id}:{pid}:{start_ts}:{executable}"
     return f"p-{_sha1_hex(raw)}"
 
-
+# 给类的实例创建唯一标识符uid
 def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     items = [(k, v) for k, v in key.items() if v is not None]
     if not items:
@@ -70,7 +74,7 @@ def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     payload = ";".join(f"{k}={v}" for k, v in items)
     return f"{ntype.value}:{payload}"
 
-
+# 基于标识符获得类的实例
 def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     if ":" not in uid:
         raise ValueError(f"Invalid uid format: {uid}")
@@ -95,6 +99,7 @@ def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     return label, {key_field: rest}
 
 
+# 图的节点定义
 @dataclass
 class GraphNode:
     ntype: NodeType
@@ -112,7 +117,7 @@ class GraphNode:
                 merged.setdefault(k, v)
         return merged
 
-
+# 图的边定义
 @dataclass
 class GraphEdge:
     src_uid: str
@@ -132,7 +137,7 @@ class GraphEdge:
     def get_rtype(self) -> RelType:
         return self.rtype
 
-
+# 主机节点定义
 def host_node(
     host_id: str | None = None,
     host_name: str | None = None,
@@ -147,7 +152,7 @@ def host_node(
         node_props.setdefault("host.name", host_name)
     return GraphNode(ntype=NodeType.HOST, key={"host.id": host_id}, props=node_props)
 
-
+# 用户节点定义
 def user_node(
     user_name: str | None = None,
     user_id: str | None = None,
@@ -163,7 +168,7 @@ def user_node(
     key = {"user.name": user_name} if user_name else {"user.id": user_id}
     return GraphNode(ntype=NodeType.USER, key=key, props=node_props)
 
-
+# 进程节点定义
 def process_node(
     process_entity_id: str | None = None,
     *,
@@ -196,6 +201,7 @@ def process_node(
     return GraphNode(ntype=NodeType.PROCESS, key={"process.entity_id": process_entity_id}, props=node_props)
 
 
+# 文件节点定义
 def file_node(
     path: str | None = None,
     hash_sha256: str | None = None,
@@ -224,7 +230,7 @@ def file_node(
         key = {"file.hash.md5": hash_md5}
     return GraphNode(ntype=NodeType.FILE, key=key, props=node_props)
 
-
+# IP节点定义
 def ip_node(addr: str, props: dict[str, Any] | None = None) -> GraphNode:
     if not addr:
         raise ValueError("ip address is required.")
@@ -232,7 +238,7 @@ def ip_node(addr: str, props: dict[str, Any] | None = None) -> GraphNode:
     node_props.setdefault("related.ip", addr)
     return GraphNode(ntype=NodeType.IP, key={"related.ip": addr}, props=node_props)
 
-
+# 域名节点定义
 def domain_node(dns_name: str | None = None, url_domain: str | None = None, props: dict[str, Any] | None = None) -> GraphNode:
     if not dns_name and not url_domain:
         raise ValueError("dns.question.name or url.domain is required.")
@@ -245,6 +251,7 @@ def domain_node(dns_name: str | None = None, url_domain: str | None = None, prop
     return GraphNode(ntype=NodeType.DOMAIN, key=key, props=node_props)
 
 
+# 网络连接节点定义
 def netcon_node(
     flow_id: str | None = None,
     community_id: str | None = None,
@@ -281,11 +288,11 @@ def netcon_node(
 
 NodeOrUid = GraphNode | str
 
-
+# 辅助函数：传入节点对象或者ID字符串，返回ID字符串
 def _uid_of(x: NodeOrUid) -> str:
     return x.uid if isinstance(x, GraphNode) else x
 
-
+# 辅助函数：传入节点对象或者ID字符串，返回节点类型
 def _ntype_of(x: NodeOrUid) -> NodeType | None:
     if isinstance(x, GraphNode):
         return x.ntype
@@ -296,7 +303,7 @@ def _ntype_of(x: NodeOrUid) -> NodeType | None:
             return None
     return None
 
-
+# 强制执行图谱的Schema规则，避免边连接不合法的节点
 def _validate_edge_types(rtype: RelType, src: NodeOrUid, dst: NodeOrUid) -> None:
     src_t = _ntype_of(src)
     dst_t = _ntype_of(dst)
@@ -313,7 +320,7 @@ def _validate_edge_types(rtype: RelType, src: NodeOrUid, dst: NodeOrUid) -> None
             f"allowed: {sorted(t.value for t in allowed_src)} -> {sorted(t.value for t in allowed_dst)}"
         )
 
-
+# 通用边工厂函数
 def make_edge(
     src: NodeOrUid,
     dst: NodeOrUid,
@@ -339,95 +346,236 @@ def make_edge(
         props=edge_props,
     )
 
+# 语义化封装
 
+# 用户登录主机
 def logon(user: GraphNode, host: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(user, host, RelType.LOGON, **kw)
 
-
+# 进程衍生子进程
 def spawned(parent: GraphNode, child: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(parent, child, RelType.SPAWNED, **kw)
 
-
+# 进程访问文件
 def accessed(proc: GraphNode, file: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(proc, file, RelType.ACCESSED, **kw)
 
-
+# 网络连接
 def connected(src: GraphNode, dst: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(src, dst, RelType.CONNECTED, **kw)
 
-
+# 主机解析域名
 def resolved(host: GraphNode, domain: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(host, domain, RelType.RESOLVED, **kw)
 
-
+# 域名解析到IP
 def resolves_to(domain: GraphNode, ip: GraphNode, **kw: Any) -> GraphEdge:
     return make_edge(domain, ip, RelType.RESOLVES_TO, **kw)
 
 
-class KillChain:
-    nodes_edges: list[dict[str, Any]]
+# ==========================================
+# 中间态数据结构
+# ==========================================
 
-    def __init__(self, nodes_edges: list[dict[str, Any]] | None = None) -> None:
-        self.nodes_edges = nodes_edges or []
+# 连通子图容器:先把要用的节点和边一次性拉到内存里，在内存里建立索引，实现快速查询（空间换时间）
+@dataclass
+class Subgraph:
+    nodes: dict[str, GraphNode] = field(default_factory=dict)
+    edges: list[GraphEdge] = field(default_factory=list)
+    
+    # 邻接表索引：加速查询
+    # key: dst_uid, value: list[GraphEdge] (指向该节点的所有边，即入边)
+    _incoming_index: dict[str, list[GraphEdge]] = field(default_factory=lambda: defaultdict(list))
 
-    def append_node_edge(self, node: GraphNode, edge: GraphEdge | None = None) -> None:
-        self.nodes_edges.append({"node": node, "edge": edge})
+    def add_node(self, node: GraphNode) -> None:
+        self.nodes[node.uid] = node
 
-    def pop_node_edge(self) -> tuple[GraphNode, GraphEdge | None]:
-        d = self.nodes_edges.pop()
-        return d["node"], d["edge"]
+    def add_edge(self, edge: GraphEdge) -> None:
+        self.edges.append(edge)
+        self._incoming_index[edge.dst_uid].append(edge)
 
-    @classmethod
-    def get_kill_chain(cls, alarm_edge: GraphEdge) -> "KillChain":
-        path = cls(nodes_edges=[])
+    def get_node(self, uid: str) -> GraphNode | None:
+        return self.nodes.get(uid)
 
-        def should_stop(curr_node: GraphNode, curr_edge: GraphEdge, depth: int) -> bool:
+    def get_incoming_edges(self, node_uid: str) -> list[GraphEdge]:
+        """获取指向该节点的所有边 (用于回溯)"""
+        return self._incoming_index[node_uid]
+
+#    [重构后的KillChain] 纯数据类，只负责存储最终的攻击路径。
+@dataclass
+class CallChain:
+    # 存储结构：直接存由边组成的有序列表，节点信息隐含在边中
+    chain: list[GraphEdge] = field(default_factory=list)
+    @property
+    def length(self) -> int:
+        return len(self.chain)
+
+
+# ==========================================
+# 分析流水线实现 (Pipeline Implementation)
+# ==========================================
+
+# 1. 数据获取
+def fetch_edges_from_db() -> tuple[list[GraphEdge], list[GraphEdge]]:
+    return [], []
+
+# 2. 状态机 (构建初步子图)
+def behavior_state_machine(
+    normal_edges: list[GraphEdge], 
+    abnormal_edges: list[GraphEdge]
+) -> list[Subgraph]:
+    """
+    逻辑：根据时序和实体关联，将边聚合成一个个 Subgraph 对象。
+    """
+    subgraphs: list[Subgraph] = []
+    
+    # 示例逻辑
+    for edge in abnormal_edges:
+        sg = Subgraph()
+        sg.add_edge(edge)
+        # 注意：这里也需要 fetch 节点信息并 add_node，暂略
+        subgraphs.append(sg)
+        
+    return subgraphs
+
+# 3. 子图补全
+def expand_to_complete_subgraph(subgraph: Subgraph) -> Subgraph:
+    """
+    逻辑：拿到 subgraph 里的所有 node uid，去数据库查它们之间漏掉的边，
+    加回到 subgraph 对象中，使其“完全连通”。
+    """
+    # 模拟：此处应该调用 database API 查找更多关联边
+    # new_edges = db.find_edges_between(subgraph.nodes.keys())
+    # for e in new_edges: subgraph.add_edge(e)
+    return subgraph
+
+# 4. 溯源分析
+def backtrack_call_chain(subgraph: Subgraph, alarm_edge: GraphEdge | None = None) -> CallChain:
+    
+    # 如果没指定从哪条边开始，默认取子图里时间最晚的边作为告警边
+    if alarm_edge is None:
+        if not subgraph.edges:
+            return CallChain()
+        # 假设按时间排序取最后一个
+        alarm_edge = subgraph.edges[-1] 
+
+    path_stack: list[GraphEdge] = [alarm_edge]
+    visited: set[tuple[str, str, str]] = set()
+
+    # 结果容器
+    final_chain = CallChain()
+
+    def should_prune(prev: GraphEdge, curr: GraphEdge) -> bool:
+        # 实现具体的剪枝逻辑
+        return False
+
+    def dfs(curr_edge: GraphEdge) -> bool:
+        """
+        递归寻找攻击链
+        """
+        sig = (curr_edge.src_uid, curr_edge.dst_uid, curr_edge.rtype.value)
+        if sig in visited:
             return False
+        visited.add(sig)
 
-        def should_prune(prev_edge: GraphEdge, curr_edge: GraphEdge, depth: int) -> bool:
-            return False
+        curr_src_uid = curr_edge.src_uid
+        
+        # 直接从 subgraph 对象获取入边，而不是调 API
+        incoming_edges = subgraph.get_incoming_edges(curr_src_uid)
+        
+        curr_ts = curr_edge.get_ts()
 
-        from graph import api as graph_api
-
-        dst_node = graph_api.get_node(alarm_edge.get_dst_uid())
-        src_node = graph_api.get_node(alarm_edge.get_src_uid())
-        if dst_node is None or src_node is None:
-            return path
-
-        path.append_node_edge(dst_node, edge=None)
-        path.append_node_edge(src_node, edge=alarm_edge)
-
-        visited_edge: set[tuple[str, str, str]] = set()
-
-        def dfs(curr_node: GraphNode, curr_edge: GraphEdge, depth: int) -> bool:
-            sig = (curr_edge.get_src_uid(), curr_edge.get_dst_uid(), curr_edge.get_rtype().value)
-            if sig in visited_edge:
-                return False
-            visited_edge.add(sig)
-
-            if should_stop(curr_node, curr_edge, depth):
-                return True
-
-            all_edges = graph_api.get_edges(curr_node) or []
-            incoming = [e for e in all_edges if e.get_dst_uid() == curr_node.uid]
-            curr_ts = curr_edge.get_ts()
-
-            for prev_edge in incoming:
-                prev_ts = prev_edge.get_ts()
-                if curr_ts is None or prev_ts is None:
+        # 标记位(含义）：有没有找到更上游的原因
+        found_upstream = False
+        for prev_edge in incoming_edges:
+            prev_ts = prev_edge.get_ts()
+            
+            # 时间因果律检查
+            if curr_ts and prev_ts and prev_ts < curr_ts:
+                if should_prune(prev_edge, curr_edge):
                     continue
-                if prev_ts < curr_ts:
-                    if should_prune(prev_edge, curr_edge, depth):
-                        continue
-                    prev_src_uid = prev_edge.get_src_uid()
-                    prev_src_node = graph_api.get_node(prev_src_uid)
-                    if prev_src_node is None:
-                        continue
-                    path.append_node_edge(prev_src_node, edge=prev_edge)
-                    if dfs(prev_src_node, prev_edge, depth + 1):
-                        return True
-                    path.pop_node_edge()
-            return False
+                
+                path_stack.append(prev_edge)
+                if dfs(prev_edge):
+                    found_upstream = True
+                    # 这里可以选择是否找到一条就返回，或者通过某种逻辑保留最长路径
+                    # 简单起见，我们保留最深的那条路径
+                    pass 
+                
+                # 如果是回溯算法，通常需要 pop，但在寻找“最长攻击链”时，
+                # 我们往往在递归到底部（叶子节点）时保存快照。
+                # 此处简化逻辑：如果找到了更上游的，就不从这里断开
+                if not found_upstream:
+                    path_stack.pop() 
+        
+        return found_upstream
 
-        dfs(src_node, alarm_edge, depth=0)
-        return path
+    # 启动 DFS
+    dfs(alarm_edge)
+    
+    # 将栈转换为结果 (注意 DFS 栈的顺序是倒序的：告警 -> 原因 -> 更早的原因)
+    # 通常我们习惯看：原因 -> 结果，所以反转一下
+    final_chain.chain = list(reversed(path_stack))
+    
+    return final_chain
+
+# 5. 向量提取
+def extract_vectors(chain: CallChain) -> list[list[float]]:
+    vectors = []
+    for edge in chain.chain:
+        # 模拟：将 Edge 的属性 (rtype, props) 转化为向量
+        v = [1.0, 0.5] 
+        vectors.append(v)
+    return vectors
+
+# 6. 特征匹配
+def match_vector_features(vectors: list[list[float]]) -> dict[str, Any]:
+    return {"attack_type": "Ransomware", "confidence": 0.98}
+
+# 7. LLM 分析
+def analyze_with_llm(match_result: dict[str, Any], chain: CallChain) -> str:
+    # 构建 Prompt，描述 chain 里的每一步
+    chain_desc = "\n".join(
+        f"{e.get_ts()}: {e.src_uid} --[{e.rtype}]--> {e.dst_uid}" 
+        for e in chain.chain
+    )
+    return f"Analysis: Detected {match_result['attack_type']}.\nDetails:\n{chain_desc}"
+
+
+# ==========================================
+# 编排入口 (Orchestrator)
+# ==========================================
+
+def run_analysis_pipeline() -> None:
+    print("[*] Starting Pipeline...")
+    
+    # 1. Get Data
+    normal, abnormal = fetch_edges_from_db()
+    
+    # 2. State Machine -> Subgraphs
+    subgraphs = behavior_state_machine(normal, abnormal)
+    
+    for i, sg in enumerate(subgraphs):
+        # 3. Expand Context
+        complete_sg = expand_to_complete_subgraph(sg)
+        
+        # 4. Backtrack (Pure Logic)
+        call_chain = backtrack_call_chain(complete_sg)
+        
+        if call_chain.length == 0:
+            continue
+            
+        # 5. Vectors
+        vectors = extract_vectors(call_chain)
+        
+        # 6. Match
+        match_res = match_vector_features(vectors)
+        
+        # 7. LLM
+        report = analyze_with_llm(match_res, call_chain)
+        
+        print(f"--- Alert #{i} ---")
+        print(report)
+
+if __name__ == "__main__":
+    run_analysis_pipeline()
