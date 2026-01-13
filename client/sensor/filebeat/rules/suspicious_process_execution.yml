@@ -1,0 +1,26 @@
+title: Suspicious Process Execution
+id: 90123456-7a8b-9c0d-1e2f-3456789abcde
+status: stable
+description: Detects execution of suspicious processes commonly used by attackers
+references:
+  - https://attack.mitre.org/techniques/T1059/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: 'python -c'
+    - message|contains: 'perl -e'
+    - message|contains: 'ruby -e'
+    - message|contains: 'bash -i'
+    - message|contains: 'sh -i'
+    - message|contains: 'php -r'
+  condition: selection
+falsepositives:
+  - Development and scripting activities
+level: medium
+tags:
+  - attack.execution
+  - attack.t1059

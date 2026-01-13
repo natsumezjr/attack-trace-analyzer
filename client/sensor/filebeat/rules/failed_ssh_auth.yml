@@ -1,0 +1,24 @@
+title: Multiple Failed SSH Authentication Attempts
+id: afb8f1a9-7a4b-4c8a-9e3d-1a2b3c4d5e6f
+status: stable
+description: Detects multiple failed SSH authentication attempts which may indicate brute force attack
+references:
+  - https://attack.mitre.org/techniques/T1110/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    - message|contains: 'Failed password'
+    - message|contains: 'authentication failure'
+    - message|contains: 'Invalid user'
+  timeframe: 5m
+  condition: selection | count() > 5
+falsepositives:
+  - Legitimate failed login attempts
+level: high
+tags:
+  - attack.credential_access
+  - attack.t1110

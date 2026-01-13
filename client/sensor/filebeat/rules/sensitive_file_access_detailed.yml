@@ -1,0 +1,25 @@
+title: Sensitive File Access
+id: 7e8f9012-3a4b-5c6d-7e8f-90123a4b5c6d
+status: stable
+description: Detects access to sensitive system files
+references:
+  - https://attack.mitre.org/techniques/T1005/
+author: Security Team
+date: 2024/01/01
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - message|contains: '/etc/shadow'
+    - message|contains: '/etc/passwd'
+    - message|contains: '/etc/group'
+    - message|contains: '/root/.ssh'
+    - message|contains: '/home/*/.ssh'
+  condition: selection
+falsepositives:
+  - System administration tasks
+level: high
+tags:
+  - attack.collection
+  - attack.t1005

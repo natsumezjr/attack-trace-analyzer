@@ -1,26 +1,33 @@
-# syntax=docker/dockerfile:1
+ARG GO_IMAGE=golang:1.25.5-bookworm
+ARG RUNTIME_IMAGE=debian:bookworm-slim
 
-FROM golang:1.22-alpine AS build
+FROM ${GO_IMAGE} AS builder
 
 WORKDIR /src
 
-RUN apk add --no-cache ca-certificates git
+# sqlite driver uses CGO (github.com/mattn/go-sqlite3) -> needs a C toolchain
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates \
+      gcc \
+      libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY . ./
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/go-client ./
 
-RUN go build -trimpath -o /out/client-backend ./cmd/client-backend
+FROM ${RUNTIME_IMAGE} AS runtime
 
-FROM alpine:3.20
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apk add --no-cache ca-certificates tzdata
+COPY --from=builder /out/go-client /usr/local/bin/go-client
 
-WORKDIR /app
-
-COPY --from=build /out/client-backend /usr/local/bin/client-backend
-
-EXPOSE 18080
-
-ENTRYPOINT ["client-backend"]
+EXPOSE 8888
+ENTRYPOINT ["/usr/local/bin/go-client"]
+CMD ["-db", "/data/data.db"]
