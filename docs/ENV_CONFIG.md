@@ -27,9 +27,9 @@
 
 | 变量名 | 说明 | 默认值 | 使用位置 |
 |--------|------|--------|----------|
-| `OPENSEARCH_NODE` | OpenSearch 节点地址 | `http://localhost:9200` | `backend/opensearch/client.py` |
-| `OPENSEARCH_USERNAME` | OpenSearch 用户名 | `admin` | `backend/opensearch/client.py` |
-| `OPENSEARCH_PASSWORD` | OpenSearch 密码 | `OpenSearch@2024!Dev` | `backend/opensearch/client.py`, `docker-compose.yml` |
+| `OPENSEARCH_NODE` | OpenSearch 节点地址 | `http://localhost:9200` | `backend/app/services/opensearch/client.py` |
+| `OPENSEARCH_USERNAME` | OpenSearch 用户名 | `admin` | `backend/app/services/opensearch/client.py` |
+| `OPENSEARCH_PASSWORD` | OpenSearch 密码 | `OpenSearch@2024!Dev` | `backend/app/services/opensearch/client.py`, `docker-compose.yml` |
 | `OPENSEARCH_INITIAL_ADMIN_PASSWORD` | 容器初始化密码 | `OpenSearch@2024!Dev` | `docker-compose.yml` |
 | `OPENSEARCH_JAVA_OPTS` | JVM 内存配置 | `-Xms512m -Xmx512m` | `docker-compose.yml` |
 
@@ -37,10 +37,10 @@
 
 | 变量名 | 说明 | 默认值 | 使用位置 |
 |--------|------|--------|----------|
-| `NEO4J_URI` | Neo4j 连接 URI | `bolt://localhost:7687` | `graph/api.py` |
-| `NEO4J_USER` | Neo4j 用户名 | `neo4j` | `graph/api.py` |
-| `NEO4J_PASSWORD` | Neo4j 密码 | `password` | `graph/api.py`, `docker-compose.yml` |
-| `NEO4J_DATABASE` | Neo4j 数据库名称 | (可选) | `graph/api.py` |
+| `NEO4J_URI` | Neo4j 连接 URI | `bolt://localhost:7687` | `backend/app/services/graph/api.py` |
+| `NEO4J_USER` | Neo4j 用户名 | `neo4j` | `backend/app/services/graph/api.py` |
+| `NEO4J_PASSWORD` | Neo4j 密码 | `password` | `backend/app/services/graph/api.py`, `docker-compose.yml` |
+| `NEO4J_DATABASE` | Neo4j 数据库名称 | (可选) | `backend/app/services/graph/api.py` |
 | `NEO4J_AUTH` | Neo4j 认证（格式: 用户名/密码） | `neo4j/password` | `docker-compose.yml` |
 | `NEO4J_server_memory_*` | Neo4j 内存配置 | `1G` | `docker-compose.yml` |
 
@@ -124,7 +124,7 @@ services:
 
 ### Backend 模块
 
-#### `backend/opensearch/client.py`
+#### `backend/app/services/opensearch/client.py`
 - ✅ `OPENSEARCH_NODE` - 已使用 `os.getenv`
 - ✅ `OPENSEARCH_USERNAME` - 已使用 `os.getenv`
 - ✅ `OPENSEARCH_PASSWORD` - 已使用 `os.getenv`
