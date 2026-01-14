@@ -30,7 +30,7 @@ from hashlib import sha1
 from typing import Any, Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from .attack_fsa import AttackState, FSAGraph, behavior_state_machine
-from ..neo4j import internal as graph_api
+from ..neo4j import db as graph_api
 from ..neo4j.models import GraphEdge, GraphNode, NodeType, RelType, parse_uid
 from ..neo4j.utils import _parse_ts_to_float
 
@@ -243,6 +243,8 @@ class KillChain:
     selected_paths: List[CandidatePath]
     explanation: str
     trace: List[Dict[str, Any]] = field(default_factory=list)
+    
+    
 
 
 # ---------------------------------------------------------------------------
@@ -893,6 +895,7 @@ def build_llm_payload(candidate: SemanticCandidateSubgraph) -> Dict[str, Any]:
 
 def select_killchain_with_llm(
     candidate: SemanticCandidateSubgraph,
+    kc_uuid: str,
     *,
     llm_client: Any = None,
 ) -> KillChain:
@@ -932,13 +935,14 @@ def select_killchain_with_llm(
             chosen_ids.append(best.path_id)
         explanation = "mock: selected shortest-hop path per anchor pair (replace with LLM)."
 
-    killchain = materialize_killchain(candidate, chosen_ids, explanation=explanation)
+    killchain = materialize_killchain(candidate, chosen_ids, kc_uuid, explanation=explanation)
     return killchain
 
 
 def materialize_killchain(
     candidate: SemanticCandidateSubgraph,
     chosen_path_ids: Sequence[str],
+    kc_uuid: str,
     *,
     explanation: str,
 ) -> KillChain:
@@ -957,8 +961,6 @@ def materialize_killchain(
             continue
         selected.append(c)
 
-    kc_uuid = str(uuid.uuid4())
-
     return KillChain(
         kc_uuid=kc_uuid,
         fsa_graph=candidate.fsa_graph,
@@ -972,42 +974,6 @@ def materialize_killchain(
 # ---------------------------------------------------------------------------
 # Persist: annotate edges/nodes with kc_uuid (ECS: custom.killchain.uuid)
 # ---------------------------------------------------------------------------
-
-KC_ECS_FIELD: str = "custom.killchain.uuid"
-"""ECS 合规的 killchain uuid 字段（custom.* 命名空间）。"""
-
-
-def _set_kc_uuid_on_edge(edge: GraphEdge, kc_uuid: str) -> None:
-    """给边写入 killchain uuid（同时写入 props）。"""
-    edge.props[KC_ECS_FIELD] = kc_uuid
-    # 若 models 已新增 kc_uuid 字段，则同步赋值（best-effort）
-    try:
-        setattr(edge, "kc_uuid", kc_uuid)
-    except Exception:
-        pass
-
-
-def _minimal_node_from_uid(uid: str, kc_uuid: str) -> Optional[GraphNode]:
-    """
-    用 uid 生成“最小 GraphNode”，仅用于把 custom.killchain.uuid merge 写入数据库。
-    这样无需依赖 get_node API。
-    """
-    try:
-        ntype, key = parse_uid(uid)
-    except Exception:
-        return None
-    return GraphNode(ntype=ntype, key=key, props={KC_ECS_FIELD: kc_uuid})
-
-
-def _set_kc_uuid_on_node(node: GraphNode, kc_uuid: str) -> None:
-    """给节点写入 killchain uuid（props + best-effort 字段）。"""
-    node.props[KC_ECS_FIELD] = kc_uuid
-    try:
-        setattr(node, "kc_uuid", kc_uuid)
-    except Exception:
-        pass
-
-
 def persist_killchain_to_db(kc: KillChain) -> None:
     """
     将 killchain 结果落库（仅靠在 props 写 kc_uuid）：
@@ -1025,8 +991,8 @@ def persist_killchain_to_db(kc: KillChain) -> None:
     if not hasattr(graph_api, "add_edge") or not hasattr(graph_api, "add_node"):
         raise RuntimeError("graph_api.add_edge/add_node not found; cannot persist killchain.")
 
-    add_edge = graph_api.add_edge
-    add_node = graph_api.add_node
+    set_analysis_task_id = graph_api.set_analysis_task_id
+    get_node = graph_api.get_node
 
     kc_uuid = kc.kc_uuid
 
@@ -1053,8 +1019,7 @@ def persist_killchain_to_db(kc: KillChain) -> None:
 
     # 2) 写入边 props 并落库
     for e in edges:
-        _set_kc_uuid_on_edge(e, kc_uuid)
-        add_edge(e)
+        set_analysis_task_id(e, kc_uuid)
 
     # 3) 收集节点 uid（从边端点）
     node_uids: Set[str] = set()
@@ -1064,11 +1029,10 @@ def persist_killchain_to_db(kc: KillChain) -> None:
 
     # 4) 生成最小节点并 merge 写入
     for uid in node_uids:
-        node = _minimal_node_from_uid(uid, kc_uuid)
+        node = get_node(uid)
         if node is None:
             continue
-        _set_kc_uuid_on_node(node, kc_uuid)
-        add_node(node)
+        set_analysis_task_id(node, kc_uuid)
 
 
 # ---------------------------------------------------------------------------
@@ -1091,6 +1055,7 @@ def match_vector_features(vectors: Any) -> Any:
 
 def run_killchain_pipeline(
     *,
+    kc_uuid: str,
     llm_client: Any = None,
     persist: bool = True,
 ) -> List[KillChain]:
@@ -1110,7 +1075,7 @@ def run_killchain_pipeline(
     # Phase C
     killchains: List[KillChain] = []
     for cand in candidates:
-        kc = select_killchain_with_llm(cand, llm_client=llm_client)
+        kc = select_killchain_with_llm(cand, kc_uuid, llm_client=llm_client)
         killchains.append(kc)
 
         # Persist (kc_uuid -> props -> DB)
