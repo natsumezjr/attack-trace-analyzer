@@ -24,8 +24,9 @@ SA_DETECTORS_SEARCH_API = "/_plugins/_security_analytics/detectors/_search"
 SA_DETECTOR_GET_API = "/_plugins/_security_analytics/detectors/{detector_id}"
 SA_DETECTOR_UPDATE_API = "/_plugins/_security_analytics/detectors/{detector_id}"
 SA_FINDINGS_SEARCH_API = "/_plugins/_security_analytics/findings/_search"
-ALERTING_WORKFLOWS_SEARCH_API = "/_plugins/_alerting/monitors/_search"
-ALERTING_WORKFLOW_EXECUTE_API = "/_plugins/_alerting/workflows/{workflow_id}/_execute"
+# 注意：某些版本 workflows/_search 不存在或被当成 id 路由，所以只用 monitors/_search
+ALERTING_MONITORS_SEARCH_API = "/_plugins/_alerting/monitors/_search"  # 统一使用 monitors 搜索
+ALERTING_WORKFLOW_EXECUTE_API = "/_plugins/_alerting/monitors/{workflow_id}/_execute"  # workflow ID 就是 monitor ID，用 monitor execute
 
 # 缓存时间窗口（秒）：如果findings在5分钟内，直接使用，不触发新扫描
 FINDINGS_CACHE_WINDOW_SECONDS = 300  # 5分钟
@@ -488,46 +489,246 @@ def _get_workflow_id_for_detector(client, detector_id: str) -> Optional[str]:
     """
     根据detector_id获取对应的workflow_id
     
-    Security Analytics会为每个detector创建一个composite workflow
+    策略（按优先级）：
+    1. 先检查detector详情里是否有monitor_id（最直接）
+    2. 通过monitors/_search查找workflow（兼容keyword/text字段）
+    
+    注意：某些detector可能没有workflow，这是正常的。如果没有workflow，
+    可以使用schedule方式触发扫描（同样有效）。
     
     参数：
     - client: OpenSearch客户端
     - detector_id: Detector ID
     
     返回：
-    - workflow_id: 如果找到则返回workflow ID，否则返回None
+    - workflow_id: 如果找到则返回workflow ID（即monitor ID），否则返回None
     """
+    # 方法1：先检查detector详情里是否有monitor_id（最直接的方式）
     try:
-        # 查询workflow，找到名称匹配detector的workflow
+        print(f"[DEBUG] 检查detector详情中是否有monitor_id...")
+        detector = _get_detector_details(client, detector_id)
+        if detector:
+            # 检查多种可能的字段名
+            monitor_id = (
+                detector.get('monitor_id') or 
+                detector.get('monitorId') or 
+                (detector.get('monitor_ids', [None])[0] if isinstance(detector.get('monitor_ids'), list) else None) or
+                detector.get('workflow_id') or 
+                detector.get('workflowId')
+            )
+            if monitor_id:
+                print(f"[DEBUG] 在detector详情中找到monitor_id: {monitor_id}")
+                return monitor_id
+            else:
+                print(f"[DEBUG] detector详情中没有monitor_id字段")
+                # 打印detector的所有keys以便调试
+                print(f"[DEBUG] detector的keys: {list(detector.keys())}")
+    except Exception as e:
+        print(f"[DEBUG] 检查detector详情失败: {e}")
+    
+    # 方法2：通过monitors/_search查找workflow（兼容keyword/text字段）
+    try:
+        print(f"[DEBUG] 通过monitors搜索API查找workflow...")
+        
+        # 先查询所有monitors，看看实际返回什么
+        print(f"[DEBUG] 先查询所有monitors（不限制条件）...")
+        all_monitors_resp = client.transport.perform_request(
+            'POST',
+            ALERTING_MONITORS_SEARCH_API,
+            body={"query": {"match_all": {}}, "size": 50}
+        )
+        
+        # 使用统一的提取函数
+        all_hits = all_monitors_resp.get('hits', {}).get('hits', [])
+        
+        print(f"[DEBUG] 找到 {len(all_hits)} 个monitors")
+        print(f"[DEBUG] 响应顶层keys: {list(all_monitors_resp.keys())}")
+        if all_hits:
+            # 打印所有monitor的关键字段以便调试
+            for i, hit in enumerate(all_hits[:3]):  # 只打印前3个
+                source = hit.get('_source', {}) if '_source' in hit else hit
+                hit_id = hit.get('_id') if '_id' in hit else hit.get('id')
+                print(f"[DEBUG] Monitor {i+1}: id={hit_id}, name={source.get('name')}, type={source.get('type')}, monitor_type={source.get('monitor_type')}, owner={source.get('owner')}")
+        
+        # 查询workflow：兼容keyword/text字段，使用should+minimum_should_match
+        # 注意：workflow的type=workflow，monitor_type可能是None或composite
+        workflow_query = {
+            "query": {
+                "bool": {
+                    "filter": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"term": {"type.keyword": "workflow"}},  # 优先用keyword
+                                    {"match": {"type": "workflow"}},  # fallback到match
+                                    {"term": {"monitor_type.keyword": "composite"}},
+                                    {"match": {"monitor_type": "composite"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        },
+                        {
+                            "bool": {
+                                "should": [
+                                    {"term": {"owner.keyword": "security_analytics"}},
+                                    {"match": {"owner": "security_analytics"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": 50
+        }
+        
+        # 先尝试严格查询
         workflow_resp = client.transport.perform_request(
             'POST',
-            ALERTING_WORKFLOWS_SEARCH_API,
-            body={
-                "query": {
-                    "bool": {
-                        "must": [
-                            {"term": {"type": "workflow"}},
-                            {"term": {"workflow_type": "composite"}},
-                            {"term": {"owner": "security_analytics"}}
-                        ]
-                    }
-                },
-                "size": 10
-            }
+            ALERTING_MONITORS_SEARCH_API,
+            body=workflow_query
         )
         
         hits = workflow_resp.get('hits', {}).get('hits', [])
-        for hit in hits:
-            workflow_source = hit.get('_source', {})
-            # workflow名称通常与detector名称相同
-            # 或者可以通过delegate monitor关联
-            workflow_id = hit.get('_id')
-            # 简单策略：返回第一个匹配的workflow（通常只有一个）
-            return workflow_id
         
-        return None
-    except Exception:
-        return None
+        # 如果严格查询没结果，尝试更宽松的查询：只匹配type=workflow和owner=security_analytics
+        if not hits:
+            print(f"[DEBUG] 严格查询无结果，尝试更宽松的查询（只匹配type=workflow和owner）...")
+            # 尝试多种查询方式：term/match，keyword/非keyword
+            relaxed_query = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"term": {"type": "workflow"}},  # 先尝试非keyword
+                                        {"term": {"type.keyword": "workflow"}},  # 再尝试keyword
+                                        {"match": {"type": "workflow"}}  # 最后用match
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            },
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"term": {"owner": "security_analytics"}},  # 先尝试非keyword
+                                        {"term": {"owner.keyword": "security_analytics"}},  # 再尝试keyword
+                                        {"match": {"owner": "security_analytics"}}  # 最后用match
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            }
+                        ]
+                    }
+                },
+                "size": 50
+            }
+            workflow_resp = client.transport.perform_request(
+                'POST',
+                ALERTING_MONITORS_SEARCH_API,
+                body=relaxed_query
+            )
+            hits = workflow_resp.get('hits', {}).get('hits', [])
+            
+            # 如果还是没结果，直接从所有monitors中筛选（fallback）
+            if not hits:
+                print(f"[DEBUG] 宽松查询也无结果，直接从所有monitors中筛选workflow...")
+                for hit in all_hits:
+                    source = hit.get('_source', {}) if '_source' in hit else hit
+                    hit_type = source.get('type')
+                    hit_owner = source.get('owner')
+                    if hit_type == 'workflow' and hit_owner == 'security_analytics':
+                        print(f"[DEBUG] 从所有monitors中找到workflow: {hit.get('_id')}")
+                        hits = [hit]
+                        break
+        
+        print(f"[DEBUG] monitors搜索API（workflow查询）返回了 {len(hits)} 个结果")
+        if hits:
+            for i, hit in enumerate(hits):
+                source = hit.get('_source', {}) if '_source' in hit else hit
+                hit_id = hit.get('_id') if '_id' in hit else hit.get('id')
+                print(f"[DEBUG] Workflow {i+1}: id={hit_id}, name={source.get('name')}, type={source.get('type')}, monitor_type={source.get('monitor_type')}, owner={source.get('owner')}")
+                # 打印inputs结构（可能包含detector关联信息）
+                inputs = source.get('inputs', [])
+                if inputs:
+                    print(f"[DEBUG]   inputs类型: {type(inputs)}")
+                    if isinstance(inputs, list) and len(inputs) > 0:
+                        print(f"[DEBUG]   第一个inputs的keys: {list(inputs[0].keys()) if isinstance(inputs[0], dict) else 'not dict'}")
+        
+        # 简单策略：返回第一个匹配的workflow（通常只有一个）
+        if hits:
+            return hits[0].get('_id')
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"[DEBUG] monitors搜索API失败: {error_type}: {error_msg}")
+    
+    print(f"[DEBUG] 未找到匹配detector {detector_id} 的workflow")
+    return None
+
+
+def _get_latest_findings_timestamp(client, detector_id: Optional[str] = None) -> tuple[int, int]:
+    """
+    获取最新findings的时间戳和数量（用于轮询确认）
+    
+    参数：
+    - client: OpenSearch客户端
+    - detector_id: Detector ID（可选）
+    
+    返回：
+    - (timestamp_ms, count): 最新finding的时间戳（毫秒）和总数
+      如果查询失败或没有findings，返回 (0, 0)
+    """
+    try:
+        params = {
+            'size': 1,  # 只要最新的一个
+            'sortString': 'timestamp',
+            'sortOrder': 'desc'
+        }
+        if detector_id:
+            params['detector_id'] = detector_id
+        
+        findings_resp = client.transport.perform_request(
+            'GET',
+            SA_FINDINGS_SEARCH_API,
+            params=params
+        )
+        
+        # 提取findings
+        findings = findings_resp.get('findings', [])
+        total_findings = findings_resp.get('total_findings', len(findings))
+        
+        if not findings:
+            return (0, total_findings)
+        
+        # 获取最新finding的时间戳
+        latest_finding = findings[0]
+        timestamp_value = latest_finding.get('timestamp') or latest_finding.get('@timestamp')
+        
+        if timestamp_value:
+            if isinstance(timestamp_value, (int, float)):
+                # 数字时间戳
+                if timestamp_value > 1e12:
+                    timestamp_ms = int(timestamp_value)  # 已经是毫秒
+                else:
+                    timestamp_ms = int(timestamp_value * 1000)  # 秒转毫秒
+            elif isinstance(timestamp_value, str):
+                # ISO格式字符串，转换为毫秒时间戳
+                try:
+                    ts = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+                    timestamp_ms = int(ts.timestamp() * 1000)
+                except Exception:
+                    timestamp_ms = 0
+            else:
+                timestamp_ms = 0
+        else:
+            timestamp_ms = 0
+        
+        return (timestamp_ms, total_findings)
+    except Exception as e:
+        print(f"[WARNING] 查询findings时间戳失败: {e}")
+        return (0, 0)
 
 
 def _get_latest_findings_count(client, detector_id: str) -> int:
@@ -541,19 +742,8 @@ def _get_latest_findings_count(client, detector_id: str) -> int:
     返回：
     - findings数量（如果查询失败则返回0）
     """
-    try:
-        findings_resp = client.transport.perform_request(
-            'GET',
-            SA_FINDINGS_SEARCH_API,
-            params={
-                'detector_id': detector_id,
-                'size': 0  # 只要总数
-            }
-        )
-        
-        return findings_resp.get('total_findings', 0)
-    except Exception:
-        return 0
+    _, count = _get_latest_findings_timestamp(client, detector_id)
+    return count
 
 
 # ========== 辅助函数：查询detector相关 ==========
@@ -585,11 +775,156 @@ def _get_detector_details(client, detector_id: str) -> Optional[dict]:
 
 
 def _should_trigger_scan(trigger_scan: bool, baseline_count: int) -> bool:
-    """判断是否需要触发新扫描"""
+    """
+    判断是否需要触发新扫描
+    
+    注意：这个函数已废弃，现在使用更详细的逻辑（检查findings年龄）
+    保留此函数是为了向后兼容
+    """
+    # 旧逻辑：只有当没有findings时才触发
+    # 新逻辑在 run_security_analytics 中实现（检查findings年龄）
     return trigger_scan and baseline_count == 0
 
 
 # ========== 辅助函数：触发扫描相关 ==========
+
+def _is_timestamp_string(value) -> bool:
+    """判断一个值是否是ISO格式的时间戳字符串"""
+    if not isinstance(value, str):
+        return False
+    # 检查是否是ISO格式的时间戳（如 "2026-01-14T04:44:38.487Z"）
+    import re
+    iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$'
+    return bool(re.match(iso_pattern, value))
+
+
+def _clean_detector_for_update(detector: dict) -> dict:
+    """
+    清理detector对象，移除可能导致更新错误的字段
+    
+    移除的字段：
+    - 时间戳字段（last_update_time, created_at, updated_at等）
+    - OpenSearch元数据字段（_version, _seq_no, _primary_term等）
+    - 任何ISO格式的时间戳字符串值
+    - 保留核心字段：name, type, detector_type, schedule, enabled, inputs等
+    """
+    # 需要移除的字段列表（时间戳和元数据字段）
+    fields_to_remove = [
+        'last_update_time',
+        'created_at',
+        'updated_at',
+        '@timestamp',
+        '_version',
+        '_seq_no',
+        '_primary_term',
+        'monitor_id',  # 可能由系统管理
+        'detector_id',  # 由URL参数提供，不应在body中
+    ]
+    
+    cleaned = detector.copy()
+    
+    # 移除已知的时间戳和元数据字段
+    for field in fields_to_remove:
+        cleaned.pop(field, None)
+    
+    # 递归清理：移除任何值是ISO时间戳字符串的字段
+    def clean_dict_recursive(obj):
+        if isinstance(obj, dict):
+            cleaned_obj = {}
+            for key, value in obj.items():
+                # 跳过时间戳字段名
+                if any(time_word in key.lower() for time_word in ['time', 'date', 'timestamp', 'created', 'updated']):
+                    continue
+                # 跳过ISO时间戳字符串值
+                if _is_timestamp_string(value):
+                    continue
+                # 递归清理嵌套对象
+                cleaned_obj[key] = clean_dict_recursive(value)
+            return cleaned_obj
+        elif isinstance(obj, list):
+            return [clean_dict_recursive(item) for item in obj]
+        else:
+            return obj
+    
+    cleaned = clean_dict_recursive(cleaned)
+    
+    return cleaned
+
+
+def _execute_workflow_manually(client, workflow_id: str) -> bool:
+    """
+    手动执行workflow（立即触发扫描，不等schedule）
+    
+    注意：workflow本质上就是composite monitor，所以使用monitor execute API
+    这是推荐的触发方式：直接调用monitor的_execute API，比临时改schedule更干净
+    
+    参数：
+    - client: OpenSearch客户端
+    - workflow_id: Workflow ID（即monitor ID）
+    
+    返回：
+    - True: 执行成功
+    - False: 执行失败
+    """
+    # 先尝试GET monitor配置，检查是否有读取权限（可选检查，不影响执行）
+    # 注意：即使GET失败，execute API可能仍然可以工作，因为execute可能不需要读取完整配置
+    try:
+        print(f"[DEBUG] 先检查是否有读取monitor配置的权限...")
+        monitor_get_path = f"/_plugins/_alerting/monitors/{workflow_id}"
+        monitor_config = client.transport.perform_request('GET', monitor_get_path)
+        print(f"[DEBUG] GET monitor配置成功，有读取权限")
+    except Exception as get_error:
+        error_msg = str(get_error)
+        error_type = type(get_error).__name__
+        print(f"[WARNING] GET monitor配置失败: {error_type}: {error_msg}")
+        # 注意：即使GET失败，我们仍然尝试执行workflow，因为execute API可能不需要读取完整配置
+        # 某些OpenSearch版本中，execute API的权限检查可能独立于GET API
+        if '403' in error_msg or 'forbidden' in error_msg.lower():
+            print(f"[WARNING] GET权限不足，但继续尝试执行workflow（execute API可能有独立权限）")
+        elif '500' in error_msg and ('indices:data/read/get' in error_msg or 'alerting_exception' in error_msg):
+            print(f"[WARNING] GET时出现权限相关错误，但继续尝试执行workflow")
+        # 不返回False，继续尝试execute
+    
+    # 尝试执行workflow
+    try:
+        print(f"[INFO] 手动执行workflow (monitor_id: {workflow_id})...")
+        api_path = ALERTING_WORKFLOW_EXECUTE_API.format(workflow_id=workflow_id)
+        print(f"[DEBUG] 调用API: POST {api_path}")
+        execute_resp = client.transport.perform_request(
+            'POST',
+            api_path,
+            body={}
+        )
+        
+        # 检查响应是否成功
+        # execute API通常返回执行结果，成功时可能有workflow_run_id、monitor_run_id等字段
+        if execute_resp:
+            print(f"[INFO] Workflow执行请求已提交，响应: {execute_resp}")
+            # 检查响应中是否有执行ID（表示成功）
+            if 'workflow_run_id' in execute_resp or 'monitor_run_id' in execute_resp or 'run_id' in execute_resp:
+                print(f"[INFO] 执行ID: {execute_resp.get('workflow_run_id') or execute_resp.get('monitor_run_id') or execute_resp.get('run_id')}")
+            return True
+        else:
+            print(f"[WARNING] Workflow执行请求返回空响应")
+            return False
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"[WARNING] 手动执行workflow失败: {error_type}: {error_msg}")
+        
+        # 检查是否是权限问题
+        if '500' in error_msg and ('alerting_exception' in error_msg or 'indices:data/read' in error_msg):
+            print(f"[ERROR] 可能是权限问题：workflow执行时需要读取系统索引，但当前用户可能缺少权限")
+            print(f"[ERROR] 需要权限：")
+            print(f"[ERROR]   1. 对alerting系统索引的read/get权限（.opensearch-alerting-config等）")
+            print(f"[ERROR]   2. 对业务索引的查询权限（ecs-events-*等）")
+            print(f"[ERROR]   3. alerting插件的execute权限")
+            print(f"[ERROR] 建议：将用户映射到alerting_full_access角色，或添加最小权限")
+        
+        import traceback
+        print(f"[DEBUG] 错误详情: {traceback.format_exc()}")
+        return False
+
 
 def _enable_detector_if_needed(client, detector_id: str, detector: dict) -> None:
     """确保detector已启用"""
@@ -625,15 +960,49 @@ def _temporarily_shorten_schedule(client, detector_id: str, detector: dict) -> t
         temp_schedule = {"period": {"interval": 1, "unit": "MINUTES"}}
         
         try:
+            cleaned_detector = _clean_detector_for_update(detector)
+            cleaned_detector['schedule'] = temp_schedule
+            cleaned_detector['enabled'] = True
             client.transport.perform_request(
                 'PUT',
                 SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                body={**detector, "schedule": temp_schedule, "enabled": True}
+                body=cleaned_detector
             )
             print(f"[INFO] Schedule已临时设置为1分钟")
             return original_schedule, True
         except Exception as e:
             print(f"[WARNING] 设置临时schedule失败: {e}")
+            return original_schedule, False
+    
+    # 如果schedule已经是分钟级别，通过临时禁用再启用来强制触发
+    if original_unit == 'MINUTES':
+        print(f"[INFO] Schedule已较短，通过禁用再启用来强制触发扫描...")
+        try:
+            cleaned_detector = _clean_detector_for_update(detector)
+            
+            # 临时禁用
+            cleaned_detector_disabled = cleaned_detector.copy()
+            cleaned_detector_disabled['enabled'] = False
+            client.transport.perform_request(
+                'PUT',
+                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
+                body=cleaned_detector_disabled
+            )
+            import time
+            time.sleep(1)  # 等待1秒确保禁用生效
+            
+            # 重新启用（这会触发一次扫描）
+            cleaned_detector_enabled = cleaned_detector.copy()
+            cleaned_detector_enabled['enabled'] = True
+            client.transport.perform_request(
+                'PUT',
+                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
+                body=cleaned_detector_enabled
+            )
+            print(f"[INFO] Detector已重新启用，应触发扫描")
+            return original_schedule, True
+        except Exception as e:
+            print(f"[WARNING] 强制触发扫描失败: {e}")
             return original_schedule, False
     
     return original_schedule, False
@@ -675,11 +1044,16 @@ def _restore_schedule(client, detector_id: str, original_schedule: dict) -> None
 def _poll_for_scan_completion(
     client, 
     detector_id: str, 
+    baseline_timestamp_ms: int,
     baseline_count: int, 
     max_wait_seconds: int
 ) -> tuple[bool, int]:
     """
-    轮询确认扫描完成
+    轮询确认扫描完成（通过时间戳判断，更准确）
+    
+    参数：
+    - baseline_timestamp_ms: 基准时间戳（毫秒），新findings的时间戳应该大于此值
+    - baseline_count: 基准数量，用于fallback判断
     
     返回: (scan_completed, scan_wait_ms)
     """
@@ -691,9 +1065,17 @@ def _poll_for_scan_completion(
     while (time.time() - start_time) < max_wait_seconds:
         time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
         
-        current_count = _get_latest_findings_count(client, detector_id)
+        # 优先使用时间戳判断（更准确）
+        current_timestamp_ms, current_count = _get_latest_findings_timestamp(client, detector_id)
         
-        if current_count > baseline_count:
+        # 如果有新时间戳且大于基准时间戳，说明有新findings
+        if baseline_timestamp_ms > 0 and current_timestamp_ms > baseline_timestamp_ms:
+            scan_wait_ms = int((time.time() - start_time) * 1000)
+            print(f"[INFO] 扫描完成！发现新findings（时间戳: {baseline_timestamp_ms} -> {current_timestamp_ms}）")
+            return True, scan_wait_ms
+        
+        # Fallback: 如果时间戳判断不可用，使用数量判断
+        if baseline_timestamp_ms == 0 and current_count > baseline_count:
             scan_wait_ms = int((time.time() - start_time) * 1000)
             print(f"[INFO] 扫描完成！Findings更新: {baseline_count} -> {current_count}")
             return True, scan_wait_ms
@@ -711,6 +1093,7 @@ def _trigger_scan_with_lock(
     client,
     detector_id: str,
     detector: dict,
+    baseline_timestamp_ms: int,
     baseline_count: int,
     max_wait_seconds: int
 ) -> dict[str, Any]:
@@ -751,23 +1134,50 @@ def _trigger_scan_with_lock(
             # 确保detector已启用
             _enable_detector_if_needed(client, detector_id, detector)
             
-            # 临时缩短schedule
-            original_schedule, schedule_was_shortened = _temporarily_shorten_schedule(
-                client, detector_id, detector
-            )
+            # 手动触发扫描：尝试多种方式，确保能够触发
+            # 方式1：如果存在workflow，优先使用workflow _execute API（最快最直接）
+            workflow_id = _get_workflow_id_for_detector(client, detector_id)
+            execute_success = False
             
-            if schedule_was_shortened:
-                # 轮询确认扫描完成
-                scan_completed, scan_wait_ms = _poll_for_scan_completion(
-                    client, detector_id, baseline_count, max_wait_seconds
+            if workflow_id:
+                print(f"[INFO] 找到workflow，尝试使用workflow _execute API手动触发...")
+                execute_success = _execute_workflow_manually(client, workflow_id)
+                if execute_success:
+                    print(f"[INFO] Workflow手动触发成功，等待扫描完成...")
+                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
+                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds
+                    )
+                    source = "triggered_scan_execute" if scan_completed else "cached_findings"
+                else:
+                    print(f"[INFO] Workflow _execute失败，将使用schedule方式触发...")
+            
+            # 方式2：如果workflow不存在或失败，使用schedule方式触发（同样有效）
+            # 注意：即使workflow存在，如果execute失败，也会fallback到这里
+            if not execute_success:
+                if not workflow_id:
+                    print(f"[INFO] 未找到workflow（这是正常的），使用schedule方式触发扫描...")
+                
+                original_schedule, schedule_was_shortened = _temporarily_shorten_schedule(
+                    client, detector_id, detector
                 )
-                source = "triggered_scan" if scan_completed else "cached_findings"
-            else:
-                print(f"[INFO] Detector schedule已较短，等待自动扫描...")
-                time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
-                scan_completed = False
-                scan_wait_ms = 0
-                source = "cached_findings"
+                
+                if schedule_was_shortened:
+                    # 轮询确认扫描完成
+                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
+                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds
+                    )
+                    source = "triggered_scan_schedule" if scan_completed else "cached_findings"
+                else:
+                    # schedule已较短且强制触发也失败，等待一个扫描周期
+                    print(f"[INFO] Detector schedule已较短，等待自动扫描...")
+                    # 等待一个扫描周期（至少30秒）
+                    wait_seconds = max(DEFAULT_POLL_INTERVAL_SECONDS, 30)
+                    time.sleep(wait_seconds)
+                    # 轮询确认是否有新findings
+                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
+                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds - wait_seconds
+                    )
+                    source = "triggered_scan_schedule" if scan_completed else "cached_findings"
         
         return {
             "scan_requested": True,
@@ -1074,19 +1484,44 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
                 "source": "no_findings"
             }
         
-        # 步骤2: 查询已有findings数量
-        baseline_count = _get_latest_findings_count(client, detector_id)
+        # 步骤2: 查询已有findings的时间戳和数量
+        baseline_timestamp_ms, baseline_count = _get_latest_findings_timestamp(client, detector_id)
+        findings_age_minutes = None
+        
         if baseline_count > 0:
             print(f"[INFO] 发现已有findings: {baseline_count} 个")
+            if baseline_timestamp_ms > 0:
+                # 计算findings年龄（分钟）
+                current_timestamp_ms = int(datetime.now().timestamp() * 1000)
+                findings_age_minutes = (current_timestamp_ms - baseline_timestamp_ms) / 1000 / 60
+                print(f"[INFO] 最新finding时间戳: {baseline_timestamp_ms}（{findings_age_minutes:.1f}分钟前）")
         
         # 步骤3: 判断是否需要触发新扫描
-        need_trigger = _should_trigger_scan(trigger_scan, baseline_count)
-        source = "cached_findings" if baseline_count > 0 else "no_findings"
-        
-        if need_trigger:
-            print(f"[INFO] 没有findings，需要触发新扫描")
+        # 如果trigger_scan=True，强制触发（不管findings是否存在或新旧）
+        # 如果trigger_scan=False，只在没有findings或findings过旧（>5分钟）时触发
+        need_trigger = False
+        if trigger_scan:
+            if baseline_count == 0:
+                print(f"[INFO] 没有findings，需要触发新扫描")
+                need_trigger = True
+            elif findings_age_minutes and findings_age_minutes > 5:
+                print(f"[INFO] Findings过旧（{findings_age_minutes:.1f}分钟前），需要触发新扫描")
+                need_trigger = True
+            else:
+                # trigger_scan=True 时，即使findings较新也强制触发
+                print(f"[INFO] 强制触发新扫描（trigger_scan=True）")
+                need_trigger = True
         else:
-            print(f"[INFO] 已有findings: {baseline_count} 个，使用已有findings")
+            if baseline_count == 0:
+                print(f"[INFO] 没有findings，需要触发新扫描")
+                need_trigger = True
+            elif findings_age_minutes and findings_age_minutes > 5:
+                print(f"[INFO] Findings过旧（{findings_age_minutes:.1f}分钟前），需要触发新扫描")
+                need_trigger = True
+            else:
+                print(f"[INFO] Findings较新（{findings_age_minutes:.1f}分钟前），使用已有findings")
+        
+        source = "cached_findings" if baseline_count > 0 else "no_findings"
         
         # 步骤4: 如果需要触发，执行触发逻辑
         scan_info = {
@@ -1101,7 +1536,7 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
             if detector:
                 try:
                     scan_info = _trigger_scan_with_lock(
-                        client, detector_id, detector, baseline_count, max_wait_seconds
+                        client, detector_id, detector, baseline_timestamp_ms, baseline_count, max_wait_seconds
                     )
                 except Exception as trigger_error:
                     print(f"[WARNING] 触发检测时出错: {trigger_error}")
