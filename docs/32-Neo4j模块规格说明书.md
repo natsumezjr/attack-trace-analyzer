@@ -98,8 +98,13 @@ Neo4j 模块必须提供以下查询能力：
 - `alarm_edges`
 - `edges_in_window`
 - `shortest_path_in_window`
+- `analysis_edges_by_task`
 
 接口的请求/响应字段由后端实现固定，Neo4j 模块负责提供稳定的查询语义与返回结构（nodes/edges 的 uid、rtype、props）。
+
+其中：
+
+- `analysis_edges_by_task`：按 `analysis.task_id` 拉取该任务写回的边集合；可选 `only_path=true` 仅返回 `analysis.is_path_edge=true` 的关键路径边。
 
 ## 5. 结果写回：边属性规范
 

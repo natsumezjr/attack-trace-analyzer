@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.api.routes import chains, events, findings, graph, health, root, targets
+from app.api.routes import analysis_tasks, chains, events, findings, graph, health, root, targets
 from app.api.utils import err
 
 try:
@@ -30,4 +30,5 @@ api_router.include_router(findings.router, tags=["findings"])
 api_router.include_router(graph.router, tags=["graph"])
 api_router.include_router(chains.router, tags=["chains"])
 api_router.include_router(targets.router, tags=["targets"])
+api_router.include_router(analysis_tasks.router, tags=["analysis"])
 api_router.include_router(ttp_similarity_router, tags=["analysis"])

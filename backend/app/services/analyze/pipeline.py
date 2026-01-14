@@ -129,6 +129,7 @@ async def run_analysis_task(
     target_node_uid: str,
     start_ts: datetime | str,
     end_ts: datetime | str,
+    created_at: datetime | None = None,
 ) -> AnalysisPipelineResult:
     """
     Main analysis entry point (task-driven).
@@ -153,13 +154,13 @@ async def run_analysis_task(
     if end_dt < start_dt:
         raise ValueError("end_ts must be >= start_ts")
 
-    created_at_dt = utc_now()
-    created_at = format_rfc3339(created_at_dt)
+    created_at_dt = created_at or utc_now()
+    created_at_rfc3339 = format_rfc3339(created_at_dt)
     index_name = await asyncio.to_thread(_ensure_analysis_tasks_index, created_at_dt)
 
     # 1) Create task doc (queued)
     task_doc: dict[str, Any] = {
-        "@timestamp": created_at,
+        "@timestamp": created_at_rfc3339,
         "task.id": task_id,
         "task.status": "queued",
         "task.progress": 0,
@@ -253,4 +254,3 @@ async def run_analysis_task(
         task_doc["task.error"] = str(error)
         await asyncio.to_thread(_write_task_doc, index_name, task_id=task_id, doc=task_doc)
         raise
-

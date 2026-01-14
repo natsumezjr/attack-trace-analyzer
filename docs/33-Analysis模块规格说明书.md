@@ -68,6 +68,19 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 
 任何回退、跳转均禁止。
 
+### 3.4 后端对外 API（固定）
+
+Analysis 模块的异步任务由后端 API 对外暴露，接口形状固定为：
+
+- `POST /api/v1/analysis/tasks`：创建任务（返回 `task_id`，并入队异步执行）
+- `GET /api/v1/analysis/tasks/{task_id}`：查询任务状态/进度/任务级结果（OpenSearch 任务文档）
+- `GET /api/v1/analysis/tasks`：按条件列出任务（用于前端任务列表/调试）
+
+任务执行完成后的图结果读取有两种方式：
+
+1) 继续使用 `POST /api/v1/graph/query` 的 `edges_in_window` 拉边，并在前端筛选 `analysis.task_id == task_id`；或
+2) 使用 `POST /api/v1/graph/query` 的 `analysis_edges_by_task` 动作，直接按 `task_id` 拉取本次写回边（可选 `only_path=true`）。
+
 ## 4. 算法流水线（固定阶段）
 
 ### 4.1 输入
