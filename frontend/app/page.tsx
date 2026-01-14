@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Globe } from "@/components/ui/globe";
 import {
@@ -68,7 +68,7 @@ export default function Home() {
           {cards.map((card) => (
             <AnimatedProfileCard
               key={card.name}
-              className="h-full min-h-[260px] w-full"
+              className="h-full min-h-[230px] w-full"
               baseCard={
                 <ProfileCardContent
                   name={card.name}

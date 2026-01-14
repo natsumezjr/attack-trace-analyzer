@@ -81,7 +81,7 @@ export const ProfileCardContent = React.forwardRef<
       <Card
         ref={ref}
         className={cn(
-          'flex h-full w-full flex-col rounded-3xl border-0 px-8 py-6',
+          'flex h-full w-full flex-col rounded-3xl border-0 px-8 py-5',
           isOnAccent
             ? 'text-[var(--on-accent-foreground)]'
             : 'bg-card text-card-foreground',
@@ -114,7 +114,7 @@ export const ProfileCardContent = React.forwardRef<
           </CardTitle>
         </CardHeader>
 
-        <CardContent className='mt-4 flex-grow p-0'>
+        <CardContent className='mt-3 flex-grow p-0'>
           <p
             className={cn(
               'text-base leading-relaxed text-left',
@@ -128,7 +128,7 @@ export const ProfileCardContent = React.forwardRef<
         </CardContent>
 
         {socials.length > 0 && (
-          <CardFooter className={cn('mt-4 p-0', footerClassName)}>
+          <CardFooter className={cn('mt-3 p-0', footerClassName)}>
             <div
               className={cn(
                 'flex items-center gap-4',
@@ -265,7 +265,7 @@ export const AnimatedProfileCard = React.forwardRef<
           } as React.CSSProperties
         }
         className={cn(
-          'relative h-fit w-[350px] overflow-hidden rounded-3xl border-2',
+          'relative h-fit w-[320px] overflow-hidden rounded-3xl border-2',
           className
         )}
         {...props}
