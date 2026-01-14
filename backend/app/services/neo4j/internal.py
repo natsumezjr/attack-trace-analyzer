@@ -11,6 +11,7 @@ from .db import add_node, add_edge
 
 # 查询操作
 from .db import get_node, get_edges, get_alarm_edges
+from .db import get_graph_by_attack_id
 from .db import get_edges_in_window
 
 # GDS 算法（用于 API routes / 分析）
@@ -39,6 +40,7 @@ __all__ = [
     "get_node",
     "get_edges",
     "get_alarm_edges",
+    "get_graph_by_attack_id",
     "get_edges_in_window",
     # GDS
     "gds_shortest_path_in_window",
@@ -53,4 +55,3 @@ __all__ = [
     "RelType",
     "parse_uid",
 ]
-
