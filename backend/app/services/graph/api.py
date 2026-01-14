@@ -157,10 +157,12 @@ def add_edge(edge: GraphEdge) -> None:
 
     # Best-effort: store a numeric timestamp for window/GDS queries.
     try:
-        if isinstance(getattr(edge, "props", None), dict) and "ts_float" not in edge.props:
-            ts = edge.get_ts() if hasattr(edge, "get_ts") else None
-            if ts is not None:
-                edge.props["ts_float"] = _parse_ts_to_float(ts)
+        if isinstance(getattr(edge, "props", None), dict):
+            ts_float = edge.props.get("ts_float")
+            if not isinstance(ts_float, (int, float)):
+                ts = edge.get_ts() if hasattr(edge, "get_ts") else None
+                if ts is not None:
+                    edge.props["ts_float"] = _parse_ts_to_float(str(ts))
     except Exception:
         pass
 
@@ -615,6 +617,107 @@ def close() -> None:
         return
     _DRIVER.close()
     _DRIVER = None
+
+
+def write_analysis_results(
+    edges: Sequence[GraphEdge],
+    *,
+    task_id: str,
+    updated_at: str,
+) -> int:
+    """Write analysis.* fields onto edges and overwrite any existing analysis state."""
+    if not edges:
+        return 0
+    ensure_schema()
+    total_updated = 0
+    with _get_session() as session:
+        for edge in edges:
+            total_updated += _execute_write(session, _write_analysis_result_tx, edge, task_id, updated_at)
+    return total_updated
+
+
+def _write_analysis_result_tx(tx, edge: GraphEdge, task_id: str, updated_at: str) -> int:
+    if not isinstance(edge.props, dict):
+        return 0
+    event_id = edge.props.get("event.id")
+    if not isinstance(event_id, str) or not event_id:
+        return 0
+
+    src_label, src_key = parse_uid(edge.src_uid)
+    dst_label, dst_key = parse_uid(edge.dst_uid)
+
+    params: Dict[str, Any] = {"event_id": event_id}
+
+    src_clause_parts = []
+    for k, v in src_key.items():
+        param = _param_key(f"src_{k}")
+        src_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    src_clause = ", ".join(src_clause_parts)
+
+    dst_clause_parts = []
+    for k, v in dst_key.items():
+        param = _param_key(f"dst_{k}")
+        dst_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    dst_clause = ", ".join(dst_clause_parts)
+
+    analysis_props: Dict[str, Any] = _analysis_props_from_edge(edge.props, task_id, updated_at)
+    params["analysis_props"] = analysis_props
+
+    analysis_fields = [
+        "analysis.task_id",
+        "analysis.updated_at",
+        "analysis.is_path_edge",
+        "analysis.risk_score",
+        "analysis.ttp.technique_ids",
+        "analysis.summary",
+    ]
+    clear_clause = ", ".join(f"r.{_cypher_prop(field)} = null" for field in analysis_fields)
+
+    cypher = (
+        f"MATCH (s:{src_label.value} {{{src_clause}}})-[r:{edge.rtype.value}]->(t:{dst_label.value} {{{dst_clause}}}) "
+        "WHERE r.`event.id` = $event_id "
+        f"SET {clear_clause} "
+        "SET r += $analysis_props "
+        "RETURN count(r) AS cnt"
+    )
+    record = tx.run(cypher, **params).single()
+    if record is None:
+        return 0
+    count = record.get("cnt")
+    return int(count) if isinstance(count, (int, float)) else 0
+
+
+def _analysis_props_from_edge(
+    edge_props: Mapping[str, Any],
+    task_id: str,
+    updated_at: str,
+) -> Dict[str, Any]:
+    is_path_edge = bool(edge_props.get("analysis.is_path_edge"))
+    props: Dict[str, Any] = {
+        "analysis.task_id": task_id,
+        "analysis.updated_at": updated_at,
+        "analysis.is_path_edge": is_path_edge,
+    }
+    if not is_path_edge:
+        return props
+
+    risk_score = edge_props.get("analysis.risk_score")
+    if isinstance(risk_score, (int, float)):
+        props["analysis.risk_score"] = float(risk_score)
+
+    technique_ids = edge_props.get("analysis.ttp.technique_ids")
+    if isinstance(technique_ids, list):
+        props["analysis.ttp.technique_ids"] = [v for v in technique_ids if isinstance(v, str) and v]
+    elif isinstance(technique_ids, str) and technique_ids:
+        props["analysis.ttp.technique_ids"] = [technique_ids]
+
+    summary = edge_props.get("analysis.summary")
+    if isinstance(summary, str) and summary:
+        props["analysis.summary"] = summary
+
+    return props
 
 
 def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:

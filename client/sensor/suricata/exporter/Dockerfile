@@ -3,7 +3,7 @@ FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/xinghanxu/mcsm:ubuntu22.
 WORKDIR /app
 
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip && \
+    apt-get install -y python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/requirements.txt

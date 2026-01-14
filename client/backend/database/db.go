@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"go-client/model"
 	"os"
 
 	"gorm.io/driver/sqlite"
@@ -24,13 +23,6 @@ func InitDB(dbPath string) error {
 	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("无法连接数据库: %w", err)
-	}
-
-	// 自动迁移：如果表不存在，GORM 会自动帮你创建表
-	// 生产环境通常手动管理 SQL，但在开发初期这个功能非常方便
-	err = DB.AutoMigrate(&model.EventData{})
-	if err != nil {
-		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
 
 	return nil
