@@ -98,7 +98,7 @@ def ingest_from_opensearch(
         tuple[int, int, int]: (总事件数, 总节点数, 总边数)
     """
     # 使用 OpenSearch API 拉取 ECS 事件并写入 Neo4j
-    from ..opensearch import INDEX_PATTERNS, get_index_name, index_exists, search
+    from ..opensearch.internal import INDEX_PATTERNS, get_index_name, index_exists, search
 
     query_body = dict(query) if query is not None else {"match_all": {}}
     index_names: list[str] = []

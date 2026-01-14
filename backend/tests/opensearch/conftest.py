@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from app.services.opensearch import get_client, initialize_indices
+from app.services.opensearch.internal import get_client, initialize_indices
 from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
 
 

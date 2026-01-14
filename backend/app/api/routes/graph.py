@@ -61,7 +61,7 @@ def _node_to_dict(node: Any) -> dict[str, Any]:
 def graph_query(req: GraphQueryRequest):
     # Lazy import: graph module depends on neo4j, which may not be installed in every dev env.
     try:
-        from app.services.neo4j import db as graph_api  # type: ignore
+        from app.services.neo4j import internal as graph_api  # type: ignore
     except Exception as error:
         return JSONResponse(
             status_code=501,
@@ -165,4 +165,3 @@ def graph_query(req: GraphQueryRequest):
             status_code=500,
             content=err("INTERNAL_ERROR", str(error)),
         )
-

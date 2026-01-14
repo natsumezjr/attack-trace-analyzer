@@ -12,8 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
-from app.services.opensearch.client import ensure_index, get_client
-from app.services.opensearch.index import INDEX_PATTERNS, hash_token
+from app.services.opensearch.internal import INDEX_PATTERNS, ensure_index, get_client, hash_token
 from app.services.opensearch.mappings import client_registry_mapping
 
 
