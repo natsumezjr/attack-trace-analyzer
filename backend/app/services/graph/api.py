@@ -28,10 +28,12 @@ from .models import (
 from .utils import _parse_ts_to_float
 
 
+# 全局驱动与 Schema 初始化状态
 _DRIVER = None
 _SCHEMA_READY = False
 
 
+# 获取/缓存 Neo4j driver
 def _get_driver():
     global _DRIVER
     if _DRIVER is None:
@@ -42,6 +44,7 @@ def _get_driver():
     return _DRIVER
 
 
+# 获取 session（支持指定数据库）
 def _get_session():
     driver = _get_driver()
     database = os.getenv("NEO4J_DATABASE")
@@ -76,6 +79,7 @@ def _name_suffix(name: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in name)
 
 
+# 初始化约束与索引（只执行一次）
 def ensure_schema() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
@@ -126,6 +130,7 @@ def _create_schema(tx) -> None:
         tx.run(f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})")
 
 
+# 写入节点（基于唯一键 MERGE）
 def add_node(node: GraphNode) -> None:
     ensure_schema()
     with _get_session() as session:
@@ -148,6 +153,7 @@ def _merge_node(tx, node: GraphNode) -> None:
     tx.run(f"MERGE (n:{label} {{{key_clause}}}) SET n += $props", **params)
 
 
+# 写入关系边（按证据追加）
 def add_edge(edge: GraphEdge) -> None:
     """Create an edge in Neo4j.
 
@@ -199,6 +205,7 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     tx.run(cypher, **params)
 
 
+# 按 UID 查询单个节点
 def get_node(uid: str) -> Optional[GraphNode]:
     label, key = parse_uid(uid)
     with _get_session() as session:
@@ -226,6 +233,7 @@ def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, 
     return record["props"]
 
 
+# 查询节点相关边
 def get_edges(node: GraphNode) -> List[GraphEdge]:
     with _get_session() as session:
         rows = _execute_read(session, _fetch_edges, node)
@@ -260,6 +268,7 @@ def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
     return list(tx.run(cypher, **params))
 
 
+# 查询告警边集合
 def get_alarm_edges() -> List[GraphEdge]:
     """Return all edges labeled as alarms (r.is_alarm = true)."""
     with _get_session() as session:
@@ -289,6 +298,7 @@ def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
     return list(tx.run(cypher))
 
 
+# 按时间窗查询边集合（可选关系类型/告警过滤）
 def get_edges_in_window(
     t_min: float,
     t_max: float,
@@ -340,6 +350,7 @@ def _fetch_edges_in_window(
     return list(tx.run(cypher, **params))
 
 
+# 基于 GDS 的时间窗最短路
 def gds_shortest_path_in_window(
     src_uid: str,
     dst_uid: str,
@@ -619,6 +630,7 @@ def close() -> None:
     _DRIVER = None
 
 
+# 写回溯源结果到边属性（analysis.* 覆盖语义）
 def write_analysis_results(
     edges: Sequence[GraphEdge],
     *,
@@ -720,6 +732,7 @@ def _analysis_props_from_edge(
     return props
 
 
+# 入图：单条 ECS 文档
 def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
     """Ingest a single ECS event by converting it into nodes/edges."""
     if ecs_event_to_graph is None:
@@ -733,6 +746,7 @@ def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
     return len(nodes), len(edges)
 
 
+# 入图：批量 ECS 文档
 def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
     """Ingest multiple ECS events."""
     if ecs_event_to_graph is None:
@@ -751,6 +765,7 @@ def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
     return total_nodes, total_edges
 
 
+# 从 OpenSearch 拉取并入图
 def ingest_from_opensearch(
     query: Mapping[str, Any] | None = None,
     *,
@@ -790,6 +805,7 @@ def ingest_from_opensearch(
     return total_events, total_nodes, total_edges
 
 
+# 查询一组节点之间的边（用于补全）
 def get_edges_inter_nodes(
     node_uids: List[str],
     t_start: float,
