@@ -10,7 +10,6 @@ from .mappings import (
     raw_findings_mapping,
     canonical_findings_mapping,
     attack_chains_mapping,
-    client_registry_mapping,
 )
 
 # ========== 索引常量 ==========
@@ -19,7 +18,6 @@ INDEX_PATTERNS = {
     "RAW_FINDINGS": "raw-findings",
     "CANONICAL_FINDINGS": "canonical-findings",
     "ATTACK_CHAINS": "attack-chains",
-    "CLIENT_REGISTRY": "client-registry",
 }
 
 
@@ -67,8 +65,5 @@ def initialize_indices() -> None:
         get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
         attack_chains_mapping,
     )
-
-    # Client Registry不需要日期后缀
-    ensure_index(INDEX_PATTERNS["CLIENT_REGISTRY"], client_registry_mapping)
 
     print("所有索引初始化完成")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.api.routes import chains, clients, events, findings, graph, health, root, targets
+from app.api.routes import chains, events, findings, graph, health, root, targets
 from app.api.utils import err
 
 try:
@@ -25,7 +25,6 @@ except Exception as error:
 api_router = APIRouter()
 api_router.include_router(root.router, tags=["root"])
 api_router.include_router(health.router, tags=["health"])
-api_router.include_router(clients.router, tags=["clients"])
 api_router.include_router(events.router, tags=["events"])
 api_router.include_router(findings.router, tags=["findings"])
 api_router.include_router(graph.router, tags=["graph"])
