@@ -73,6 +73,12 @@ services:
       SURICATA_MODE: ${SURICATA_MODE:-live}
       # Optional override, otherwise auto-detected inside container.
       SURICATA_INTERFACE: ${SURICATA_INTERFACE:-auto}
+      # Optional override for Suricata address groups:
+      # - auto: infer from the capture interface's on-link routes (recommended for one-click deploy)
+      # - or an explicit CIDR/list, e.g. "192.168.1.0/24" or "[10.0.0.0/8,192.168.0.0/16]"
+      SURICATA_HOME_NET: "${SURICATA_HOME_NET:-auto}"
+      # Used when auto-detection fails (e.g. no IPv4 on the capture interface).
+      SURICATA_HOME_NET_FALLBACK: "${SURICATA_HOME_NET_FALLBACK:-[10.0.0.0/8,172.16.0.0/12,192.168.0.0/16]}"
       # Only used when SURICATA_MODE=pcap
       PCAP_FILE: ${PCAP_FILE:-/data/pcap/sample.pcap}
     cap_add:
