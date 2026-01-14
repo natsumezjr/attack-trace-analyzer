@@ -9,7 +9,6 @@ from .mappings import (
     ecs_events_mapping,
     raw_findings_mapping,
     canonical_findings_mapping,
-    attack_chains_mapping,
     analysis_tasks_mapping,
     client_registry_mapping,
 )
@@ -19,7 +18,6 @@ INDEX_PATTERNS = {
     "ECS_EVENTS": "ecs-events",
     "RAW_FINDINGS": "raw-findings",
     "CANONICAL_FINDINGS": "canonical-findings",
-    "ATTACK_CHAINS": "attack-chains",
     "ANALYSIS_TASKS": "analysis-tasks",
     "CLIENT_REGISTRY": "client-registry",
 }
@@ -63,11 +61,6 @@ def initialize_indices() -> None:
     ensure_index(
         get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today),
         canonical_findings_mapping,
-    )
-
-    ensure_index(
-        get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
-        attack_chains_mapping,
     )
 
     ensure_index(

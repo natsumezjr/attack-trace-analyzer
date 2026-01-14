@@ -142,46 +142,6 @@ canonical_findings_mapping = {
     },
 }
 
-# Attack Chains索引映射
-attack_chains_mapping = {
-    "properties": {
-        "@timestamp": {"type": "date"},
-        "chain.id": {"type": "keyword"},
-        "chain.start_ts": {"type": "date"},
-        "chain.end_ts": {"type": "date"},
-        "chain.stages": {
-            "type": "nested",
-            "properties": {
-                "tactic.id": {"type": "keyword"},
-                "tactic.name": {"type": "keyword"},
-                "technique.id": {"type": "keyword"},
-                "technique.name": {"type": "keyword"},
-                "timestamp": {"type": "date"},
-                "key_entities": {"type": "keyword"},
-                "evidence_event_ids": {"type": "keyword"},
-            },
-        },
-        "chain.key_path": {
-            "type": "nested",
-            "properties": {
-                "node_type": {"type": "keyword"},
-                "node_id": {"type": "keyword"},
-                "edge_type": {"type": "keyword"},
-                "timestamp": {"type": "date"},
-            },
-        },
-        "chain.similar_apts": {
-            "type": "nested",
-            "properties": {
-                "intrusion_set.id": {"type": "keyword"},
-                "intrusion_set.name": {"type": "keyword"},
-                "similarity_score": {"type": "float"},
-                "top_techniques": {"type": "keyword"},
-            },
-        },
-    },
-}
-
 # Client Registry 索引映射
 # 固定索引名：client-registry（不按日滚动）
 # 用于中心机维护“已注册客户机 + 轮询状态/游标”等元数据。
