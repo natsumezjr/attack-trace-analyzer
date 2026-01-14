@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from app.services.graph import models
-from app.services.graph.ecs_ingest import _extract_dns_answer_ips, ecs_event_to_graph
+from app.services.neo4j import models
+from app.services.neo4j.ecs_ingest import _extract_dns_answer_ips, ecs_event_to_graph
 
 
 def _fixtures_dir() -> Path:

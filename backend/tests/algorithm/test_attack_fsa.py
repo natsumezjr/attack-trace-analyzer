@@ -29,7 +29,7 @@ from app.services.algorithm.attack_fsa import (
     behavior_state_machine,
     _can_transition,
 )
-from app.services.graph.models import GraphEdge, RelType
+from app.services.neo4j.models import GraphEdge, RelType
 
 
 # ========== 测试辅助函数 ==========

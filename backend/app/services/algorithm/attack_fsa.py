@@ -24,8 +24,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from ..graph.models import GraphEdge
-from ..graph.utils import _parse_ts_to_float
+from ..neo4j.models import GraphEdge
+from ..neo4j.utils import _parse_ts_to_float
 
 
 class AttackState(str, Enum):

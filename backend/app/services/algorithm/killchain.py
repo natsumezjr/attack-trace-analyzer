@@ -30,9 +30,9 @@ from hashlib import sha1
 from typing import Any, Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from .attack_fsa import AttackState, FSAGraph, behavior_state_machine
-from ..graph import api as graph_api
-from ..graph.models import GraphEdge, GraphNode, NodeType, RelType, parse_uid
-from ..graph.utils import _parse_ts_to_float
+from ..neo4j import api as graph_api
+from ..neo4j.models import GraphEdge, GraphNode, NodeType, RelType, parse_uid
+from ..neo4j.utils import _parse_ts_to_float
 
 
 # ---------------------------------------------------------------------------

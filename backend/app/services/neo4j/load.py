@@ -7,14 +7,14 @@ SERVICES_DIR = GRAPH_DIR.parent
 APP_DIR = SERVICES_DIR.parent
 BACKEND_DIR = APP_DIR.parent
 
-# Prefer package-relative imports (`python -m app.services.graph.load`), but keep a
-# fallback path injection so `python backend/app/services/graph/load.py` still works.
+# Prefer package-relative imports (`python -m app.services.neo4j.load`), but keep a
+# fallback path injection so `python backend/app/services/neo4j/load.py` still works.
 try:
     from . import api as graph_api
 except ImportError:  # pragma: no cover
     if str(SERVICES_DIR) not in sys.path:
         sys.path.insert(0, str(SERVICES_DIR))
-    from graph import api as graph_api  # type: ignore
+    from neo4j import api as graph_api  # type: ignore
 
 # 样例文件优先从测试夹读取，旧路径仅作兼容兜底
 SAMPLE_EVENTS_PATH = BACKEND_DIR / "tests" / "fixtures" / "graph" / "testExample.json"
