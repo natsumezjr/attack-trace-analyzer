@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -7,13 +7,13 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { useGSAP } from '@gsap/react';
-import { gsap } from 'gsap';
-import { useTheme } from 'next-themes';
-import * as React from 'react';
-import { useRef } from 'react';
+} from "@/components/card/card2";
+import { cn } from "@/lib/utils";
+import { useGSAP } from "@gsap/react";
+import { gsap } from "gsap";
+import { useTheme } from "next-themes";
+import * as React from "react";
+import { useRef } from "react";
 
 export interface SocialLink {
   id: string;
@@ -35,7 +35,7 @@ export interface ProfileCardContentProps
    * that needs to be readable on a background matching the accent color.
    * @default 'default'
    */
-  variant?: 'default' | 'on-accent';
+  variant?: "default" | "on-accent";
   /** An array of social media links to display in the footer. */
   socials?: SocialLink[];
   /** Optional inline styles for the main title element. */
@@ -64,7 +64,7 @@ export const ProfileCardContent = React.forwardRef<
       name,
       location,
       bio,
-      variant = 'default',
+      variant = "default",
       socials = [],
       titleStyle,
       cardStyle,
@@ -75,38 +75,38 @@ export const ProfileCardContent = React.forwardRef<
     },
     ref
   ) => {
-    const isOnAccent = variant === 'on-accent';
+    const isOnAccent = variant === "on-accent";
 
     return (
       <Card
         ref={ref}
         className={cn(
-          'flex h-full w-full flex-col rounded-3xl border-0 px-8 py-5',
+          "flex h-full w-full flex-col rounded-3xl border-0 px-8 py-5",
           isOnAccent
-            ? 'text-[var(--on-accent-foreground)]'
-            : 'bg-card text-card-foreground',
+            ? "text-[var(--on-accent-foreground)]"
+            : "bg-card text-card-foreground",
           className
         )}
         style={cardStyle}
         {...props}
       >
-        <CardHeader className='p-0'>
+        <CardHeader className="p-0">
           <CardDescription
             className={cn(
-              'pt-6 text-left',
-              !isOnAccent && 'text-muted-foreground',
+              "pt-6 text-left",
+              !isOnAccent && "text-muted-foreground",
               descriptionClassName
             )}
             style={
-              isOnAccent ? { color: 'var(--on-accent-muted-foreground)' } : {}
+              isOnAccent ? { color: "var(--on-accent-muted-foreground)" } : {}
             }
           >
             {location}
           </CardDescription>
           <CardTitle
-            className={cn('text-2xl text-left', className)}
+            className={cn("text-2xl text-left", className)}
             style={{
-              ...(isOnAccent ? { color: 'var(--on-accent-foreground)' } : {}),
+              ...(isOnAccent ? { color: "var(--on-accent-foreground)" } : {}),
               ...titleStyle,
             }}
           >
@@ -114,11 +114,11 @@ export const ProfileCardContent = React.forwardRef<
           </CardTitle>
         </CardHeader>
 
-        <CardContent className='mt-3 flex-grow p-0'>
+        <CardContent className="mt-3 flex-grow p-0">
           <p
             className={cn(
-              'text-base leading-relaxed text-left',
-              !isOnAccent && 'text-foreground/80',
+              "text-base leading-relaxed text-left",
+              !isOnAccent && "text-foreground/80",
               bioClassName
             )}
             style={isOnAccent ? { opacity: 0.9 } : {}}
@@ -128,14 +128,14 @@ export const ProfileCardContent = React.forwardRef<
         </CardContent>
 
         {socials.length > 0 && (
-          <CardFooter className={cn('mt-3 p-0', footerClassName)}>
+          <CardFooter className={cn("mt-3 p-0", footerClassName)}>
             <div
               className={cn(
-                'flex items-center gap-4',
-                !isOnAccent && 'text-muted-foreground'
+                "flex items-center gap-4",
+                !isOnAccent && "text-muted-foreground"
               )}
               style={
-                isOnAccent ? { color: 'var(--on-accent-muted-foreground)' } : {}
+                isOnAccent ? { color: "var(--on-accent-muted-foreground)" } : {}
               }
             >
               {socials.map((social) => (
@@ -143,11 +143,11 @@ export const ProfileCardContent = React.forwardRef<
                   key={social.id}
                   href={social.url}
                   aria-label={social.label}
-                  target='_blank'
-                  rel='noopener noreferrer'
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={cn(
-                    'transition-opacity',
-                    isOnAccent ? 'hover:opacity-75' : 'hover:text-foreground'
+                    "transition-opacity",
+                    isOnAccent ? "hover:opacity-75" : "hover:text-foreground"
                   )}
                 >
                   {social.icon}
@@ -160,7 +160,7 @@ export const ProfileCardContent = React.forwardRef<
     );
   }
 );
-ProfileCardContent.displayName = 'ProfileCardContent';
+ProfileCardContent.displayName = "ProfileCardContent";
 
 export interface AnimatedProfileCardProps
   extends React.HTMLAttributes<HTMLDivElement> {
@@ -197,11 +197,9 @@ export const AnimatedProfileCard = React.forwardRef<
   (
     {
       className,
-      accentColor =
-        'color-mix(in oklch, var(--foreground) 85%, var(--background))',
-      onAccentForegroundColor = 'var(--background)',
-      onAccentMutedForegroundColor =
-        'color-mix(in oklch, var(--background) 80%, transparent)',
+      accentColor = "color-mix(in oklch, var(--foreground) 85%, var(--background))",
+      onAccentForegroundColor = "var(--background)",
+      onAccentMutedForegroundColor = "color-mix(in oklch, var(--background) 80%, transparent)",
       baseCard,
       overlayCard,
       ...props
@@ -211,12 +209,18 @@ export const AnimatedProfileCard = React.forwardRef<
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
     const { resolvedTheme } = useTheme();
-    const overlayThemeClass = resolvedTheme === 'dark' ? 'light' : 'dark';
+    const [mounted, setMounted] = React.useState(false);
+    const overlayThemeClass =
+      mounted && resolvedTheme === "dark" ? "light" : "dark";
+
+    React.useEffect(() => {
+      setMounted(true);
+    }, []);
 
     const setContainerRef = React.useCallback(
       (node: HTMLDivElement | null) => {
         containerRef.current = node;
-        if (typeof ref === 'function') {
+        if (typeof ref === "function") {
           ref(node);
         } else if (ref) {
           (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -225,8 +229,8 @@ export const AnimatedProfileCard = React.forwardRef<
       [ref]
     );
 
-    const initialClipPath = 'circle(0% at 20% 20%)';
-    const hoverClipPath = 'circle(150% at 20% 20%)';
+    const initialClipPath = "circle(0% at 20% 20%)";
+    const hoverClipPath = "circle(150% at 20% 20%)";
 
     useGSAP(
       () => {
@@ -239,7 +243,7 @@ export const AnimatedProfileCard = React.forwardRef<
       gsap.to(overlayRef.current, {
         clipPath: hoverClipPath,
         duration: 0.4,
-        ease: 'expo.inOut',
+        ease: "expo.inOut",
       });
     };
     const handleMouseLeave = () => {
@@ -247,7 +251,7 @@ export const AnimatedProfileCard = React.forwardRef<
       gsap.to(overlayRef.current, {
         clipPath: initialClipPath,
         duration: 0.6,
-        ease: 'expo.out(1, 1)',
+        ease: "expo.out(1, 1)",
       });
     };
 
@@ -258,22 +262,22 @@ export const AnimatedProfileCard = React.forwardRef<
         onMouseLeave={handleMouseLeave}
         style={
           {
-            '--accent-color': accentColor,
-            '--on-accent-foreground': onAccentForegroundColor,
-            '--on-accent-muted-foreground': onAccentMutedForegroundColor,
-            borderColor: 'var(--accent-color)',
+            "--accent-color": accentColor,
+            "--on-accent-foreground": onAccentForegroundColor,
+            "--on-accent-muted-foreground": onAccentMutedForegroundColor,
+            borderColor: "var(--accent-color)",
           } as React.CSSProperties
         }
         className={cn(
-          'relative h-fit w-[320px] overflow-hidden rounded-3xl border-2',
+          "relative h-fit w-[320px] overflow-hidden rounded-3xl border-2",
           className
         )}
         {...props}
       >
-        <div className='h-full w-full'>{baseCard}</div>
+        <div className="h-full w-full">{baseCard}</div>
         <div
           ref={overlayRef}
-          className={cn('absolute inset-0 h-full w-full', overlayThemeClass)}
+          className={cn("absolute inset-0 h-full w-full", overlayThemeClass)}
         >
           {overlayCard}
         </div>
@@ -281,4 +285,4 @@ export const AnimatedProfileCard = React.forwardRef<
     );
   }
 );
-AnimatedProfileCard.displayName = 'AnimatedProfileCard';
+AnimatedProfileCard.displayName = "AnimatedProfileCard";

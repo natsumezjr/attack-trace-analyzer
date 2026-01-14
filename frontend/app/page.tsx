@@ -43,9 +43,7 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <Globe className="scale-125 opacity-60 blur-[0.2px]" />
         </div>
-        <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
-          <ModeToggle />
-        </div>
+
         <section className="relative z-10 flex w-full animate-in flex-col items-center text-center fade-in-0 slide-in-from-bottom-4 duration-700">
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
             AttackTraceAnalyzer

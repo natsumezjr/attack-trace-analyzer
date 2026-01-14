@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@antv/g6": "^5.0.51",
     "@gsap/react": "^2.1.2",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -28,6 +29,7 @@
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-resizable-panels": "^4.4.1",
