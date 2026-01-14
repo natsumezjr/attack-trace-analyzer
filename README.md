@@ -76,6 +76,8 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+若靶机有多网卡/多网段，或需要强制指定 Suricata 的 `HOME_NET`（影响 `$HOME_NET/$EXTERNAL_NET` 方向规则），可在 `client/.env` 里设置：`SURICATA_INTERFACE` / `SURICATA_HOME_NET`（详见 `docs/53-环境变量规范.md`）。
+
 ## 目录结构
 
 | 目录 | 技术栈 | 作用 |
