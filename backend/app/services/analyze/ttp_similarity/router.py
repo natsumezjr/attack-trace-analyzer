@@ -5,8 +5,8 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.services.ttp_similarity.service import (
-    fetch_attack_techniques_from_canonical_findings,
+from app.services.analyze.ttp_similarity.service import (
+    fetch_attack_ttps_from_canonical_findings,
     rank_similar_intrusion_sets,
 )
 
@@ -28,6 +28,7 @@ class IntrusionSetRef(BaseModel):
 class SimilarAptItem(BaseModel):
     intrusion_set: IntrusionSetRef
     similarity_score: float
+    top_tactics: list[str]
     top_techniques: list[str]
 
 
@@ -35,6 +36,7 @@ class TTPSimilarityResponse(BaseModel):
     host_id: str
     start_ts: datetime
     end_ts: datetime
+    attack_tactics: list[str]
     attack_techniques: list[str]
     similar_apts: list[SimilarAptItem]
 
@@ -45,12 +47,15 @@ def ttp_similarity(req: TTPSimilarityRequest) -> TTPSimilarityResponse:
         raise HTTPException(status_code=400, detail="end_ts must be >= start_ts")
 
     try:
-        attack_techniques = fetch_attack_techniques_from_canonical_findings(
+        attack_tactics, attack_techniques = fetch_attack_ttps_from_canonical_findings(
             host_id=req.host_id,
             start_ts=req.start_ts,
             end_ts=req.end_ts,
         )
-        attack_ids, candidates = rank_similar_intrusion_sets(attack_techniques=attack_techniques)
+        attack_ids, candidates = rank_similar_intrusion_sets(
+            attack_tactics=attack_tactics,
+            attack_techniques=attack_techniques,
+        )
     except FileNotFoundError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     except Exception as error:
@@ -60,6 +65,7 @@ def ttp_similarity(req: TTPSimilarityRequest) -> TTPSimilarityResponse:
         host_id=req.host_id,
         start_ts=req.start_ts,
         end_ts=req.end_ts,
+        attack_tactics=sorted(attack_tactics),
         attack_techniques=list(attack_ids),
         similar_apts=[
             SimilarAptItem(
@@ -68,6 +74,7 @@ def ttp_similarity(req: TTPSimilarityRequest) -> TTPSimilarityResponse:
                     name=c.intrusion_set_name,
                 ),
                 similarity_score=c.similarity_score,
+                top_tactics=list(c.top_tactics),
                 top_techniques=list(c.top_techniques),
             )
             for c in candidates
