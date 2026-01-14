@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
 from . import models
+from .utils import _parse_ts_to_float
 
 
 _MISSING = object()
@@ -89,6 +90,7 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     nodes_by_uid: dict[str, models.GraphNode] = {}
     edges: list[models.GraphEdge] = []
 
+    # 仅允许 Telemetry 与 Canonical Finding 入图（见 32/52）
     event_kind = _get_in(event, ["event", "kind"])
     if not isinstance(event_kind, str):
         return [], []
@@ -108,8 +110,18 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     event_type_raw = _as_list(_get_in(event, ["event", "type"]))
     event_category = _norm_set(event_category_raw)
     event_type = _norm_set(event_type_raw)
-    ts = event.get("@timestamp")
+    # 文档要求 @timestamp 与 event.id 必填，缺失直接丢弃
+    ts_raw = event.get("@timestamp")
+    if isinstance(ts_raw, (int, float)):
+        ts = str(ts_raw)
+    elif isinstance(ts_raw, str) and ts_raw:
+        ts = ts_raw
+    else:
+        return [], []
+
     event_id = _get_in(event, ["event", "id"])
+    if not isinstance(event_id, str) or not event_id:
+        return [], []
     event_severity = _get_in(event, ["event", "severity"])
     event_outcome = _get_in(event, ["event", "outcome"])
     event_code = _get_in(event, ["event", "code"])
@@ -117,14 +129,21 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
 
     evidence_ids: list[str] | None = None
     if event_kind == "alert":
+        # Canonical Finding 必须携带证据 event_ids
         raw_ids = _get_in(event, ["custom", "evidence", "event_ids"])
-        evidence_ids = _as_list(raw_ids) if raw_ids else None
-    elif event_id:
+        evidence_ids = [
+            item for item in _as_list(raw_ids) if isinstance(item, str) and item
+        ]
+        if not evidence_ids:
+            return [], []
+    else:
         evidence_ids = [event_id]
 
     is_alarm = event_kind == "alert"
 
     base_edge_props: dict[str, Any] = {}
+    # 为时间窗过滤与 GDS 投影准备数值时间戳
+    base_edge_props["ts_float"] = _parse_ts_to_float(ts)
     if event_id:
         base_edge_props["event.id"] = event_id
     if event_kind:
@@ -261,9 +280,9 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
     file_hash_sha1 = _get_in(event, ["file", "hash", "sha1"])
     file_hash_md5 = _get_in(event, ["file", "hash", "md5"])
 
-    is_auth = "authentication" in event_category or dataset.startswith("hostlog.auth")
-    is_process = "process" in event_category or dataset.startswith("hostlog.process")
-    is_file = "file" in event_category or dataset.startswith("hostbehavior.file") or dataset.startswith("hostlog.file_registry")
+    is_auth = "authentication" in event_category or dataset == "hostlog.auth"
+    is_process = "process" in event_category or dataset == "hostlog.process"
+    is_file = "file" in event_category or dataset in ("hostbehavior.file", "hostlog.file_registry")
     is_network = "network" in event_category or dataset.startswith("netflow.")
 
     dns_name = _get_in(event, ["dns", "question", "name"])
@@ -283,11 +302,11 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
         add_edge(models.RelType.LOGON, user_node, host_node)
 
     # RUNS_ON: Process -> Host (structural edge)
-    if proc_node and host_node and (dataset in ("hostlog.process", "hostbehavior.syscall", "hostbehavior.file")):
+    if proc_node and host_node and is_process:
         add_edge(models.RelType.RUNS_ON, proc_node, host_node)
 
     # SPAWN: parent -> child (only when parent entity_id is available; do not guess from PID)
-    if proc_node and parent_node and (dataset in ("hostlog.process", "hostbehavior.syscall")):
+    if proc_node and parent_node and is_process:
         add_edge(models.RelType.SPAWN, parent_node, proc_node)
 
     # FILE_ACCESS
@@ -312,12 +331,15 @@ def ecs_event_to_graph(event: Mapping[str, Any]) -> tuple[list[models.GraphNode]
             # hostbehavior.file requires process.entity_id by spec; do not downgrade to Host.
             if proc_node and file_node2:
                 add_edge(models.RelType.FILE_ACCESS, proc_node, file_node2, props=props)
-        else:
+        elif dataset == "hostlog.file_registry":
             # hostlog.file_registry allows missing process.entity_id; downgrade to Host->File when needed.
             if proc_node and file_node2:
                 add_edge(models.RelType.FILE_ACCESS, proc_node, file_node2, props=props)
             elif host_node and file_node2:
                 add_edge(models.RelType.FILE_ACCESS, host_node, file_node2, props=props)
+        else:
+            if proc_node and file_node2:
+                add_edge(models.RelType.FILE_ACCESS, proc_node, file_node2, props=props)
 
     # HAS_IP: Host -> IP (optional)
     host_ips = _as_list(_get_in(event, ["host", "ip"]))

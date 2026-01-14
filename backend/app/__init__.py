@@ -1,1 +1,1 @@
-"""Application package."""
+"""Business logic services."""

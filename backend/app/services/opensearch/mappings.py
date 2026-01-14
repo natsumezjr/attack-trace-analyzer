@@ -24,14 +24,24 @@ ecs_events_mapping = {
         "process.pid": {"type": "long"},
         "process.parent.pid": {"type": "long"},
         "process.name": {"type": "keyword"},
-        "process.command_line": {"type": "wildcard"},
+        "process.command_line": {
+            "type": "text",
+            "fields": {
+                "keyword": {"type": "keyword", "ignore_above": 256}
+            }
+        },
         "source.ip": {"type": "ip"},
         "source.port": {"type": "long"},
         "destination.ip": {"type": "ip"},
         "destination.port": {"type": "long"},
         "network.transport": {"type": "keyword"},
         "network.direction": {"type": "keyword"},
-        "dns.question.name": {"type": "wildcard"},
+        "dns.question.name": {
+            "type": "text",
+            "fields": {
+                "keyword": {"type": "keyword", "ignore_above": 256}
+            }
+        },
         "file.path": {"type": "keyword"},
         "file.hash.sha256": {"type": "keyword"},
         "session.id": {"type": "keyword"},
@@ -74,7 +84,12 @@ raw_findings_mapping = {
         "source.ip": {"type": "ip"},
         "destination.ip": {"type": "ip"},
         "destination.port": {"type": "long"},
-        "dns.question.name": {"type": "wildcard"},
+        "dns.question.name": {
+            "type": "text",
+            "fields": {
+                "keyword": {"type": "keyword", "ignore_above": 256}
+            }
+        },
         "file.path": {"type": "keyword"},
         "file.hash.sha256": {"type": "keyword"},
         "message": {"type": "text"},
@@ -115,7 +130,12 @@ canonical_findings_mapping = {
         "source.ip": {"type": "ip"},
         "destination.ip": {"type": "ip"},
         "destination.port": {"type": "long"},
-        "dns.question.name": {"type": "wildcard"},
+        "dns.question.name": {
+            "type": "text",
+            "fields": {
+                "keyword": {"type": "keyword", "ignore_above": 256}
+            }
+        },
         "file.path": {"type": "keyword"},
         "file.hash.sha256": {"type": "keyword"},
         "message": {"type": "text"},

@@ -13,7 +13,9 @@ except ImportError:
 
 # OpenSearch客户端配置
 def _get_opensearch_config():
-    node_url = os.getenv("OPENSEARCH_NODE", "https://localhost:9200")
+    # 默认使用 HTTP（如果禁用了安全插件）
+    # 如果启用了安全插件，请设置环境变量 OPENSEARCH_NODE=https://localhost:9200
+    node_url = os.getenv("OPENSEARCH_NODE", "http://localhost:9200")
     # 解析URL，提取host和port
     from urllib.parse import urlparse
     parsed = urlparse(node_url)
@@ -21,17 +23,23 @@ def _get_opensearch_config():
     port = parsed.port or 9200
     use_ssl = parsed.scheme == "https"
     
-    return {
+    config = {
         "hosts": [{"host": host, "port": port}],
-        "http_auth": (
-            os.getenv("OPENSEARCH_USERNAME", "admin"),
-            os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev"),
-        ),
         "use_ssl": use_ssl,
-        "verify_certs": False,  # 开发环境可关闭证书验证（OpenSearch 3.4.0 默认启用 HTTPS）
-        "ssl_show_warn": False,
         "connection_class": RequestsHttpConnection,
     }
+    
+    # 只有在启用 SSL 时才设置 SSL 相关配置
+    if use_ssl:
+        config["verify_certs"] = False  # 开发环境可关闭证书验证
+        config["ssl_show_warn"] = False
+        # 只有在启用 SSL 时才需要认证（安全插件启用时）
+        config["http_auth"] = (
+            os.getenv("OPENSEARCH_USERNAME", "admin"),
+            os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev"),
+        )
+    
+    return config
 
 
 # 创建OpenSearch客户端单例
@@ -56,7 +64,7 @@ def get_client() -> OpenSearch:
         except Exception as e:
             error_msg = str(e)
             if 'connection' in error_msg.lower() or 'connect' in error_msg.lower():
-                node_url = os.getenv("OPENSEARCH_NODE", "https://localhost:9200")
+                node_url = os.getenv("OPENSEARCH_NODE", "http://localhost:9200")
                 raise ConnectionError(
                     f"无法连接到 OpenSearch ({node_url}): {error_msg}\n"
                     f"请检查：\n"
@@ -67,6 +75,30 @@ def get_client() -> OpenSearch:
                 ) from e
             raise
     return _opensearch_client
+
+
+def reset_client():
+    """
+    重置OpenSearch客户端（清除缓存，强制重新连接）
+    
+    用途：
+    - 权限配置更改后，需要重新连接以应用新权限
+    - 配置更改后，需要重新连接以使用新配置
+    
+    使用方法：
+        from app.services.opensearch.client import reset_client
+        reset_client()  # 清除缓存
+        # 下次调用 get_client() 时会重新创建连接
+    """
+    global _opensearch_client
+    if _opensearch_client is not None:
+        try:
+            # 尝试关闭现有连接（如果有close方法）
+            if hasattr(_opensearch_client, 'close'):
+                _opensearch_client.close()
+        except Exception:
+            pass  # 忽略关闭错误
+    _opensearch_client = None
 
 
 def index_exists(index_name: str) -> bool:
