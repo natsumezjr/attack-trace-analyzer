@@ -39,6 +39,9 @@ from ..neo4j.utils import _parse_ts_to_float
 # Config knobs (Phase B)
 # ---------------------------------------------------------------------------
 
+KC_ECS_FIELD: str = "custom.killchain.uuid"
+"""ECS 合规字段：killchain uuid 写入到 edge/node 的该字段。"""
+
 TIME_MARGIN_SEC: float = 1.0
 """锚点窗口左右扩展的 margin（秒）：抗时钟偏差/入库延迟。"""
 
@@ -895,7 +898,7 @@ def build_llm_payload(candidate: SemanticCandidateSubgraph) -> Dict[str, Any]:
 
 def select_killchain_with_llm(
     candidate: SemanticCandidateSubgraph,
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     *,
     llm_client: Any = None,
 ) -> KillChain:
@@ -913,6 +916,9 @@ def select_killchain_with_llm(
       - 每个 pair 选择 hop 最短的一条（edges 数最少）
       - explanation 写入简单占位文本
     """
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     payload = build_llm_payload(candidate)
 
     chosen_ids: List[str] = []
@@ -942,11 +948,14 @@ def select_killchain_with_llm(
 def materialize_killchain(
     candidate: SemanticCandidateSubgraph,
     chosen_path_ids: Sequence[str],
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     *,
     explanation: str,
 ) -> KillChain:
     """把 LLM 输出的 path_id 列表映射回 CandidatePath，生成最终 KillChain。"""
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     # 建立 path_id -> CandidatePath 的索引
     idx: Dict[str, CandidatePath] = {}
     for p in candidate.pair_candidates:
@@ -991,9 +1000,6 @@ def persist_killchain_to_db(kc: KillChain) -> None:
     if not hasattr(graph_api, "add_edge") or not hasattr(graph_api, "add_node"):
         raise RuntimeError("graph_api.add_edge/add_node not found; cannot persist killchain.")
 
-    set_analysis_task_id = graph_api.set_analysis_task_id
-    get_node = graph_api.get_node
-
     kc_uuid = kc.kc_uuid
 
     # 1) 收集边（去重：按 stable edge id）
@@ -1019,7 +1025,10 @@ def persist_killchain_to_db(kc: KillChain) -> None:
 
     # 2) 写入边 props 并落库
     for e in edges:
-        set_analysis_task_id(e, kc_uuid)
+        if not isinstance(getattr(e, "props", None), dict):
+            e.props = {}
+        e.props[KC_ECS_FIELD] = kc_uuid
+        graph_api.add_edge(e)
 
     # 3) 收集节点 uid（从边端点）
     node_uids: Set[str] = set()
@@ -1029,10 +1038,9 @@ def persist_killchain_to_db(kc: KillChain) -> None:
 
     # 4) 生成最小节点并 merge 写入
     for uid in node_uids:
-        node = get_node(uid)
-        if node is None:
-            continue
-        set_analysis_task_id(node, kc_uuid)
+        label, key = parse_uid(uid)
+        node = GraphNode(ntype=label, key=key, props={KC_ECS_FIELD: kc_uuid})
+        graph_api.add_node(node)
 
 
 # ---------------------------------------------------------------------------
@@ -1055,7 +1063,7 @@ def match_vector_features(vectors: Any) -> Any:
 
 def run_killchain_pipeline(
     *,
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     llm_client: Any = None,
     persist: bool = True,
 ) -> List[KillChain]:
@@ -1063,6 +1071,9 @@ def run_killchain_pipeline(
     完整流水线：
       abnormal -> PhaseA(FSA) -> PhaseB(candidate) -> PhaseC(LLM choose) -> persist kc_uuid -> return killchains
     """
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     abnormal = graph_api.get_alarm_edges()
 
     # Phase A
@@ -1083,6 +1094,3 @@ def run_killchain_pipeline(
             persist_killchain_to_db(kc)
 
     return killchains
-
-
-
