@@ -1,39 +1,40 @@
+# Neo4j 数据库操作模块
 from __future__ import annotations
 
 import os
-from datetime import datetime
 import uuid
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-
 from neo4j import GraphDatabase
 from neo4j.exceptions import Neo4jError
-
-# Optional: ECS ingest integration (legacy compatibility)
-try:
-    from .ecs_ingest import ecs_event_to_graph  # type: ignore
-except Exception:
-    ecs_event_to_graph = None  # type: ignore
 
 from .models import (
     GraphEdge,
     GraphNode,
     NodeType,
     RelType,
-    NODE_UNIQUE_KEY,
-    build_uid,
     parse_uid,
 )
-from .utils import _parse_ts_to_float
+from .utils import (
+    _execute_read,
+    _execute_write,
+    _node_uid_from_record,
+    _param_key,
+    _cypher_prop,
+    _name_suffix,
+)
 
 
-# 全局驱动与 Schema 初始化状态
+# =============================================================================
+# 全局驱动与 Schema 初始化
+# =============================================================================
+
 _DRIVER = None
 _SCHEMA_READY = False
 
 
-# 获取/缓存 Neo4j driver
 def _get_driver():
+    """获取/缓存 Neo4j driver"""
     global _DRIVER
     if _DRIVER is None:
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -43,8 +44,8 @@ def _get_driver():
     return _DRIVER
 
 
-# 获取 session（支持指定数据库）
 def _get_session():
+    """获取 session（支持指定数据库）"""
     driver = _get_driver()
     database = os.getenv("NEO4J_DATABASE")
     if database:
@@ -52,34 +53,8 @@ def _get_session():
     return driver.session()
 
 
-def _execute_write(session, func, *args, **kwargs):
-    if hasattr(session, "execute_write"):
-        return session.execute_write(func, *args, **kwargs)
-    return session.write_transaction(func, *args, **kwargs)
-
-
-def _execute_read(session, func, *args, **kwargs):
-    if hasattr(session, "execute_read"):
-        return session.execute_read(func, *args, **kwargs)
-    return session.read_transaction(func, *args, **kwargs)
-
-
-def _param_key(name: str) -> str:
-    safe = "".join(ch if ch.isalnum() else "_" for ch in name)
-    return f"key_{safe}"
-
-
-def _cypher_prop(name: str) -> str:
-    escaped = name.replace("`", "``")
-    return f"`{escaped}`"
-
-
-def _name_suffix(name: str) -> str:
-    return "".join(ch if ch.isalnum() else "_" for ch in name)
-
-
-# 初始化约束与索引（只执行一次）
 def ensure_schema() -> None:
+    """初始化约束与索引（只执行一次）"""
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
@@ -89,6 +64,7 @@ def ensure_schema() -> None:
 
 
 def _create_schema(tx) -> None:
+    """创建 v2 schema 约束与索引"""
     # v2 schema aligns with docs/52 (no NetConn nodes; composite keys for User/File).
     constraints: list[tuple[str, tuple[str, ...]]] = [
         ("Host", ("host.id",)),
@@ -129,14 +105,19 @@ def _create_schema(tx) -> None:
         tx.run(f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})")
 
 
-# 写入节点（基于唯一键 MERGE）
+# =============================================================================
+# CRUD 操作
+# =============================================================================
+
 def add_node(node: GraphNode) -> None:
+    """写入节点（基于唯一键 MERGE）"""
     ensure_schema()
     with _get_session() as session:
         _execute_write(session, _merge_node, node)
 
 
 def _merge_node(tx, node: GraphNode) -> None:
+    """MERGE 节点事务函数"""
     label = node.ntype.value
     key_props = node.key
     merged_props = node.merged_props()
@@ -152,9 +133,8 @@ def _merge_node(tx, node: GraphNode) -> None:
     tx.run(f"MERGE (n:{label} {{{key_clause}}}) SET n += $props", **params)
 
 
-# 写入关系边（按证据追加）
 def add_edge(edge: GraphEdge) -> None:
-    """Create an edge in Neo4j.
+    """写入关系边（按证据追加）
 
     关键：为 Phase B 的窗口过滤和 GDS 投影，写入数值时间戳 r.ts_float。
 
@@ -165,6 +145,8 @@ def add_edge(edge: GraphEdge) -> None:
         ValueError: 当 edge 的 src_uid 或 dst_uid 格式无效时
         Neo4jError: 当数据库写入失败时
     """
+    from .utils import _parse_ts_to_float
+
     ensure_schema()
 
     # Best-effort: store a numeric timestamp for window/GDS queries.
@@ -181,6 +163,7 @@ def add_edge(edge: GraphEdge) -> None:
 
 
 def _create_edge(tx, edge: GraphEdge) -> None:
+    """CREATE 边事务函数"""
     src_label, src_key = parse_uid(edge.src_uid)
     dst_label, dst_key = parse_uid(edge.dst_uid)
 
@@ -209,9 +192,12 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     tx.run(cypher, **params)
 
 
-# 按 UID 查询单个节点
+# =============================================================================
+# 查询操作
+# =============================================================================
+
 def get_node(uid: str) -> Optional[GraphNode]:
-    """查询给定 UID 的节点。
+    """按 UID 查询单个节点
 
     Args:
         uid: 节点 UID（格式："NodeType:key=value"）
@@ -234,6 +220,7 @@ def get_node(uid: str) -> Optional[GraphNode]:
 
 
 def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """查询单个节点的事务函数"""
     params: Dict[str, Any] = {}
     clause_parts = []
     for k, v in key.items():
@@ -248,9 +235,8 @@ def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, 
     return record["props"]
 
 
-# 查询节点相关边
 def get_edges(node: GraphNode) -> List[GraphEdge]:
-    """查询与给定节点相关的所有边。
+    """查询节点相关边
 
     Args:
         node: 节点实例
@@ -275,6 +261,7 @@ def get_edges(node: GraphNode) -> List[GraphEdge]:
 
 
 def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
+    """查询节点相关边的事务函数"""
     params: Dict[str, Any] = {}
     clause_parts = []
     for k, v in node.key.items():
@@ -291,9 +278,8 @@ def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
     return list(tx.run(cypher, **params))
 
 
-# 查询告警边集合
 def get_alarm_edges() -> List[GraphEdge]:
-    """查询所有告警边（is_alarm = true 的边）。
+    """查询所有告警边（is_alarm = true 的边）
 
     Returns:
         List[GraphEdge]: 告警边的列表
@@ -315,6 +301,7 @@ def get_alarm_edges() -> List[GraphEdge]:
 
 
 def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
+    """查询告警边的事务函数"""
     cypher = (
         "MATCH ()-[r]->() "
         "WHERE coalesce(r.is_alarm, false) = true "
@@ -325,7 +312,6 @@ def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
     return list(tx.run(cypher))
 
 
-# 按时间窗查询边集合（可选关系类型/告警过滤）
 def get_edges_in_window(
     *,
     t_min: float,
@@ -333,7 +319,7 @@ def get_edges_in_window(
     allowed_reltypes: Optional[Sequence[str]] = None,
     only_alarm: bool = False,
 ) -> List[GraphEdge]:
-    """查询时间窗口内的所有边。
+    """按时间窗查询边集合（可选关系类型/告警过滤）
 
     Args:
         t_min: 时间窗口起始时间（Unix 时间戳，秒）
@@ -382,6 +368,7 @@ def _fetch_edges_in_window(
     allowed_reltypes: Optional[Sequence[str]],
     only_alarm: bool,
 ) -> List[Dict[str, Any]]:
+    """时间窗查询的事务函数"""
     params: Dict[str, Any] = {
         "t_min": float(t_min),
         "t_max": float(t_max),
@@ -401,10 +388,10 @@ def _fetch_edges_in_window(
     return list(tx.run(cypher, **params))
 
 
+# =============================================================================
+# GDS 算法
+# =============================================================================
 
-
-
-# 基于 GDS 的时间窗最短路
 def gds_shortest_path_in_window(
     src_uid: str,
     dst_uid: str,
@@ -415,7 +402,7 @@ def gds_shortest_path_in_window(
     min_risk: float = 0.0,
     allowed_reltypes: Optional[Sequence[str]] = None,
 ) -> Optional[Tuple[float, List[GraphEdge]]]:
-    """使用 Neo4j GDS 计算时间窗内的加权最短路径。
+    """使用 Neo4j GDS 计算时间窗内的加权最短路径
 
     Args:
         src_uid: 源节点 UID
@@ -451,6 +438,7 @@ def gds_shortest_path_in_window(
 
 
 def _match_clause_for_uid(uid: str, alias: str, params: Dict[str, Any], prefix: str) -> str:
+    """为 UID 生成 MATCH 子句"""
     label, key = parse_uid(uid)
     clause_parts = []
     for k, v in key.items():
@@ -472,6 +460,7 @@ def _gds_shortest_path_in_window_tx(
     min_risk: float,
     allowed_reltypes: Optional[List[str]],
 ) -> Optional[Tuple[float, List[GraphEdge]]]:
+    """GDS 最短路算法的事务函数"""
     params: Dict[str, Any] = {
         "graph_name": graph_name,
         "t_min": t_min,
@@ -603,6 +592,7 @@ def _gds_shortest_path_in_window_tx(
 
 
 def _reconstruct_edges_between_node_ids_cypher(node_ids: List[int]) -> str:
+    """生成节点 ID 对之间重建边的 Cypher 查询"""
     return (
         "UNWIND range(0, size($node_ids)-2) AS i "
         "WITH $node_ids[i] AS sid, $node_ids[i+1] AS tid "
@@ -623,73 +613,12 @@ def _reconstruct_edges_between_node_ids_cypher(node_ids: List[int]) -> str:
     )
 
 
-def _node_uid_from_record(labels: Iterable[str], props: Dict[str, Any]) -> Optional[str]:
-    ntype = _label_to_ntype(labels)
-    if ntype is None:
-        return None
-    if ntype == NodeType.USER:
-        user_id = props.get("user.id")
-        if user_id:
-            return build_uid(ntype, {"user.id": user_id})
-        host_id = props.get("host.id")
-        user_name = props.get("user.name")
-        if host_id and user_name:
-            return build_uid(ntype, {"host.id": host_id, "user.name": user_name})
-    if ntype == NodeType.FILE:
-        host_id = props.get("host.id")
-        file_path = props.get("file.path")
-        if host_id and file_path:
-            return build_uid(ntype, {"host.id": host_id, "file.path": file_path})
-    key_field = NODE_UNIQUE_KEY.get(ntype)
-    if key_field and key_field in props:
-        return build_uid(ntype, {key_field: props[key_field]})
-    fallback = _fallback_key(ntype, props)
-    if fallback:
-        return build_uid(ntype, fallback)
-    return None
-
-
-def _label_to_ntype(labels: Iterable[str]) -> Optional[NodeType]:
-    for label in labels:
-        try:
-            return NodeType(label)
-        except ValueError:
-            continue
-    return None
-
-
-def _fallback_key(ntype: NodeType, props: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    fallback_fields = {
-        NodeType.HOST: ["host.id", "host.name"],
-        NodeType.USER: ["user.id", "host.id", "user.name"],
-        NodeType.PROCESS: ["process.entity_id"],
-        NodeType.FILE: ["host.id", "file.path"],
-        NodeType.DOMAIN: ["domain.name"],
-        NodeType.IP: ["ip"],
-    }
-    if ntype == NodeType.USER:
-        user_id = props.get("user.id")
-        if user_id:
-            return {"user.id": user_id}
-        host_id = props.get("host.id")
-        user_name = props.get("user.name")
-        if host_id and user_name:
-            return {"host.id": host_id, "user.name": user_name}
-        return None
-    if ntype == NodeType.FILE:
-        host_id = props.get("host.id")
-        file_path = props.get("file.path")
-        if host_id and file_path:
-            return {"host.id": host_id, "file.path": file_path}
-        return None
-
-    for field in fallback_fields.get(ntype, []):
-        if field in props:
-            return {field: props[field]}
-    return None
-
+# =============================================================================
+# 分析结果写回
+# =============================================================================
 
 def close() -> None:
+    """关闭 Neo4j driver 连接"""
     global _DRIVER
     if _DRIVER is None:
         return
@@ -697,14 +626,13 @@ def close() -> None:
     _DRIVER = None
 
 
-# 写回溯源结果到边属性（analysis.* 覆盖语义）
 def write_analysis_results(
     edges: Sequence[GraphEdge],
     *,
     task_id: str,
     updated_at: str,
 ) -> int:
-    """Write analysis.* fields onto edges and overwrite any existing analysis state."""
+    """写回溯源结果到边属性（analysis.* 覆盖语义）"""
     if not edges:
         return 0
     ensure_schema()
@@ -716,6 +644,7 @@ def write_analysis_results(
 
 
 def _write_analysis_result_tx(tx, edge: GraphEdge, task_id: str, updated_at: str) -> int:
+    """写回单条分析结果的事务函数"""
     if not isinstance(edge.props, dict):
         return 0
     event_id = edge.props.get("event.id")
@@ -773,6 +702,7 @@ def _analysis_props_from_edge(
     task_id: str,
     updated_at: str,
 ) -> Dict[str, Any]:
+    """从边属性提取分析结果属性"""
     is_path_edge = bool(edge_props.get("analysis.is_path_edge"))
     props: Dict[str, Any] = {
         "analysis.task_id": task_id,
@@ -797,76 +727,3 @@ def _analysis_props_from_edge(
         props["analysis.summary"] = summary
 
     return props
-
-
-# 入图：单条 ECS 文档
-def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
-    """Ingest a single ECS event by converting it into nodes/edges."""
-    if ecs_event_to_graph is None:
-        raise NotImplementedError("ecs_event_to_graph is not available")
-
-    nodes, edges = ecs_event_to_graph(event)
-    for node in nodes:
-        add_node(node)
-    for edge in edges:
-        add_edge(edge)
-    return len(nodes), len(edges)
-
-
-# 入图：批量 ECS 文档
-def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
-    """Ingest multiple ECS events."""
-    if ecs_event_to_graph is None:
-        raise NotImplementedError("ecs_event_to_graph is not available")
-
-    total_nodes = 0
-    total_edges = 0
-    for event in events:
-        nodes, edges = ecs_event_to_graph(event)
-        for node in nodes:
-            add_node(node)
-        for edge in edges:
-            add_edge(edge)
-        total_nodes += len(nodes)
-        total_edges += len(edges)
-    return total_nodes, total_edges
-
-
-# 从 OpenSearch 拉取并入图
-def ingest_from_opensearch(
-    query: Mapping[str, Any] | None = None,
-    *,
-    size: int = 100,
-    include_events: bool = True,
-    include_raw_findings: bool = False,
-    include_canonical_findings: bool = True,
-    date: datetime | None = None,
-) -> tuple[int, int, int]:
-    # 使用 OpenSearch API 拉取 ECS 事件并写入 Neo4j
-    from ..opensearch import INDEX_PATTERNS, get_index_name, index_exists, search
-
-    query_body = dict(query) if query is not None else {"match_all": {}}
-    index_names: list[str] = []
-    if include_events:
-        index_names.append(get_index_name(INDEX_PATTERNS["ECS_EVENTS"], date))
-    if include_raw_findings:
-        index_names.append(get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], date))
-    if include_canonical_findings:
-        index_names.append(get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], date))
-
-    total_events = 0
-    total_nodes = 0
-    total_edges = 0
-
-    for index_name in index_names:
-        if not index_exists(index_name):
-            continue
-        events = search(index_name, query_body, size=size)
-        if not events:
-            continue
-        total_events += len(events)
-        node_count, edge_count = ingest_ecs_events(events)
-        total_nodes += node_count
-        total_edges += edge_count
-
-    return total_events, total_nodes, total_edges
