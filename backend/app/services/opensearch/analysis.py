@@ -8,6 +8,7 @@ OpenSearch 数据分析模块
 """
 
 import hashlib
+import os
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
 
@@ -1134,29 +1135,43 @@ def _trigger_scan_with_lock(
             # 确保detector已启用
             _enable_detector_if_needed(client, detector_id, detector)
             
-            # 手动触发扫描：尝试多种方式，确保能够触发
-            # 方式1：如果存在workflow，优先使用workflow _execute API（最快最直接）
+            # 手动触发扫描：Security Analytics 的 workflow 执行依赖 Alerting 监控配置系统索引，
+            # 在部分 OpenSearch 版本/配置中，即使用 admin + all_access 也可能触发
+            # `alerting_exception ... indices:data/read/get[s]`（系统索引访问限制）。
+            #
+            # 默认策略：优先使用 schedule 方式触发，避免 execute API 的权限/系统索引问题。
+            # 如需优先尝试 workflow execute，可设置环境变量：OPENSEARCH_SA_PREFER_WORKFLOW_EXECUTE=1
+            prefer_workflow_execute = os.getenv("OPENSEARCH_SA_PREFER_WORKFLOW_EXECUTE", "0").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
+
             workflow_id = _get_workflow_id_for_detector(client, detector_id)
             execute_success = False
-            
-            if workflow_id:
-                print(f"[INFO] 找到workflow，尝试使用workflow _execute API手动触发...")
+
+            if workflow_id and prefer_workflow_execute:
+                print("[INFO] 找到workflow，尝试使用workflow _execute API手动触发...")
                 execute_success = _execute_workflow_manually(client, workflow_id)
                 if execute_success:
-                    print(f"[INFO] Workflow手动触发成功，等待扫描完成...")
+                    print("[INFO] Workflow手动触发成功，等待扫描完成...")
                     scan_completed, scan_wait_ms = _poll_for_scan_completion(
                         client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds
                     )
                     source = "triggered_scan_execute" if scan_completed else "cached_findings"
                 else:
-                    print(f"[INFO] Workflow _execute失败，将使用schedule方式触发...")
-            
-            # 方式2：如果workflow不存在或失败，使用schedule方式触发（同样有效）
-            # 注意：即使workflow存在，如果execute失败，也会fallback到这里
+                    print("[INFO] Workflow _execute失败，将使用schedule方式触发...")
+            elif workflow_id and not prefer_workflow_execute:
+                print(
+                    "[INFO] 已找到workflow，但默认跳过 execute（避免 alerting 系统索引权限限制），使用 schedule 方式触发。"
+                )
+
+            # 方式：使用 schedule 触发（同样有效）
             if not execute_success:
                 if not workflow_id:
-                    print(f"[INFO] 未找到workflow（这是正常的），使用schedule方式触发扫描...")
-                
+                    print("[INFO] 未找到workflow（这是正常的），使用schedule方式触发扫描...")
+
                 original_schedule, schedule_was_shortened = _temporarily_shorten_schedule(
                     client, detector_id, detector
                 )
@@ -1168,8 +1183,8 @@ def _trigger_scan_with_lock(
                     )
                     source = "triggered_scan_schedule" if scan_completed else "cached_findings"
                 else:
-                    # schedule已较短且强制触发也失败，等待一个扫描周期
-                    print(f"[INFO] Detector schedule已较短，等待自动扫描...")
+                    # schedule较短或强制触发失败，等待一个扫描周期
+                    print("[INFO] Detector schedule较短或强制触发失败，等待自动扫描...")
                     # 等待一个扫描周期（至少30秒）
                     wait_seconds = max(DEFAULT_POLL_INTERVAL_SECONDS, 30)
                     time.sleep(wait_seconds)
