@@ -8,19 +8,12 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# 添加 backend 目录到路径，以便导入 app.services.*
-# 当前文件路径：backend/app/services/opensearch/scripts/setup_security_analytics.py
-# parents: scripts -> opensearch -> services -> app -> backend
-backend_dir = Path(__file__).resolve().parents[4]
+# 添加 backend 目录到路径，以便从 opensearch 包导入
+# 脚本在 backend/opensearch/scripts/，需要回到 backend/ 才能导入 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.services.opensearch.internal import (
-    INDEX_PATTERNS,
-    get_client,
-    get_index_name,
-    index_exists,
-    initialize_indices,
-)
+from opensearch.internal import get_client, INDEX_PATTERNS, get_index_name, initialize_indices, index_exists
 
 
 def check_security_analytics_available() -> bool:
@@ -105,7 +98,7 @@ def get_prepackaged_rules(detector_type: str = "dns") -> list:
         return []
 
 
-def get_custom_rules(detector_type: str = "dns", max_rules: int = 20) -> dict:
+def get_custom_rules(detector_type: str = "dns", max_rules: int = 200) -> dict:
     """获取已导入的自定义规则（我们导入的 Sigma 规则）"""
     client = get_client()
     
@@ -116,51 +109,184 @@ def get_custom_rules(detector_type: str = "dns", max_rules: int = 20) -> dict:
         "windows": ["windows"],
         "linux": ["linux"],
         "macos": ["macos"],
+        "dns": ["dns", "network"],  # dns类型也可以使用network规则
     }
-    target_categories = category_map.get(detector_type.lower(), ["dns"])  # 默认使用 dns（我们有12个dns规则）
+    target_categories = category_map.get(detector_type.lower(), ["dns", "network", "windows", "linux"])  # 默认尝试多个category
     
     try:
         prepackaged_rules = []
         custom_rules = []
+        seen_ids = set()  # 用于去重
         
-        # 直接查询匹配category的规则，而不是获取所有规则再筛选
-        for category in target_categories:
-            if len(prepackaged_rules) + len(custom_rules) >= max_rules:
-                break
-                
-            response = client.transport.perform_request(
+        # 方法1：直接查询所有规则，然后按category筛选（更可靠）
+        try:
+            # 先查询所有规则索引
+            try:
+                indices_response = client.indices.get_alias(index="*rules*")
+                print(f"[DEBUG] 找到规则相关索引: {list(indices_response.keys())[:5]}")
+            except Exception:
+                pass
+            
+            all_rules_response = client.transport.perform_request(
                 'POST',
                 '/_plugins/_security_analytics/rules/_search',
                 body={
-                    "query": {
-                        "term": {"category": category}
-                    },
-                    "size": max_rules
+                    "query": {"match_all": {}},
+                    "size": 5000  # 增加查询数量，确保包含所有规则（包括您导入的1500个规则）
                 }
             )
-            hits = response.get('hits', {}).get('hits', [])
+            all_hits = all_rules_response.get('hits', {}).get('hits', [])
+            print(f"[DEBUG] 查询到总共 {len(all_hits)} 个规则，开始筛选...")
             
-            for hit in hits:
+            # 统计自定义规则索引中的规则
+            custom_index_rules = [h for h in all_hits if '.opensearch-sap-custom-rules-config' in h.get('_index', '')]
+            print(f"[DEBUG] 自定义规则索引中的规则数量: {len(custom_index_rules)}")
+            if custom_index_rules:
+                # 检查前几个自定义规则的字段
+                sample_rule = custom_index_rules[0].get('_source', {})
+                print(f"[DEBUG] 自定义规则示例字段: {list(sample_rule.keys())[:10]}")
+                print(f"[DEBUG] 自定义规则示例 - category: {sample_rule.get('category')}, logType: {sample_rule.get('logType')}")
+            
+            # 按category筛选
+            for hit in all_hits:
+                if len(prepackaged_rules) + len(custom_rules) >= max_rules:
+                    break
+                    
                 rule_id = hit.get('_id')
+                if not rule_id or rule_id in seen_ids:
+                    continue
+                
                 rule_source = hit.get('_source', {})
+                rule_category = rule_source.get('category', '').lower()
+                
+                # 检查是否匹配目标category
+                if rule_category not in [c.lower() for c in target_categories]:
+                    continue
+                
                 rule_index = hit.get('_index', '')
                 
-                if rule_id:
-                    # 判断是预打包规则还是自定义规则
-                    is_prepackaged = ('pre-packaged' in rule_index.lower() or 
-                                     'prepackaged' in rule_index.lower() or
-                                     rule_source.get('prePackaged', False))
+                # 判断是预打包规则还是自定义规则
+                # 关键：我们导入的规则都有logType字段，这是最可靠的判断依据
+                has_logtype = rule_source.get('logType') is not None
+                rule_logtype = rule_source.get('logType', '').lower() if has_logtype else ''
+                
+                # 预打包规则的索引名通常包含 "pre-packaged" 或 "prepackaged"
+                # 但如果规则有logType字段，说明是我们导入的规则（即使存储在预打包索引中）
+                is_prepackaged = (
+                    ('pre-packaged' in rule_index.lower() or 
+                     'prepackaged' in rule_index.lower() or
+                     rule_source.get('prePackaged', False) or
+                     rule_source.get('pre_packaged', False))
+                    and not has_logtype  # 如果有logType字段，不是预打包规则
+                )
+                
+                # 自定义规则判断：
+                # 1. 索引名包含 "custom-rules"（最直接的判断）
+                # 2. 有logType字段（我们导入的规则都有这个字段）
+                # 3. 或者索引名不包含pre-packaged/prepackaged
+                is_custom = (
+                    'custom-rules' in rule_index.lower() or  # 自定义规则索引
+                    has_logtype or  # 有logType字段，说明是我们导入的规则
+                    ('security-analytics-rules' in rule_index.lower()) or
+                    ('rules' in rule_index.lower() and 'pre-packaged' not in rule_index.lower() and 'prepackaged' not in rule_index.lower())
+                )
+                
+                rule_obj = {"id": rule_id}
+                seen_ids.add(rule_id)
+                
+                if is_prepackaged:
+                    if len(prepackaged_rules) < max_rules:
+                        prepackaged_rules.append(rule_obj)
+                elif is_custom:
+                    if len(custom_rules) < max_rules:
+                        custom_rules.append(rule_obj)
+                # 如果无法判断，默认作为自定义规则（因为用户导入的规则应该都是自定义的）
+                else:
+                    if len(custom_rules) < max_rules:
+                        custom_rules.append(rule_obj)
+            
+            print(f"[DEBUG] 筛选后: 预打包 {len(prepackaged_rules)} 个, 自定义 {len(custom_rules)} 个")
+        except Exception as e:
+            print(f"[WARNING] 查询所有规则失败，尝试按category查询: {e}")
+            # 方法2：如果方法1失败，回退到按category查询
+            for category in target_categories:
+                if len(prepackaged_rules) + len(custom_rules) >= max_rules:
+                    break
                     
-                    rule_obj = {"id": rule_id}
-                    if is_prepackaged:
-                        if len(prepackaged_rules) < max_rules:
-                            prepackaged_rules.append(rule_obj)
-                    else:
-                        if len(custom_rules) < max_rules:
-                            custom_rules.append(rule_obj)
+                try:
+                    # 先尝试term查询（精确匹配），如果失败则尝试match查询
+                    try:
+                        response = client.transport.perform_request(
+                            'POST',
+                            '/_plugins/_security_analytics/rules/_search',
+                            body={
+                                "query": {
+                                    "term": {"category": category}
+                                },
+                                "size": max_rules * 2
+                            }
+                        )
+                    except Exception:
+                        response = client.transport.perform_request(
+                            'POST',
+                            '/_plugins/_security_analytics/rules/_search',
+                            body={
+                                "query": {
+                                    "match": {"category": category}
+                                },
+                                "size": max_rules * 2
+                            }
+                        )
+                    hits = response.get('hits', {}).get('hits', [])
+                    print(f"[DEBUG] category '{category}' 查询到 {len(hits)} 个规则")
                     
-                    if len(prepackaged_rules) + len(custom_rules) >= max_rules:
-                        break
+                    for hit in hits:
+                        rule_id = hit.get('_id')
+                        if not rule_id or rule_id in seen_ids:
+                            continue
+                        
+                        rule_source = hit.get('_source', {})
+                        rule_index = hit.get('_index', '')
+                        
+                        # 判断是预打包规则还是自定义规则
+                        # 预打包规则的索引名通常包含 "pre-packaged" 或 "prepackaged"
+                        # 自定义规则（我们导入的）的索引名通常是 "security-analytics-rules" 或其他
+                        is_prepackaged = (
+                            'pre-packaged' in rule_index.lower() or 
+                            'prepackaged' in rule_index.lower() or
+                            rule_source.get('prePackaged', False) or
+                            rule_source.get('pre_packaged', False)
+                        )
+                        
+                        # 如果索引名包含 "security-analytics-rules" 且不是预打包，则认为是自定义规则
+                        # 或者如果规则有我们导入时添加的特殊标记
+                        is_custom = (
+                            not is_prepackaged and (
+                                'security-analytics-rules' in rule_index.lower() or
+                                rule_source.get('logType') is not None  # 我们导入的规则有logType字段
+                            )
+                        )
+                        
+                        rule_obj = {"id": rule_id}
+                        seen_ids.add(rule_id)
+                        
+                        if is_prepackaged:
+                            if len(prepackaged_rules) < max_rules:
+                                prepackaged_rules.append(rule_obj)
+                        elif is_custom:
+                            if len(custom_rules) < max_rules:
+                                custom_rules.append(rule_obj)
+                        # 如果无法判断，默认作为自定义规则（因为用户导入的规则应该都是自定义的）
+                        else:
+                            if len(custom_rules) < max_rules:
+                                custom_rules.append(rule_obj)
+                        
+                        if len(prepackaged_rules) + len(custom_rules) >= max_rules:
+                            break
+                except Exception as e:
+                    # 如果某个category查询失败，继续下一个
+                    print(f"[DEBUG] 查询category '{category}' 失败: {e}")
+                    continue
         
         # 返回预打包规则和自定义规则
         return {"prepackaged": prepackaged_rules, "custom": custom_rules}
@@ -185,31 +311,60 @@ def create_default_detector() -> dict:
     prepackaged_rules = []
     custom_rules = []
     
+    # 收集所有detector_type的规则信息，然后选择最好的
+    candidates = []
+    
     for dt in detector_types_to_try:
         print(f"[INFO] 尝试 detector_type: {dt}")
         prepackaged = get_prepackaged_rules(dt)
-        if prepackaged:
-            detector_type = dt
-            prepackaged_rules = prepackaged
-            print(f"[OK] 找到 {len(prepackaged)} 个预打包规则")
-            break
-        else:
-            custom_result = get_custom_rules(dt, max_rules=20)
-            if isinstance(custom_result, dict):
-                found_prepackaged = custom_result.get('prepackaged', [])
-                found_custom = custom_result.get('custom', [])
-                if found_prepackaged or found_custom:
-                    detector_type = dt
-                    prepackaged_rules = found_prepackaged
-                    custom_rules = found_custom
-                    total = len(found_prepackaged) + len(found_custom)
-                    print(f"[OK] 找到 {len(found_prepackaged)} 个预打包规则和 {len(found_custom)} 个自定义规则（共 {total} 个）")
-                    break
-            elif custom_result:
-                detector_type = dt
-                custom_rules = custom_result
-                print(f"[OK] 找到 {len(custom_rules)} 个自定义规则")
-                break
+        custom_result = get_custom_rules(dt, max_rules=500)  # 增加max_rules以获取更多规则
+        
+        # 合并预打包规则和自定义规则
+        found_prepackaged = prepackaged if prepackaged else []
+        found_custom = []
+        
+        if isinstance(custom_result, dict):
+            found_prepackaged.extend(custom_result.get('prepackaged', []))
+            found_custom = custom_result.get('custom', [])
+        elif custom_result:
+            found_custom = custom_result if isinstance(custom_result, list) else []
+        
+        # 去重（避免重复添加相同的规则）
+        seen_ids = set()
+        unique_prepackaged = []
+        for rule in found_prepackaged:
+            rule_id = rule.get('id') if isinstance(rule, dict) else rule
+            if rule_id and rule_id not in seen_ids:
+                seen_ids.add(rule_id)
+                unique_prepackaged.append(rule if isinstance(rule, dict) else {"id": rule})
+        
+        unique_custom = []
+        for rule in found_custom:
+            rule_id = rule.get('id') if isinstance(rule, dict) else rule
+            if rule_id and rule_id not in seen_ids:
+                seen_ids.add(rule_id)
+                unique_custom.append(rule if isinstance(rule, dict) else {"id": rule})
+        
+        total = len(unique_prepackaged) + len(unique_custom)
+        if total > 0:
+            candidates.append({
+                "detector_type": dt,
+                "prepackaged": unique_prepackaged,
+                "custom": unique_custom,
+                "total": total,
+                "custom_count": len(unique_custom)
+            })
+            print(f"[OK] 找到 {len(unique_prepackaged)} 个预打包规则和 {len(unique_custom)} 个自定义规则（共 {total} 个）")
+    
+    # 选择最佳candidate：优先选择自定义规则最多的，其次选择总数最多的
+    if candidates:
+        # 按自定义规则数量降序排序，如果相同则按总数排序
+        candidates.sort(key=lambda x: (x["custom_count"], x["total"]), reverse=True)
+        best = candidates[0]
+        detector_type = best["detector_type"]
+        prepackaged_rules = best["prepackaged"]
+        custom_rules = best["custom"]
+        print(f"\n[INFO] 选择 detector_type: {detector_type} (自定义规则: {best['custom_count']} 个, 总计: {best['total']} 个)")
     
     if not detector_type:
         detector_type = "dns"  # 默认使用 dns 类型（因为我们有DNS规则）
@@ -218,7 +373,7 @@ def create_default_detector() -> dict:
     # 如果上面没有找到规则，再尝试一次
     if not prepackaged_rules and not custom_rules:
         print("[INFO] 未找到预打包规则，尝试查找已导入的自定义规则...")
-        rules_result = get_custom_rules(detector_type, max_rules=20)
+        rules_result = get_custom_rules(detector_type, max_rules=500)  # 增加规则数量
         if isinstance(rules_result, dict):
             prepackaged_rules = rules_result.get('prepackaged', [])
             custom_rules = rules_result.get('custom', [])
@@ -374,8 +529,8 @@ def create_default_detector() -> dict:
             print("\n解决方案:")
             print("1. 手动在 OpenSearch Dashboards 中创建 detector 和规则")
             print("2. 或者导入 Sigma 规则后，再运行此脚本:")
-            print("   uv run python app/services/opensearch/scripts/import_sigma_rules.py --auto")
-            print("3. 参考说明: docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）")
+            print("   uv run python opensearch/import_sigma_rules.py --auto")
+            print("3. 参考文档: opensearch/docs/TEST_SECURITY_ANALYTICS.md（阶段 1：配置 Security Analytics）")
             return {
                 "success": False,
                 "message": "需要至少一个规则才能创建 detector。请手动配置或导入规则。"
@@ -412,7 +567,7 @@ def create_default_detector() -> dict:
             print("\n解决方案:")
             print("1. 手动在 OpenSearch Dashboards 中创建 detector 和规则")
             print("2. 或者导入 Sigma 规则后，再运行此脚本")
-            print("3. 参考说明: docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）")
+            print("3. 参考文档: opensearch/docs/TEST_SECURITY_ANALYTICS.md（阶段 1：配置 Security Analytics）")
         else:
             print(f"[ERROR] 创建 detector 失败: {e}")
         return {
@@ -445,8 +600,404 @@ def list_detectors() -> list:
         return []
 
 
+def create_multiple_detectors() -> dict:
+    """创建多个detector，每个对应一种类型，以覆盖所有规则"""
+    print("\n" + "=" * 80)
+    print("创建多个 Detector（覆盖所有规则类型）")
+    print("=" * 80)
+    
+    detector_types = ["dns", "network", "windows", "linux"]
+    created_detectors = []
+    failed_detectors = []
+    
+    for dt in detector_types:
+        print(f"\n[创建 {dt} detector]")
+        print("-" * 80)
+        
+        # 为每种类型创建detector
+        result = create_detector_for_type(dt)
+        if result.get("success"):
+            detector_id = result.get("detector_id")
+            detector_name = result.get("detector_name", f"ecs-events-detector-{dt}")
+            rules_count = result.get("rules_count", 0)
+            created_detectors.append({
+                "type": dt,
+                "id": detector_id,
+                "name": detector_name,
+                "rules": rules_count
+            })
+            print(f"✅ {dt} detector 创建成功 (ID: {detector_id}, 规则: {rules_count} 个)")
+        else:
+            failed_detectors.append({
+                "type": dt,
+                "reason": result.get("message", "未知错误")
+            })
+            print(f"❌ {dt} detector 创建失败: {result.get('message')}")
+    
+    return {
+        "success": len(created_detectors) > 0,
+        "created": created_detectors,
+        "failed": failed_detectors
+    }
+
+
+def create_or_update_detector_from_rules(rule_ids: list, detector_type: str = None, detector_name: str = "ecs-events-detector") -> dict:
+    """
+    根据规则ID列表创建或更新detector
+    
+    Args:
+        rule_ids: 规则ID列表
+        detector_type: detector类型（如果为None，会自动检测）
+        detector_name: detector名称
+    
+    Returns:
+        包含success、detector_id等信息的字典
+    """
+    client = get_client()
+    
+    if not rule_ids:
+        return {
+            "success": False,
+            "message": "没有规则，无法创建detector"
+        }
+    
+    # 限制规则数量（避免detector配置过大）
+    rules_to_use = rule_ids[:100]  # 增加到100个规则
+    
+    # 如果没有指定detector_type，尝试从规则中推断
+    if detector_type is None:
+        # 查询规则以确定类型
+        try:
+            response = client.transport.perform_request(
+                'POST',
+                '/_plugins/_security_analytics/rules/_search',
+                body={
+                    "query": {
+                        "ids": {"values": rules_to_use[:10]}  # 只查询前10个规则
+                    },
+                    "size": 10
+                }
+            )
+            hits = response.get('hits', {}).get('hits', [])
+            if hits:
+                # 统计最常见的category
+                categories = {}
+                for hit in hits:
+                    category = hit.get('_source', {}).get('category', '').lower()
+                    if category:
+                        categories[category] = categories.get(category, 0) + 1
+                
+                if categories:
+                    # 选择最常见的category作为detector_type
+                    detector_type = max(categories.items(), key=lambda x: x[1])[0]
+                    print(f"[INFO] 从规则推断detector_type: {detector_type}")
+        except Exception as e:
+            print(f"[WARNING] 无法推断detector_type: {e}")
+        
+        # 如果推断失败，使用默认值
+        if not detector_type:
+            detector_type = "dns"  # 默认使用dns类型
+    
+    # 准备索引
+    today = datetime.now()
+    specific_index = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
+    
+    # 确保索引存在
+    if not index_exists(specific_index):
+        print(f"[INFO] 索引不存在，正在创建: {specific_index}")
+        initialize_indices()
+    
+    # 根据detector_type决定使用索引模式还是具体索引
+    use_index_pattern = detector_type.lower() == "network"
+    
+    if use_index_pattern:
+        indices = ["ecs-events-*"]
+    else:
+        indices = [specific_index]
+    
+    detector_config = {
+        "name": detector_name,
+        "description": f"检测 ECS 事件中的可疑行为（自动创建，使用 {len(rules_to_use)} 个规则）",
+        "detector_type": detector_type,
+        "enabled": True,
+        "schedule": {
+            "period": {
+                "interval": 1,
+                "unit": "MINUTES"
+            }
+        },
+        "inputs": [
+            {
+                "detector_input": {
+                    "description": f"扫描 ECS 事件索引（detector_type: {detector_type}）",
+                    "indices": indices,
+                    "custom_rules": [{"id": rule_id} for rule_id in rules_to_use]
+                }
+            }
+        ],
+        "triggers": []
+    }
+    
+    try:
+        # 检查是否已存在
+        response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/detectors/_search',
+            body={
+                "query": {
+                    "match": {"name": detector_name}
+                },
+                "size": 10
+            }
+        )
+        hits = response.get('hits', {}).get('hits', [])
+        if hits:
+            detector_id = hits[0].get('_id')
+            print(f"[INFO] Detector 已存在 (ID: {detector_id})，尝试更新...")
+            # 更新现有detector
+            update_response = client.transport.perform_request(
+                'PUT',
+                f'/_plugins/_security_analytics/detectors/{detector_id}',
+                body=detector_config
+            )
+            print(f"[OK] Detector 更新成功")
+            return {
+                "success": True,
+                "detector_id": detector_id,
+                "detector_name": detector_name,
+                "detector_type": detector_type,
+                "rules_count": len(rules_to_use),
+                "message": "更新成功"
+            }
+        
+        # 创建新detector
+        response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/detectors',
+            body=detector_config
+        )
+        detector_id = response.get('_id')
+        print(f"[OK] Detector 创建成功 (ID: {detector_id})")
+        print(f"     使用了 {len(rules_to_use)} 个规则")
+        return {
+            "success": True,
+            "detector_id": detector_id,
+            "detector_name": detector_name,
+            "detector_type": detector_type,
+            "rules_count": len(rules_to_use),
+            "message": "创建成功"
+        }
+        
+    except Exception as e:
+        error_str = str(e)
+        print(f"[ERROR] 创建/更新detector失败: {e}")
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+
+def create_detector_for_type(detector_type: str) -> dict:
+    """为特定类型创建detector"""
+    client = get_client()
+    
+    print(f"[INFO] 查找 {detector_type} 类型的规则...")
+    
+    # 先查询所有规则，看看实际的category分布（调试用）
+    try:
+        all_rules_response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/rules/_search',
+            body={
+                "query": {"match_all": {}},
+                "size": 2000  # 增加查询数量
+            }
+        )
+        all_hits = all_rules_response.get('hits', {}).get('hits', [])
+        category_stats = {}
+        custom_category_stats = {}  # 单独统计自定义规则
+        for hit in all_hits:
+            rule_source = hit.get('_source', {})
+            category = rule_source.get('category', 'unknown')
+            rule_index = hit.get('_index', '')
+            is_prepackaged = (
+                'pre-packaged' in rule_index.lower() or 
+                'prepackaged' in rule_index.lower() or
+                rule_source.get('prePackaged', False)
+            )
+            is_custom = not is_prepackaged and (
+                'security-analytics-rules' in rule_index.lower() or
+                rule_source.get('logType') is not None
+            )
+            
+            key = f"{category} ({'预打包' if is_prepackaged else '自定义' if is_custom else '未知'})"
+            category_stats[key] = category_stats.get(key, 0) + 1
+            
+            # 单独统计自定义规则
+            if is_custom or (not is_prepackaged and category in ['windows', 'network', 'linux', 'dns']):
+                custom_category_stats[category] = custom_category_stats.get(category, 0) + 1
+        
+        print(f"[DEBUG] 所有规则category统计（前10个）:")
+        for cat, count in sorted(category_stats.items(), key=lambda x: -x[1])[:10]:
+            print(f"  - {cat}: {count} 个")
+        
+        if custom_category_stats:
+            print(f"[DEBUG] 自定义规则category统计:")
+            for cat, count in sorted(custom_category_stats.items(), key=lambda x: -x[1]):
+                print(f"  - {cat}: {count} 个")
+        
+        # 显示索引名统计（帮助诊断）
+        index_stats = {}
+        for hit in all_hits[:100]:  # 只检查前100个
+            rule_index = hit.get('_index', 'unknown')
+            index_stats[rule_index] = index_stats.get(rule_index, 0) + 1
+        
+        print(f"[DEBUG] 规则索引名统计（前5个）:")
+        for idx, count in sorted(index_stats.items(), key=lambda x: -x[1])[:5]:
+            print(f"  - {idx}: {count} 个")
+    except Exception as e:
+        print(f"[DEBUG] 查询所有规则失败: {e}")
+    
+    # 获取该类型的规则（包括预打包和自定义）
+    prepackaged = get_prepackaged_rules(detector_type)
+    custom_result = get_custom_rules(detector_type, max_rules=500)  # 增加规则数量（最多500个）
+    
+    # 合并规则
+    prepackaged_rules = prepackaged if prepackaged else []
+    custom_rules = []
+    
+    if isinstance(custom_result, dict):
+        # 合并预打包规则（避免重复）
+        for rule in custom_result.get('prepackaged', []):
+            rule_id = rule.get('id') if isinstance(rule, dict) else rule
+            # 检查是否已经在prepackaged列表中
+            if not any(r.get('id') == rule_id if isinstance(r, dict) else r == rule_id 
+                      for r in prepackaged_rules):
+                prepackaged_rules.append(rule if isinstance(rule, dict) else {"id": rule})
+        custom_rules = custom_result.get('custom', [])
+    
+    # 去重
+    seen_ids = set()
+    unique_prepackaged = []
+    for rule in prepackaged_rules:
+        rule_id = rule.get('id') if isinstance(rule, dict) else rule
+        if rule_id and rule_id not in seen_ids:
+            seen_ids.add(rule_id)
+            unique_prepackaged.append(rule if isinstance(rule, dict) else {"id": rule})
+    
+    unique_custom = []
+    for rule in custom_rules:
+        rule_id = rule.get('id') if isinstance(rule, dict) else rule
+        if rule_id and rule_id not in seen_ids:
+            seen_ids.add(rule_id)
+            unique_custom.append(rule if isinstance(rule, dict) else {"id": rule})
+    
+    print(f"[DEBUG] {detector_type} 类型规则统计:")
+    print(f"  - 预打包规则: {len(unique_prepackaged)} 个")
+    print(f"  - 自定义规则: {len(unique_custom)} 个")
+    print(f"  - 总计: {len(unique_prepackaged) + len(unique_custom)} 个")
+    
+    # 如果没有规则，跳过
+    if not unique_prepackaged and not unique_custom:
+        return {
+            "success": False,
+            "message": f"未找到 {detector_type} 类型的规则（预打包或自定义）"
+        }
+    
+    # 准备索引
+    from datetime import datetime
+    today = datetime.now()
+    specific_index = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
+    
+    if not index_exists(specific_index):
+        initialize_indices()
+    
+    # 根据detector_type决定使用索引模式还是具体索引
+    # 注意：doc-level monitor不支持索引模式，所以所有类型都使用具体索引
+    # 之前的代码中network类型使用索引模式会导致错误
+    use_index_pattern = False  # 禁用索引模式，所有类型都使用具体索引
+    indices = [specific_index]  # 统一使用具体索引
+    
+    detector_config = {
+        "name": f"ecs-events-detector-{detector_type}",
+        "description": f"检测 ECS 事件中的 {detector_type} 类型可疑行为",
+        "detector_type": detector_type,
+        "enabled": True,
+        "schedule": {
+            "period": {
+                "interval": 1,
+                "unit": "MINUTES"
+            }
+        },
+        "inputs": [
+            {
+                "detector_input": {
+                    "description": f"扫描 ECS 事件索引（detector_type: {detector_type}）",
+                    "indices": indices,
+                    "pre_packaged_rules": unique_prepackaged[:100],  # 限制数量避免过大
+                    "custom_rules": unique_custom[:100]
+                }
+            }
+        ],
+        "triggers": []
+    }
+    
+    try:
+        # 检查是否已存在
+        response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/detectors/_search',
+            body={
+                "query": {
+                    "match": {"name": detector_config["name"]}
+                },
+                "size": 10
+            }
+        )
+        hits = response.get('hits', {}).get('hits', [])
+        if hits:
+            detector_id = hits[0].get('_id')
+            print(f"[INFO] Detector 已存在 (ID: {detector_id})，跳过创建")
+            return {
+                "success": True,
+                "detector_id": detector_id,
+                "detector_name": detector_config["name"],
+                "rules_count": len(unique_prepackaged) + len(unique_custom)
+            }
+        
+        # 创建新detector
+        response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/detectors',
+            body=detector_config
+        )
+        detector_id = response.get('_id')
+        
+        return {
+            "success": True,
+            "detector_id": detector_id,
+            "detector_name": detector_config["name"],
+            "rules_count": len(unique_prepackaged) + len(unique_custom)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+
 def main():
     """主函数"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="OpenSearch Security Analytics 配置工具")
+    parser.add_argument(
+        "--multiple",
+        action="store_true",
+        help="创建多个detector（每个类型一个），覆盖所有规则"
+    )
+    args = parser.parse_args()
+    
     print("=" * 80)
     print("OpenSearch Security Analytics 配置工具")
     print("=" * 80)
@@ -455,15 +1006,23 @@ def main():
     print("\n[1/3] 检查 Security Analytics 插件...")
     if not check_security_analytics_available():
         print("\n配置失败：Security Analytics 插件不可用")
-        print("请参考 docs/31-OpenSearch模块规格说明书.md（OpenSearch 模块 / 脚本工具）进行手动配置/联调")
+        print("请参考 docs/TEST_SECURITY_ANALYTICS.md（阶段 1：配置 Security Analytics）进行手动配置")
         return
     
-    # 2. 创建默认 detector
-    print("\n[2/3] 创建默认 detector...")
-    result = create_default_detector()
-    if not result.get("success"):
-        print(f"\n配置失败: {result.get('message')}")
-        return
+    # 2. 创建detector(s)
+    if args.multiple:
+        print("\n[2/3] 创建多个 detector（覆盖所有类型）...")
+        result = create_multiple_detectors()
+        if not result.get("success"):
+            print("\n配置失败: 没有成功创建任何detector")
+            return
+    else:
+        print("\n[2/3] 创建默认 detector...")
+        result = create_default_detector()
+        if not result.get("success"):
+            print(f"\n配置失败: {result.get('message')}")
+            print("\n提示: 可以使用 --multiple 参数创建多个detector（每个类型一个）")
+            return
     
     # 3. 列出所有 detectors
     print("\n[3/3] 当前所有 detectors:")
@@ -472,15 +1031,21 @@ def main():
         for detector in detectors:
             status = "启用" if detector.get('enabled') else "禁用"
             detector_id = detector.get('_id') or detector.get('id', 'unknown')
-            print(f"  - {detector.get('name')} (ID: {detector_id}, 状态: {status})")
+            detector_type = detector.get('detector_type', 'unknown')
+            print(f"  - {detector.get('name')} (ID: {detector_id}, 类型: {detector_type}, 状态: {status})")
     else:
         print("  没有找到 detectors")
     
     print("\n" + "=" * 80)
     print("配置完成！")
     print("=" * 80)
-    print("\nSecurity Analytics 现在会每1分钟自动扫描 ecs-events-* 索引")
-    print("检测结果可以通过 run_security_analytics() 函数读取")
+    if args.multiple:
+        print("\n已创建多个detector，覆盖所有规则类型")
+        print("每个detector会扫描相同的索引，但使用不同类型的规则")
+    else:
+        print("\nSecurity Analytics 现在会每1分钟自动扫描 ecs-events-* 索引")
+        print("检测结果可以通过 run_security_analytics() 函数读取")
+        print("\n提示: 可以使用 --multiple 参数创建多个detector（每个类型一个）")
 
 
 if __name__ == "__main__":
