@@ -72,6 +72,9 @@ def _log_dropped_killchains(dropped: List[DroppedFSAGraph]) -> None:
 # Config knobs (Phase B)
 # ---------------------------------------------------------------------------
 
+KC_ECS_FIELD: str = "custom.killchain.uuid"
+"""ECS 合规字段：killchain uuid 写入到 edge/node 的该字段。"""
+
 TIME_MARGIN_SEC: float = 120.0
 """锚点窗口左右扩展的 margin（秒）：抗时钟偏差/入库延迟。测试数据跨度较大，放宽为 120 秒。"""
 
@@ -1349,7 +1352,7 @@ def build_llm_payload(candidate: SemanticCandidateSubgraph) -> Dict[str, Any]:
 
 def select_killchain_with_llm(
     candidate: SemanticCandidateSubgraph,
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     *,
     llm_client: KillChainLLMClient = None,
 ) -> KillChain:
@@ -1369,6 +1372,9 @@ def select_killchain_with_llm(
       - explanation 写入简单占位文本
       - confidence 默认为 0.5（fallback 模式）
     """
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     payload = build_llm_payload(candidate)
 
     chosen_ids: List[str] = []
@@ -1428,12 +1434,15 @@ def select_killchain_with_llm(
 def materialize_killchain(
     candidate: SemanticCandidateSubgraph,
     chosen_path_ids: Sequence[str],
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     *,
     explanation: str,
     confidence: float = 0.5,
 ) -> KillChain:
     """把 LLM 输出的 path_id 列表映射回 CandidatePath，生成最终 KillChain。"""
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     # 建立 path_id -> CandidatePath 的索引
     idx: Dict[str, CandidatePath] = {}
     for p in candidate.pair_candidates:
@@ -1509,7 +1518,10 @@ def persist_killchain_to_db(kc: KillChain) -> None:
 
     # 2) 写入边 props 并落库
     for e in edges:
-        set_analysis_task_id(e, kc_uuid)
+        if not isinstance(getattr(e, "props", None), dict):
+            e.props = {}
+        e.props[KC_ECS_FIELD] = kc_uuid
+        graph_api.add_edge(e)
 
     # 3) 收集节点 uid（从边端点）
     node_uids: Set[str] = set()
@@ -1547,7 +1559,7 @@ def match_vector_features(vectors: Any) -> Any:
 
 def run_killchain_pipeline(
     *,
-    kc_uuid: str,
+    kc_uuid: str | None = None,
     llm_client: Any = None,
     persist: bool = True,
 ) -> List[KillChain]:
@@ -1559,6 +1571,9 @@ def run_killchain_pipeline(
       - 如果 persist=True，只会将可信度最高的 killchain 存入数据库
       - 所有 killchains 都会返回，但只有最高可信度的会被持久化
     """
+    if kc_uuid is None:
+        kc_uuid = str(uuid.uuid4())
+
     abnormal = graph_api.get_alarm_edges()
 
     # Phase A
@@ -1592,6 +1607,3 @@ def run_killchain_pipeline(
         persist_killchain_to_db(best_kc)
 
     return killchains
-
-
-

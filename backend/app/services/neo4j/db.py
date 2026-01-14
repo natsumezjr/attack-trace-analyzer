@@ -278,6 +278,61 @@ def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
     return list(tx.run(cypher, **params))
 
 
+def get_graph_by_attack_id(attack_id: str) -> Tuple[List[GraphNode], List[GraphEdge]]:
+    """按 ATT&CK ID 查询子图（节点 + 边）
+
+    Args:
+        attack_id: ATT&CK tactic ID 或 technique ID（如 TA0001 / T1059）
+
+    Returns:
+        Tuple[List[GraphNode], List[GraphEdge]]: 去重后的节点列表与边列表
+    """
+    if not isinstance(attack_id, str) or not attack_id.strip():
+        return [], []
+    with _get_session() as session:
+        rows = _execute_read(session, _fetch_graph_by_attack_id, attack_id.strip())
+
+    nodes_by_uid: Dict[str, GraphNode] = {}
+    edges: List[GraphEdge] = []
+    for row in rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+
+        for uid, labels, props in (
+            (src_uid, row["src_labels"], row["src_props"]),
+            (dst_uid, row["dst_labels"], row["dst_props"]),
+        ):
+            if uid in nodes_by_uid:
+                continue
+            ntype, key = parse_uid(uid)
+            node_props = dict(props)
+            for k in key:
+                node_props.pop(k, None)
+            nodes_by_uid[uid] = GraphNode(ntype=ntype, key=key, props=node_props)
+
+    return list(nodes_by_uid.values()), edges
+
+
+def _fetch_graph_by_attack_id(tx, attack_id: str) -> List[Dict[str, Any]]:
+    """按 ATT&CK ID 查询子图的事务函数"""
+    cypher = (
+        "MATCH ()-[r]->() "
+        "WHERE r.`threat.technique.id` = $attack_id "
+        "OR r.`threat.tactic.id` = $attack_id "
+        "RETURN type(r) AS rtype, properties(r) AS rprops, "
+        "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
+        "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
+    )
+    return list(tx.run(cypher, attack_id=attack_id))
+
+
 def get_alarm_edges() -> List[GraphEdge]:
     """查询所有告警边（is_alarm = true 的边）
 
@@ -359,6 +414,48 @@ def get_edges_in_window(
             )
         )
     return edges
+
+
+def get_edges_by_task_id(
+    *,
+    task_id: str,
+    only_path: bool = False,
+) -> List[GraphEdge]:
+    """按 analysis.task_id 查询边集合（可选仅关键路径边）"""
+    if not isinstance(task_id, str) or not task_id:
+        raise ValueError("task_id is required")
+
+    ensure_schema()
+    with _get_session() as session:
+        rows = _execute_read(session, _fetch_edges_by_task_id, task_id, bool(only_path))
+
+    edges: List[GraphEdge] = []
+    for row in rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+    return edges
+
+
+def _fetch_edges_by_task_id(tx, task_id: str, only_path: bool) -> List[Dict[str, Any]]:
+    """按 analysis.task_id 查询边的事务函数"""
+    params: Dict[str, Any] = {"task_id": task_id, "only_path": bool(only_path)}
+
+    cypher = (
+        "MATCH ()-[r]->() "
+        f"WHERE r.{_cypher_prop('analysis.task_id')} = $task_id "
+        "AND (NOT $only_path OR coalesce(r.`analysis.is_path_edge`, false) = true) "
+        "RETURN type(r) AS rtype, properties(r) AS rprops, "
+        "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
+        "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
+    )
+    return list(tx.run(cypher, **params))
 
 
 def _fetch_edges_in_window(

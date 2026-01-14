@@ -36,7 +36,7 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 
 ### 3.2 任务文档存储（OpenSearch）
 
-每个任务在 `analysis-tasks-*` 中保存 1 条任务文档，字段集合固定为：
+每个任务在 `analysis-tasks-*` 中保存 1 条任务文档，字段集合固定为（核心字段 + 任务级结构化结果）：
 
 - `@timestamp`：任务创建时间（RFC3339）
 - `task.id`：`task_id`
@@ -50,6 +50,14 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 - `task.error`：失败原因（字符串）
 - `task.result.summary`：任务结果摘要（字符串）
 
+此外，任务必须写入以下“任务级结果”字段（用于展示/报告复用）：
+
+- `task.result.ttp_similarity.attack_tactics[]`：本任务时间窗内的 ATT&CK tactic id 集合（TAxxxx）
+- `task.result.ttp_similarity.attack_techniques[]`：本任务时间窗内的 ATT&CK technique id 集合（Txxxx[.xxx]）
+- `task.result.ttp_similarity.similar_apts[]`：Top-3 相似组织列表（数组，每项包含 intrusion_set / similarity_score / top_tactics / top_techniques）
+- `task.result.trace.updated_edges`：写回到 Neo4j 的边数量
+- `task.result.trace.path_edges`：其中关键路径边数量（`analysis.is_path_edge=true`）
+
 ### 3.3 状态机（必须严格）
 
 状态转移只能是：
@@ -59,6 +67,19 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 - `running → failed`
 
 任何回退、跳转均禁止。
+
+### 3.4 后端对外 API（固定）
+
+Analysis 模块的异步任务由后端 API 对外暴露，接口形状固定为：
+
+- `POST /api/v1/analysis/tasks`：创建任务（返回 `task_id`，并入队异步执行）
+- `GET /api/v1/analysis/tasks/{task_id}`：查询任务状态/进度/任务级结果（OpenSearch 任务文档）
+- `GET /api/v1/analysis/tasks`：按条件列出任务（用于前端任务列表/调试）
+
+任务执行完成后的图结果读取有两种方式：
+
+1) 继续使用 `POST /api/v1/graph/query` 的 `edges_in_window` 拉边，并在前端筛选 `analysis.task_id == task_id`；或
+2) 使用 `POST /api/v1/graph/query` 的 `analysis_edges_by_task` 动作，直接按 `task_id` 拉取本次写回边（可选 `only_path=true`）。
 
 ## 4. 算法流水线（固定阶段）
 
@@ -71,7 +92,13 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 
 ### 4.2 处理阶段
 
-算法流水线固定为四个阶段（Phase A/B/C/D），每个阶段的输出都必须可用于解释与回溯：
+本任务在同一个 `task_id` 下必须执行 **两条主算法 + 一条派生标注**，三者都必须完成（没有可选开关），并且都要产出可回溯的结构化输出：
+
+1. **主算法-Trace（回溯链条/关键路径）**：从 Neo4j 读取目标节点相关子图，生成“关键边集合 + 子图边集合 + 风险/解释”，并写回 Neo4j 的 `analysis.*` 字段。
+2. **主算法-TTP Similarity（APT 组织匹配）**：从 OpenSearch 的 Canonical Findings 提取 `threat.tactic.id + threat.technique.id`，结合离线 Enterprise CTI 计算 Top-3 相似组织，写入 OpenSearch 的任务文档 `task.result.ttp_similarity.*`。
+3. **派生标注（Edge-level TTP）**：对 Trace 的关键路径边，派生并写回 `analysis.ttp.technique_ids[]`（从边的 `threat.technique.*` 字段提取/展开），用于前端高亮与报告解释。
+
+其中 Trace 的算法流水线仍按 Phase A/B/C/D 描述（细节见下文），但它必须与 TTP Similarity 同一任务内共同执行与落库。
 
 #### Phase A：攻击阶段骨架（Attack FSA）
 
