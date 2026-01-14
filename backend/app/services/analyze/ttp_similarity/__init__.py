@@ -1,8 +1,4 @@
-"""
-DEPRECATED: moved to app.services.analyze.ttp_similarity
-
-Keep this shim to avoid breaking older imports.
-"""
+"""ATT&CK TTP similarity (tactics + techniques) via offline Enterprise CTI + TF-IDF + cosine."""
 
 from app.services.analyze.ttp_similarity.router import router
 from app.services.analyze.ttp_similarity.service import (
@@ -17,3 +13,4 @@ __all__ = [
     "rank_similar_intrusion_sets",
     "router",
 ]
+

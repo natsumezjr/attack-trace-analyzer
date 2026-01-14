@@ -70,8 +70,8 @@ coverage.xml
 client/data/
 
 # --- Offline CTI data (large; fetched locally) ---
-backend/app/services/ttp_similarity/cti/enterprise-attack.json
-backend/app/services/ttp_similarity/cti/enterprise-attack.json.tmp
+backend/app/services/analyze/ttp_similarity/cti/enterprise-attack.json
+backend/app/services/analyze/ttp_similarity/cti/enterprise-attack.json.tmp
 
 # --- OpenSearch ---
 # Sigma规则库（使用git submodule管理，不直接提交）

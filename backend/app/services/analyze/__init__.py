@@ -1,14 +1,20 @@
-from .killchain import KillChain, run_killchain_pipeline
-from .killchain_llm import create_llm_client
-from typing import List
+"""
+Analysis algorithms (task-driven).
 
-def analyze_killchain(kc_uuid: str) -> List[KillChain]:
-    try:
-        llm_client = create_llm_client()
-    except Exception as e:
-        print(f"[killchain] 无法创建 LLM client: {e}，使用 fallback")
-        llm_client = None
-        kcs = run_killchain_pipeline(kc_uuid, llm_client=llm_client, persist=False)
-        return kcs
+This package is the single home for all analysis/algorithm implementations.
+It is designed to be driven by a `task_id` and write results back to:
+  - OpenSearch task document (analysis-tasks-*)
+  - Neo4j edge properties (analysis.*)
+"""
 
-__all__ = ["analyze_killchain"]
+from app.services.analyze.pipeline import new_task_id, run_analysis_task
+
+# Legacy / algorithm-level exports (still useful for local debugging / scripts).
+from app.services.analyze.killchain import KillChain, run_killchain_pipeline
+
+__all__ = [
+    "new_task_id",
+    "run_analysis_task",
+    "KillChain",
+    "run_killchain_pipeline",
+]
