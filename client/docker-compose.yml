@@ -109,6 +109,8 @@ services:
       - "8888:8888"
     volumes:
       - ./data:/data
+    environment:
+      - DB_PATH=/data/data.db
     command: ["-db", "/data/data.db"]
     depends_on:
       - falco
