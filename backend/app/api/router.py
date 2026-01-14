@@ -5,7 +5,7 @@ from app.api.routes import chains, events, findings, graph, health, root, target
 from app.api.utils import err
 
 try:
-    from app.services.ttp_similarity.router import router as ttp_similarity_router
+    from app.services.analyze.ttp_similarity.router import router as ttp_similarity_router
 except Exception as error:
     # Do not block the entire API service if optional analysis modules are broken
     # or their dependencies are unavailable. Expose a clear 501 instead.

@@ -10,6 +10,8 @@ from .mappings import (
     raw_findings_mapping,
     canonical_findings_mapping,
     attack_chains_mapping,
+    analysis_tasks_mapping,
+    client_registry_mapping,
 )
 
 # ========== 索引常量 ==========
@@ -18,6 +20,8 @@ INDEX_PATTERNS = {
     "RAW_FINDINGS": "raw-findings",
     "CANONICAL_FINDINGS": "canonical-findings",
     "ATTACK_CHAINS": "attack-chains",
+    "ANALYSIS_TASKS": "analysis-tasks",
+    "CLIENT_REGISTRY": "client-registry",
 }
 
 
@@ -64,6 +68,17 @@ def initialize_indices() -> None:
     ensure_index(
         get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
         attack_chains_mapping,
+    )
+
+    ensure_index(
+        get_index_name(INDEX_PATTERNS["ANALYSIS_TASKS"], today),
+        analysis_tasks_mapping,
+    )
+
+    # Client registry is a fixed index (not time-series).
+    ensure_index(
+        INDEX_PATTERNS["CLIENT_REGISTRY"],
+        client_registry_mapping,
     )
 
     print("所有索引初始化完成")
