@@ -12,6 +12,8 @@ import os
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
 
+from app.core.time import parse_datetime, to_rfc3339, utc_now_rfc3339
+
 from .client import get_client, search, bulk_index, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
 
@@ -35,10 +37,6 @@ FINDINGS_CACHE_WINDOW_SECONDS = 300  # 5分钟
 # 默认超时设置
 DEFAULT_SCAN_TIMEOUT_SECONDS = 60  # 扫描超时时间（秒）
 DEFAULT_POLL_INTERVAL_SECONDS = 2  # 轮询间隔（秒）
-
-
-def _utc_now_rfc3339() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def fingerprint_id_from_key(fingerprint_key: str) -> str:
@@ -87,29 +85,10 @@ def generate_fingerprint(finding: dict[str, Any]) -> str:
 
     # 时间桶计算：time_bucket = floor(@timestamp / Δt)
     timestamp_value = finding.get("@timestamp") or finding.get("event", {}).get("created")
-    
-    # 处理不同格式的时间戳
-    if timestamp_value:
-        if isinstance(timestamp_value, str):
-            # ISO格式字符串
-            timestamp = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
-            timestamp_ms = int(timestamp.timestamp() * 1000)
-        elif isinstance(timestamp_value, datetime):
-            # datetime对象
-            timestamp_ms = int(timestamp_value.timestamp() * 1000)
-        elif isinstance(timestamp_value, (int, float)):
-            # 整数或浮点数时间戳
-            # 判断是秒还是毫秒（毫秒通常 > 1e12）
-            if timestamp_value > 1e12:
-                timestamp_ms = int(timestamp_value)  # 已经是毫秒
-            else:
-                timestamp_ms = int(timestamp_value * 1000)  # 秒转毫秒
-        else:
-            # 未知格式，使用当前时间
-            timestamp_ms = int(datetime.now().timestamp() * 1000)
-    else:
-        # 没有时间戳，使用当前时间
-        timestamp_ms = int(datetime.now().timestamp() * 1000)
+    dt = parse_datetime(timestamp_value)
+    if dt is None:
+        dt = datetime.now(timezone.utc)
+    timestamp_ms = int(dt.timestamp() * 1000)
     
     time_bucket_ms = TIME_WINDOW_MINUTES * 60 * 1000  # 转换为毫秒
     time_bucket = timestamp_ms // time_bucket_ms
@@ -126,18 +105,24 @@ def extract_provider(finding: dict[str, Any]) -> str:
     if isinstance(providers, list) and len(providers) > 0:
         return providers[0]
 
+    dataset = finding.get("event", {}).get("dataset") or finding.get("event.dataset")
+    if isinstance(dataset, str) and dataset.startswith("finding.raw."):
+        provider = dataset.split("finding.raw.", 1)[1]
+        if provider in {"falco", "suricata", "filebeat_sigma", "security_analytics"}:
+            return provider
+
     # 根据规则来源推断
     rule_id = finding.get("rule", {}).get("id") or finding.get("rule.id")
     if rule_id:
         rule_id_lower = rule_id.lower()
-        if "filebeat" in rule_id_lower:
-            return "filebeat"
+        if "filebeat" in rule_id_lower or "sigma" in rule_id_lower:
+            return "filebeat_sigma"
         if "falco" in rule_id_lower:
             return "falco"
         if "suricata" in rule_id_lower:
             return "suricata"
-        if "sigma" in rule_id_lower or "opensearch" in rule_id_lower:
-            return "opensearch-security-analytics"
+        if "opensearch" in rule_id_lower or "security_analytics" in rule_id_lower:
+            return "security_analytics"
 
     return "unknown"
 
@@ -152,26 +137,21 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
 
     base = copy.deepcopy(findings[0])
 
-    # 合并 providers
+    # 合并 providers（优先信任 custom.finding.providers；缺失时再推断）
     providers = set()
     for f in findings:
-        provider = extract_provider(f)
-        providers.add(provider)
-        # 如果 finding 有 providers 数组，也添加进去
         f_custom = f.get("custom", {})
         f_finding = f_custom.get("finding", {})
         f_providers = f_finding.get("providers")
         if isinstance(f_providers, list):
             providers.update(f_providers)
+        provider = extract_provider(f)
+        if provider != "unknown":
+            providers.add(provider)
 
-    # 合并 evidence.event_ids
+    # 合并 evidence.event_ids（只允许 Telemetry event.id；不要把 finding 自身的 event.id 混进来）
     event_ids = set()
     for f in findings:
-        event = f.get("event", {})
-        if event.get("id"):
-            event_ids.add(event.get("id"))
-        if f.get("event.id"):
-            event_ids.add(f.get("event.id"))
         f_custom = f.get("custom", {})
         f_evidence = f_custom.get("evidence", {})
         f_event_ids = f_evidence.get("event_ids")
@@ -192,11 +172,11 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
         base["custom"]["finding"] = {}
 
     base["custom"]["finding"]["stage"] = "canonical"
-    base["custom"]["finding"]["providers"] = list(providers)
+    base["custom"]["finding"]["providers"] = sorted(p for p in providers if isinstance(p, str) and p)
 
     if "evidence" not in base["custom"]:
         base["custom"]["evidence"] = {}
-    base["custom"]["evidence"]["event_ids"] = list(event_ids)
+    base["custom"]["evidence"]["event_ids"] = sorted(e for e in event_ids if isinstance(e, str) and e)
 
     # 设置 severity
     if "event" in base:
@@ -233,12 +213,12 @@ def deduplicate_findings() -> dict[str, Any]:
     根据文档：在时间窗 Δt 内，将满足相同指纹的 Raw Finding 合并为一条 Canonical Finding
     """
     client = get_client()
-    today = datetime.now()
+    today = datetime.now(timezone.utc)
     raw_index_name = get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today)
     canonical_index_name = get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today)
 
     try:
-        canonical_ingested_now = _utc_now_rfc3339()
+        canonical_ingested_now = utc_now_rfc3339()
 
         # 查询所有 Raw Findings
         raw_findings = search(
@@ -461,11 +441,9 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
     - 这个函数就是把它的格式转换成我们系统能用的格式
     - 就像把"外国话"翻译成"中国话"
     """
-    from datetime import datetime
-    
     # 提取基本信息
-    finding_id = finding.get('id', f"sa-finding-{datetime.now().timestamp()}")
-    timestamp = finding.get('timestamp', datetime.now().isoformat())
+    finding_id = finding.get("id") or f"sa-finding-{int(datetime.now(timezone.utc).timestamp())}"
+    timestamp = to_rfc3339(finding.get("timestamp")) or utc_now_rfc3339()
     
     # 提取检测信息
     detector = finding.get('detector', {})
@@ -597,7 +575,7 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
             "category": ["intrusion_detection"],
             "type": ["alert"],
             "action": "security_analytics_detection",
-            "dataset": "finding.raw",
+            "dataset": "finding.raw.security_analytics",
             "severity": finding.get('severity', 50),  # Security Analytics 的严重程度
         },
         "rule": rule_info if rule_info else {
@@ -609,7 +587,7 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
         "custom": {
             "finding": {
                 "stage": "raw",
-                "providers": ["security-analytics"],  # 标记来源
+                "providers": ["security_analytics"],  # 标记来源（docs/51-ECS字段规范.md）
             },
             "confidence": finding.get('confidence', 0.7),
         },
@@ -820,24 +798,8 @@ def _get_latest_findings_timestamp(client, detector_id: Optional[str] = None) ->
         latest_finding = findings[0]
         timestamp_value = latest_finding.get('timestamp') or latest_finding.get('@timestamp')
         
-        if timestamp_value:
-            if isinstance(timestamp_value, (int, float)):
-                # 数字时间戳
-                if timestamp_value > 1e12:
-                    timestamp_ms = int(timestamp_value)  # 已经是毫秒
-                else:
-                    timestamp_ms = int(timestamp_value * 1000)  # 秒转毫秒
-            elif isinstance(timestamp_value, str):
-                # ISO格式字符串，转换为毫秒时间戳
-                try:
-                    ts = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
-                    timestamp_ms = int(ts.timestamp() * 1000)
-                except Exception:
-                    timestamp_ms = 0
-            else:
-                timestamp_ms = 0
-        else:
-            timestamp_ms = 0
+        dt = parse_datetime(timestamp_value)
+        timestamp_ms = int(dt.timestamp() * 1000) if dt is not None else 0
         
         return (timestamp_ms, total_findings)
     except Exception as e:
@@ -1327,12 +1289,14 @@ def _get_last_processed_timestamp(client, detector_id: str) -> Optional[datetime
     try:
         # 查询raw-findings索引中该detector的最新finding时间戳
         index_pattern = INDEX_PATTERNS["RAW_FINDINGS"]
-        today = datetime.now()
+        today = datetime.now(timezone.utc)
         
         # 查询最近7天的索引（避免遗漏跨天数据）
         latest_timestamp = None
         for days_back in range(7):
-            check_date = datetime(today.year, today.month, today.day) - timedelta(days=days_back)
+            check_date = datetime(today.year, today.month, today.day, tzinfo=timezone.utc) - timedelta(
+                days=days_back
+            )
             index_name = get_index_name(index_pattern, check_date)
             
             try:
@@ -1358,16 +1322,9 @@ def _get_last_processed_timestamp(client, detector_id: str) -> Optional[datetime
                 if hits:
                     doc = hits[0].get('_source', {})
                     timestamp_str = doc.get('@timestamp')
-                    if timestamp_str:
-                        if isinstance(timestamp_str, str):
-                            ts = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-                        elif isinstance(timestamp_str, datetime):
-                            ts = timestamp_str
-                        else:
-                            continue
-                        
-                        if latest_timestamp is None or ts > latest_timestamp:
-                            latest_timestamp = ts
+                    ts = parse_datetime(timestamp_str)
+                    if ts is not None and (latest_timestamp is None or ts > latest_timestamp):
+                        latest_timestamp = ts
             except Exception:
                 # 索引可能不存在，继续查询下一个
                 continue
@@ -1391,6 +1348,9 @@ def _filter_new_findings(findings: list[dict[str, Any]], last_timestamp: Optiona
     if last_timestamp is None:
         # 如果没有上次处理时间，返回所有findings
         return findings
+
+    if last_timestamp.tzinfo is None:
+        last_timestamp = last_timestamp.replace(tzinfo=timezone.utc)
     
     new_findings = []
     for finding in findings:
@@ -1400,29 +1360,12 @@ def _filter_new_findings(findings: list[dict[str, Any]], last_timestamp: Optiona
             new_findings.append(finding)
             continue
         
-        # 解析时间戳
-        try:
-            if isinstance(timestamp_value, str):
-                finding_ts = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
-            elif isinstance(timestamp_value, datetime):
-                finding_ts = timestamp_value
-            elif isinstance(timestamp_value, (int, float)):
-                # 假设是毫秒时间戳
-                if timestamp_value > 1e12:
-                    finding_ts = datetime.fromtimestamp(timestamp_value / 1000)
-                else:
-                    finding_ts = datetime.fromtimestamp(timestamp_value)
-            else:
-                # 无法解析，保守处理：包含它
-                new_findings.append(finding)
-                continue
-            
-            # 只包含时间戳大于上次处理时间的finding
-            # 使用微秒精度比较，避免边界问题
-            if finding_ts > last_timestamp:
-                new_findings.append(finding)
-        except Exception:
-            # 解析失败，保守处理：包含它
+        finding_ts = parse_datetime(timestamp_value)
+        if finding_ts is None:
+            new_findings.append(finding)
+            continue
+
+        if finding_ts > last_timestamp:
             new_findings.append(finding)
     
     return new_findings
@@ -1611,7 +1554,7 @@ def run_security_analytics(
             print(f"[INFO] 发现已有findings: {baseline_count} 个")
             if baseline_timestamp_ms > 0:
                 # 计算findings年龄（分钟）
-                current_timestamp_ms = int(datetime.now().timestamp() * 1000)
+                current_timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
                 findings_age_minutes = (current_timestamp_ms - baseline_timestamp_ms) / 1000 / 60
                 print(f"[INFO] 最新finding时间戳: {baseline_timestamp_ms}（{findings_age_minutes:.1f}分钟前）")
         

@@ -1,10 +1,11 @@
 # Neo4j 工具函数集合
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 
 from .models import NodeType, NODE_UNIQUE_KEY, build_uid
+from app.core.time import parse_datetime
 
 
 # =============================================================================
@@ -24,22 +25,13 @@ def _parse_ts_to_float(ts: str | None) -> float:
     except ValueError:
         pass
 
-    # 2. 解析 ISO 8601 格式字符串
-    try:
-        # 处理 'Z' 后缀：Python 3.11 以前的 fromisoformat 不支持 'Z' 结尾，
-        # 需要将其替换为 '+00:00' 来表示 UTC 时区。
-        if ts.endswith('Z'):
-            ts = ts[:-1] + '+00:00'
-
-        # 解析字符串为 datetime 对象
-        dt = datetime.fromisoformat(ts)
-
-        # 转换为 Unix 时间戳 (float 秒数)
-        return dt.timestamp()
-
-    except (ValueError, TypeError):
-        # 如果格式依然无法解析，返回 0.0 作为兜底，防止程序崩溃
+    # 2. 解析 ISO 8601 格式字符串（默认按 UTC 解释）
+    dt = parse_datetime(ts)
+    if dt is None:
         return 0.0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp()
 
 
 # =============================================================================

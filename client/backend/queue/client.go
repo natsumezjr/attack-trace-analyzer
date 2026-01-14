@@ -1,9 +1,11 @@
 package queue
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -32,6 +34,39 @@ func (c *Client) Close() {
 	if c.conn != nil && !c.conn.IsClosed() {
 		_ = c.conn.Close()
 	}
+}
+
+func ensureEventID(body []byte) ([]byte, error) {
+	var doc map[string]any
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return nil, err
+	}
+
+	if existing, ok := doc["event.id"].(string); ok && strings.TrimSpace(existing) != "" {
+		return body, nil
+	}
+	if ev, ok := doc["event"].(map[string]any); ok {
+		if existing, ok := ev["id"].(string); ok && strings.TrimSpace(existing) != "" {
+			return body, nil
+		}
+	}
+
+	sum := sha1.Sum(body)
+	full := fmt.Sprintf("%x", sum[:])
+	eventID := "evt-" + full[:16]
+
+	ev, ok := doc["event"].(map[string]any)
+	if !ok || ev == nil {
+		ev = map[string]any{}
+		doc["event"] = ev
+	}
+	ev["id"] = eventID
+
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *Client) FetchAll(queueName string) ([]json.RawMessage, error) {
@@ -67,7 +102,12 @@ func (c *Client) FetchAll(queueName string) ([]json.RawMessage, error) {
 			break
 		}
 		if json.Valid(msg.Body) {
-			out = append(out, msg.Body)
+			withID, err := ensureEventID(msg.Body)
+			if err != nil {
+				out = append(out, msg.Body)
+			} else {
+				out = append(out, withID)
+			}
 		}
 		if err := msg.Ack(false); err != nil {
 			c.log.Printf("rabbitmq ack failed for %s: %v", queueName, err)

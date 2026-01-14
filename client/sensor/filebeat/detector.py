@@ -300,7 +300,10 @@ class AnomalyDetector:
             log_entry['event']['category'] = ['intrusion_detection']
             log_entry['event']['type'] = ['indicator']
             log_entry['event']['severity'] = matched_rules[0]['severity_num']
-            log_entry['event']['dataset'] = log_entry.get('event', {}).get('dataset', 'finding.raw')
+            dataset = log_entry.get('event', {}).get('dataset')
+            if not dataset or dataset == 'finding.raw':
+                dataset = 'finding.raw.filebeat_sigma'
+            log_entry['event']['dataset'] = dataset
 
             # 添加rule字段（ECS标准）
             log_entry['rule'] = {
