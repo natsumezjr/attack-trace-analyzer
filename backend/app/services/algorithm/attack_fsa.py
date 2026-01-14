@@ -461,7 +461,7 @@ def behavior_state_machine(
     policy: Optional[TransitionPolicy] = None,
     accept_states: Optional[Set[AttackState]] = None,
     max_backtrack_edges: int = 10,
-    beam_width: int = 100,
+    beam_width: int = 30,
 ) -> List[FSAGraph]:
     """
     Phase A 对外接口：构造可接受的状态转移图列表。

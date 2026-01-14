@@ -10,6 +10,7 @@ dependencies = [
     "httpx>=0.28.1",
     "neo4j>=5.0.0",
     "opensearch-py>=2.0.0",
+    "openai>=1.0.0",
     "pyyaml>=6.0.0",
     "uvicorn>=0.40.0",
     "pytest>=7.4.0",

@@ -28,10 +28,12 @@ from .models import (
 from .utils import _parse_ts_to_float
 
 
+# 全局驱动与 Schema 初始化状态
 _DRIVER = None
 _SCHEMA_READY = False
 
 
+# 获取/缓存 Neo4j driver
 def _get_driver():
     global _DRIVER
     if _DRIVER is None:
@@ -42,6 +44,7 @@ def _get_driver():
     return _DRIVER
 
 
+# 获取 session（支持指定数据库）
 def _get_session():
     driver = _get_driver()
     database = os.getenv("NEO4J_DATABASE")
@@ -76,6 +79,7 @@ def _name_suffix(name: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in name)
 
 
+# 初始化约束与索引（只执行一次）
 def ensure_schema() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
@@ -126,6 +130,7 @@ def _create_schema(tx) -> None:
         tx.run(f"CREATE INDEX {iname} IF NOT EXISTS FOR (n:{label}) ON (n.{_cypher_prop(prop)})")
 
 
+# 写入节点（基于唯一键 MERGE）
 def add_node(node: GraphNode) -> None:
     ensure_schema()
     with _get_session() as session:
@@ -148,6 +153,7 @@ def _merge_node(tx, node: GraphNode) -> None:
     tx.run(f"MERGE (n:{label} {{{key_clause}}}) SET n += $props", **params)
 
 
+# 写入关系边（按证据追加）
 def add_edge(edge: GraphEdge) -> None:
     """Create an edge in Neo4j.
 
@@ -157,10 +163,12 @@ def add_edge(edge: GraphEdge) -> None:
 
     # Best-effort: store a numeric timestamp for window/GDS queries.
     try:
-        if isinstance(getattr(edge, "props", None), dict) and "ts_float" not in edge.props:
-            ts = edge.get_ts() if hasattr(edge, "get_ts") else None
-            if ts is not None:
-                edge.props["ts_float"] = _parse_ts_to_float(ts)
+        if isinstance(getattr(edge, "props", None), dict):
+            ts_float = edge.props.get("ts_float")
+            if not isinstance(ts_float, (int, float)):
+                ts = edge.get_ts() if hasattr(edge, "get_ts") else None
+                if ts is not None:
+                    edge.props["ts_float"] = _parse_ts_to_float(str(ts))
     except Exception:
         pass
 
@@ -197,6 +205,7 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     tx.run(cypher, **params)
 
 
+# 按 UID 查询单个节点
 def get_node(uid: str) -> Optional[GraphNode]:
     label, key = parse_uid(uid)
     with _get_session() as session:
@@ -224,6 +233,7 @@ def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, 
     return record["props"]
 
 
+# 查询节点相关边
 def get_edges(node: GraphNode) -> List[GraphEdge]:
     with _get_session() as session:
         rows = _execute_read(session, _fetch_edges, node)
@@ -258,6 +268,7 @@ def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
     return list(tx.run(cypher, **params))
 
 
+# 查询告警边集合
 def get_alarm_edges() -> List[GraphEdge]:
     """Return all edges labeled as alarms (r.is_alarm = true)."""
     with _get_session() as session:
@@ -287,16 +298,24 @@ def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
     return list(tx.run(cypher))
 
 
+# 按时间窗查询边集合（可选关系类型/告警过滤）
 def get_edges_in_window(
+    *,
     t_min: float,
     t_max: float,
-    *,
     allowed_reltypes: Optional[Sequence[str]] = None,
     only_alarm: bool = False,
 ) -> List[GraphEdge]:
-    """Fetch edges with numeric timestamp within [t_min, t_max]."""
+    """查询一个时间窗口内的所有边（可选关系类型/告警过滤）"""
     with _get_session() as session:
-        rows = _execute_read(session, _fetch_edges_in_window, t_min, t_max, allowed_reltypes, only_alarm)
+        rows = _execute_read(
+            session,
+            _fetch_edges_in_window,
+            float(t_min),
+            float(t_max),
+            allowed_reltypes,
+            only_alarm,
+        )
 
     edges: List[GraphEdge] = []
     for row in rows:
@@ -308,7 +327,14 @@ def get_edges_in_window(
             rtype = RelType(row["rtype"])
         except ValueError:
             continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+        edges.append(
+            GraphEdge(
+                src_uid=src_uid,
+                dst_uid=dst_uid,
+                rtype=rtype,
+                props=dict(row["rprops"]),
+            )
+        )
     return edges
 
 
@@ -338,6 +364,10 @@ def _fetch_edges_in_window(
     return list(tx.run(cypher, **params))
 
 
+
+
+
+# 基于 GDS 的时间窗最短路
 def gds_shortest_path_in_window(
     src_uid: str,
     dst_uid: str,
@@ -617,6 +647,109 @@ def close() -> None:
     _DRIVER = None
 
 
+# 写回溯源结果到边属性（analysis.* 覆盖语义）
+def write_analysis_results(
+    edges: Sequence[GraphEdge],
+    *,
+    task_id: str,
+    updated_at: str,
+) -> int:
+    """Write analysis.* fields onto edges and overwrite any existing analysis state."""
+    if not edges:
+        return 0
+    ensure_schema()
+    total_updated = 0
+    with _get_session() as session:
+        for edge in edges:
+            total_updated += _execute_write(session, _write_analysis_result_tx, edge, task_id, updated_at)
+    return total_updated
+
+
+def _write_analysis_result_tx(tx, edge: GraphEdge, task_id: str, updated_at: str) -> int:
+    if not isinstance(edge.props, dict):
+        return 0
+    event_id = edge.props.get("event.id")
+    if not isinstance(event_id, str) or not event_id:
+        return 0
+
+    src_label, src_key = parse_uid(edge.src_uid)
+    dst_label, dst_key = parse_uid(edge.dst_uid)
+
+    params: Dict[str, Any] = {"event_id": event_id}
+
+    src_clause_parts = []
+    for k, v in src_key.items():
+        param = _param_key(f"src_{k}")
+        src_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    src_clause = ", ".join(src_clause_parts)
+
+    dst_clause_parts = []
+    for k, v in dst_key.items():
+        param = _param_key(f"dst_{k}")
+        dst_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    dst_clause = ", ".join(dst_clause_parts)
+
+    analysis_props: Dict[str, Any] = _analysis_props_from_edge(edge.props, task_id, updated_at)
+    params["analysis_props"] = analysis_props
+
+    analysis_fields = [
+        "analysis.task_id",
+        "analysis.updated_at",
+        "analysis.is_path_edge",
+        "analysis.risk_score",
+        "analysis.ttp.technique_ids",
+        "analysis.summary",
+    ]
+    clear_clause = ", ".join(f"r.{_cypher_prop(field)} = null" for field in analysis_fields)
+
+    cypher = (
+        f"MATCH (s:{src_label.value} {{{src_clause}}})-[r:{edge.rtype.value}]->(t:{dst_label.value} {{{dst_clause}}}) "
+        "WHERE r.`event.id` = $event_id "
+        f"SET {clear_clause} "
+        "SET r += $analysis_props "
+        "RETURN count(r) AS cnt"
+    )
+    record = tx.run(cypher, **params).single()
+    if record is None:
+        return 0
+    count = record.get("cnt")
+    return int(count) if isinstance(count, (int, float)) else 0
+
+
+def _analysis_props_from_edge(
+    edge_props: Mapping[str, Any],
+    task_id: str,
+    updated_at: str,
+) -> Dict[str, Any]:
+    is_path_edge = bool(edge_props.get("analysis.is_path_edge"))
+    props: Dict[str, Any] = {
+        "analysis.task_id": task_id,
+        "analysis.updated_at": updated_at,
+        "analysis.is_path_edge": is_path_edge,
+    }
+    if not is_path_edge:
+        return props
+
+    risk_score = edge_props.get("analysis.risk_score")
+    if isinstance(risk_score, (int, float)):
+        props["analysis.risk_score"] = float(risk_score)
+
+    technique_ids = edge_props.get("analysis.ttp.technique_ids")
+    if isinstance(technique_ids, list):
+        props["analysis.ttp.technique_ids"] = [v for v in technique_ids if isinstance(v, str) and v]
+    elif isinstance(technique_ids, str) and technique_ids:
+        props["analysis.ttp.technique_ids"] = [technique_ids]
+
+    summary = edge_props.get("analysis.summary")
+    if isinstance(summary, str) and summary:
+        props["analysis.summary"] = summary
+
+    return props
+
+
+# 入图：单条 ECS 文档
 def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
     """Ingest a single ECS event by converting it into nodes/edges."""
     if ecs_event_to_graph is None:
@@ -630,6 +763,7 @@ def ingest_ecs_event(event: Mapping[str, Any]) -> Tuple[int, int]:
     return len(nodes), len(edges)
 
 
+# 入图：批量 ECS 文档
 def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
     """Ingest multiple ECS events."""
     if ecs_event_to_graph is None:
@@ -648,6 +782,7 @@ def ingest_ecs_events(events: Iterable[Mapping[str, Any]]) -> Tuple[int, int]:
     return total_nodes, total_edges
 
 
+# 从 OpenSearch 拉取并入图
 def ingest_from_opensearch(
     query: Mapping[str, Any] | None = None,
     *,
@@ -687,33 +822,6 @@ def ingest_from_opensearch(
     return total_events, total_nodes, total_edges
 
 
-def get_edges_inter_nodes(
-    node_uids: List[str],
-    t_start: float,
-    t_end: float,
-) -> List[GraphEdge]:
-    """Query edges among a set of node uids within a time window.
-
-    Note:
-        - This is used by Phase B graph completion to stitch FSA segments.
-        - It returns directed edges, but callers may treat them as undirected.
-    """
-    if not node_uids or len(node_uids) < 2:
-        return []
-    with _get_session() as session:
-        rows = _execute_read(session, _fetch_edges_inter_nodes, list(node_uids), float(t_start), float(t_end))
-    edges: List[GraphEdge] = []
-    for row in rows:
-        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
-        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
-        if src_uid is None or dst_uid is None:
-            continue
-        try:
-            rtype = RelType(row["rtype"])
-        except ValueError:
-            continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
-    return edges
 
 
 def _fetch_edges_inter_nodes(tx, node_uids: List[str], t_start: float, t_end: float) -> List[Dict[str, Any]]:
