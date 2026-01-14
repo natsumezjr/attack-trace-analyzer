@@ -17,5 +17,4 @@ ENV EVE_FILE=/data/eve.json \
     AGENT_NAME=netflow-exporter \
     AGENT_VERSION=0.1.0
 
-EXPOSE 8080
-CMD ["python3", "-m", "waitress", "--listen=0.0.0.0:8080", "app:app"]
+CMD ["python3", "/app/app.py"]
