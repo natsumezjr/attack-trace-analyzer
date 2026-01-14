@@ -82,7 +82,7 @@ docker compose up -d --build
 
 | 目录 | 技术栈 | 作用 |
 |---|---|---|
-| `client/` | Docker + SQLite + Go | 客户机侧采集/转换/缓冲与对外拉取接口 |
+| `client/` | Docker + RabbitMQ + Go | 客户机侧采集/转换/缓冲与对外拉取接口 |
 | `backend/` | Python FastAPI + uv | 中心机后端：流水线调度、OpenSearch/Neo4j/Analysis 模块与 API |
 | `frontend/` | Next.js + TypeScript | 中心机前端：可视化与报告导出 |
 | `docs/` | Markdown | 规格与规范（权威口径） |

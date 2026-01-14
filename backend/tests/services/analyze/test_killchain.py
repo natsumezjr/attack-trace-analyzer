@@ -109,21 +109,8 @@ def create_test_fsa_graph(edges: List[GraphEdge]) -> FSAGraph:
         # 如果无法生成图，创建一个简单的 mock
         from app.services.analyze.attack_fsa import EdgeNode
         nodes = [EdgeNode(e) for e in edges]
-        segments = [
-            StateSegment(
-                state=AttackState.INITIAL_ACCESS,
-                nodes=nodes[:len(nodes)//2] if len(nodes) > 1 else nodes,
-            ),
-            StateSegment(
-                state=AttackState.EXECUTION,
-                nodes=nodes[len(nodes)//2:] if len(nodes) > 1 else nodes,
-            ),
-        ]
         return FSAGraph(
             nodes=nodes,
-            segments=segments,
-            t_start=edges[0].props.get("ts_float", 0.0) if edges else 0.0,
-            t_end=edges[-1].props.get("ts_float", 0.0) if edges else 0.0,
             trace=[],
         )
     return graphs[0]
@@ -531,9 +518,6 @@ class TestPhaseBCandidatePaths:
         
         fsa_graph = FSAGraph(
             nodes=nodes1 + nodes2,
-            segments=segments,
-            t_start=edges1[0].props.get("ts_float", 0.0),
-            t_end=edges2[0].props.get("ts_float", 0.0),
             trace=[],
         )
         

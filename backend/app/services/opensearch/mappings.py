@@ -181,23 +181,3 @@ attack_chains_mapping = {
         },
     },
 }
-
-# Client Registry索引映射
-client_registry_mapping = {
-    "properties": {
-        "@timestamp": {"type": "date"},
-        "client.id": {"type": "keyword"},
-        "client.listen_url": {"type": "keyword"},
-        "client.version": {"type": "keyword"},
-        "client.host.id": {"type": "keyword"},
-        "client.host.name": {"type": "keyword"},
-        "client.capabilities.filebeat": {"type": "boolean"},
-        "client.capabilities.falco": {"type": "boolean"},
-        "client.capabilities.suricata": {"type": "boolean"},
-        "client.token_hash": {"type": "keyword"},
-        "poll.cursor": {"type": "keyword"},
-        "poll.last_seen": {"type": "date"},
-        "poll.last_error": {"type": "text", "index": False},
-        "poll.status": {"type": "keyword"},
-    },
-}

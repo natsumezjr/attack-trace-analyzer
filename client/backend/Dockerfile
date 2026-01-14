@@ -12,4 +12,3 @@ RUN chmod +x /usr/local/bin/go-client
 
 EXPOSE 8888
 ENTRYPOINT ["/usr/local/bin/go-client"]
-CMD ["-falco-db", "/data/falco.db", "-filebeat-db", "/data/filebeat.db", "-suricata-db", "/data/suricata.db"]
