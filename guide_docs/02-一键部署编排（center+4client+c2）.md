@@ -42,7 +42,7 @@ client 的 compose 默认端口是 `8888` 和 `8080`，多实例会冲突。你�
 
 - 不同宿主端口（见 `01` 的表）
 - 不同 `HOST_ID/HOST_NAME`
-- 不同 `./data` 挂载目录（否则 SQLite/输出混在一起）
+- 不同 `./data` 挂载目录（否则输出文件混在一起）
 
 你可以选两种方式：
 
@@ -85,7 +85,8 @@ c2 的细节见：
 你需要能在演示前做到：
 
 - 停止所有容器
-- 清空 `run/client-*/data/`（至少清空 `data.db` 与 suricata/falco 输出）
+- 清空 `run/client-*/data/`（至少清空 suricata/falco/filebeat 输出）
+- 重置 RabbitMQ 队列（最简单做法：重建 rabbitmq 容器；若多实例则每个实例各自重建）
 - （可选）清空 OpenSearch/Neo4j 持久化卷（演示前“从零开始”时很有用）
 
 建议你把“清空策略”分两档：
@@ -98,11 +99,10 @@ c2 的细节见：
 ## 5. 你下一步实际要做的事情（按优先级）
 
 1) 先只跑 `backend/docker-compose.yml`（OpenSearch+Neo4j）确认端口可用  
-2) 再跑 1 个 client 实例确认 `data.db` 会增长  
+2) 再跑 1 个 client 实例确认 RabbitMQ 队列有消息（或拉取接口返回 `total>0`）  
 3) 再加 c2-01（先独立跑通 DNS+HTTP）  
 4) 最后扩到 4 个 client 实例（满足 ≥5 节点）
 
 验证标准见：
 
 - `04-验证清单（网络-采集-证据）.md`
-
