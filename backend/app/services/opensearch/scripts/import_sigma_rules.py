@@ -70,16 +70,15 @@ def test_opensearch_connection() -> bool:
     """测试OpenSearch连接"""
     from urllib.parse import urlparse
     parsed = urlparse(OPENSEARCH_URL)
-    use_ssl = parsed.scheme == "https"
     
     try:
-        # 只有在启用 SSL 时才使用认证
+        # 安全插件启用时通常需要认证（可能是 http 或 https）
         client_kwargs = {
             "verify": False,
             "timeout": httpx.Timeout(10.0, connect=5.0),
             "follow_redirects": True
         }
-        if use_ssl:
+        if OPENSEARCH_USER and OPENSEARCH_PASSWORD:
             client_kwargs["auth"] = (OPENSEARCH_USER, OPENSEARCH_PASSWORD)
         
         client = httpx.Client(**client_kwargs)
@@ -388,7 +387,6 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
         # 根据 URL 协议决定是否使用认证
         from urllib.parse import urlparse
         parsed = urlparse(OPENSEARCH_URL)
-        use_ssl = parsed.scheme == "https"
         
         try:
             # 创建客户端，禁用SSL验证并配置连接池
@@ -402,7 +400,7 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
                     keepalive_expiry=5.0
                 )
             }
-            if use_ssl:
+            if OPENSEARCH_USER and OPENSEARCH_PASSWORD:
                 client_kwargs["auth"] = (OPENSEARCH_USER, OPENSEARCH_PASSWORD)
             
             client = httpx.Client(**client_kwargs)

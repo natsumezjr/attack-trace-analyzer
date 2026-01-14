@@ -8,8 +8,10 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# 添加 backend 目录到路径，以便从 opensearch 包导入
-backend_dir = Path(__file__).parent.parent.parent.parent
+# 添加 backend 目录到路径，以便导入 app.services.*
+# 当前文件路径：backend/app/services/opensearch/scripts/setup_security_analytics.py
+# parents: scripts -> opensearch -> services -> app -> backend
+backend_dir = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(backend_dir))
 
 from app.services.opensearch import get_client
