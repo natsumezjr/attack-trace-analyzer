@@ -1,0 +1,4627 @@
+[
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652100.0,
+      "event.id": "evt-logon-001",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-001",
+      "user.name": "user01",
+      "host.id": "h-001"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-001",
+      "host.name": "host-01"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652101.0,
+      "event.id": "evt-hostip-001",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-001",
+      "host.name": "host-01"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.1.3"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652102.0,
+      "event.id": "evt-runs-001",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-001-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-001",
+      "host.name": "host-01"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652103.0,
+      "event.id": "evt-spawn-001",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-001-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-001-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652104.0,
+      "event.id": "evt-file-001",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-001-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-001",
+      "file.path": "C:\\Users\\user01\\AppData\\Local\\Temp\\dropper-01.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652105.0,
+      "event.id": "evt-dns-001",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-001-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-01.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652106.0,
+      "event.id": "evt-resolve-001",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-01.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.1"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652107.0,
+      "event.id": "evt-net-001",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-001-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.1"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652200.0,
+      "event.id": "evt-logon-002",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-002",
+      "user.name": "user02",
+      "host.id": "h-002"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-002",
+      "host.name": "host-02"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652201.0,
+      "event.id": "evt-hostip-002",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-002",
+      "host.name": "host-02"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.2.6"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652202.0,
+      "event.id": "evt-runs-002",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-002-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-002",
+      "host.name": "host-02"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652203.0,
+      "event.id": "evt-spawn-002",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-002-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-002-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652204.0,
+      "event.id": "evt-file-002",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-002-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-002",
+      "file.path": "C:\\Users\\user02\\AppData\\Local\\Temp\\dropper-02.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652205.0,
+      "event.id": "evt-dns-002",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-002-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-02.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652206.0,
+      "event.id": "evt-resolve-002",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-02.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.2"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652207.0,
+      "event.id": "evt-net-002",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-002-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.2"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652300.0,
+      "event.id": "evt-logon-003",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-003",
+      "user.name": "user03",
+      "host.id": "h-003"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-003",
+      "host.name": "host-03"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652301.0,
+      "event.id": "evt-hostip-003",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-003",
+      "host.name": "host-03"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.3.9"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652302.0,
+      "event.id": "evt-runs-003",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-003-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-003",
+      "host.name": "host-03"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652303.0,
+      "event.id": "evt-spawn-003",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-003-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-003-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652304.0,
+      "event.id": "evt-file-003",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-003-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-003",
+      "file.path": "C:\\Users\\user03\\AppData\\Local\\Temp\\dropper-03.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652305.0,
+      "event.id": "evt-dns-003",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-003-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-03.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652306.0,
+      "event.id": "evt-resolve-003",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-03.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.3"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652307.0,
+      "event.id": "evt-net-003",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-003-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.3"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652400.0,
+      "event.id": "evt-logon-004",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-004",
+      "user.name": "user04",
+      "host.id": "h-004"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-004",
+      "host.name": "host-04"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652401.0,
+      "event.id": "evt-hostip-004",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-004",
+      "host.name": "host-04"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.4.12"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652402.0,
+      "event.id": "evt-runs-004",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-004-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-004",
+      "host.name": "host-04"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652403.0,
+      "event.id": "evt-spawn-004",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-004-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-004-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652404.0,
+      "event.id": "evt-file-004",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-004-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-004",
+      "file.path": "C:\\Users\\user04\\AppData\\Local\\Temp\\dropper-04.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652405.0,
+      "event.id": "evt-dns-004",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-004-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-04.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652406.0,
+      "event.id": "evt-resolve-004",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-04.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.4"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652407.0,
+      "event.id": "evt-net-004",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-004-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.4"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652500.0,
+      "event.id": "evt-logon-005",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-005",
+      "user.name": "user05",
+      "host.id": "h-005"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-005",
+      "host.name": "host-05"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652501.0,
+      "event.id": "evt-hostip-005",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-005",
+      "host.name": "host-05"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.5.15"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652502.0,
+      "event.id": "evt-runs-005",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-005-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-005",
+      "host.name": "host-05"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652503.0,
+      "event.id": "evt-spawn-005",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-005-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-005-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652504.0,
+      "event.id": "evt-file-005",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-005-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-005",
+      "file.path": "C:\\Users\\user05\\AppData\\Local\\Temp\\dropper-05.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652505.0,
+      "event.id": "evt-dns-005",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 70,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-005-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-05.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652506.0,
+      "event.id": "evt-resolve-005",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-05.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.5"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652507.0,
+      "event.id": "evt-net-005",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 80,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-005-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.5"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652600.0,
+      "event.id": "evt-logon-006",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-006",
+      "user.name": "user06",
+      "host.id": "h-006"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-006",
+      "host.name": "host-06"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652601.0,
+      "event.id": "evt-hostip-006",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-006",
+      "host.name": "host-06"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.6.18"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652602.0,
+      "event.id": "evt-runs-006",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-006-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-006",
+      "host.name": "host-06"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652603.0,
+      "event.id": "evt-spawn-006",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-006-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-006-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652604.0,
+      "event.id": "evt-file-006",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-006-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-006",
+      "file.path": "C:\\Users\\user06\\AppData\\Local\\Temp\\dropper-06.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652605.0,
+      "event.id": "evt-dns-006",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-006-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-06.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652606.0,
+      "event.id": "evt-resolve-006",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-06.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.6"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652607.0,
+      "event.id": "evt-net-006",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-006-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.6"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652700.0,
+      "event.id": "evt-logon-007",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-007",
+      "user.name": "user07",
+      "host.id": "h-007"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-007",
+      "host.name": "host-07"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652701.0,
+      "event.id": "evt-hostip-007",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-007",
+      "host.name": "host-07"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.7.21"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652702.0,
+      "event.id": "evt-runs-007",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-007-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-007",
+      "host.name": "host-07"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652703.0,
+      "event.id": "evt-spawn-007",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-007-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-007-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652704.0,
+      "event.id": "evt-file-007",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-007-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-007",
+      "file.path": "C:\\Users\\user07\\AppData\\Local\\Temp\\dropper-07.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652705.0,
+      "event.id": "evt-dns-007",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-007-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-07.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652706.0,
+      "event.id": "evt-resolve-007",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-07.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.7"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652707.0,
+      "event.id": "evt-net-007",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-007-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.7"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652800.0,
+      "event.id": "evt-logon-008",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-008",
+      "user.name": "user08",
+      "host.id": "h-008"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-008",
+      "host.name": "host-08"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652801.0,
+      "event.id": "evt-hostip-008",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-008",
+      "host.name": "host-08"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.8.24"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652802.0,
+      "event.id": "evt-runs-008",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-008-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-008",
+      "host.name": "host-08"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652803.0,
+      "event.id": "evt-spawn-008",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-008-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-008-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652804.0,
+      "event.id": "evt-file-008",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-008-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-008",
+      "file.path": "C:\\Users\\user08\\AppData\\Local\\Temp\\dropper-08.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652805.0,
+      "event.id": "evt-dns-008",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-008-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-08.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652806.0,
+      "event.id": "evt-resolve-008",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-08.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.8"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652807.0,
+      "event.id": "evt-net-008",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-008-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.8"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736652900.0,
+      "event.id": "evt-logon-009",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-009",
+      "user.name": "user09",
+      "host.id": "h-009"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-009",
+      "host.name": "host-09"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736652901.0,
+      "event.id": "evt-hostip-009",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-009",
+      "host.name": "host-09"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.9.27"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736652902.0,
+      "event.id": "evt-runs-009",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-009-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-009",
+      "host.name": "host-09"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736652903.0,
+      "event.id": "evt-spawn-009",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-009-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-009-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736652904.0,
+      "event.id": "evt-file-009",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-009-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-009",
+      "file.path": "C:\\Users\\user09\\AppData\\Local\\Temp\\dropper-09.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736652905.0,
+      "event.id": "evt-dns-009",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-009-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-09.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736652906.0,
+      "event.id": "evt-resolve-009",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-09.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.9"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736652907.0,
+      "event.id": "evt-net-009",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-009-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.9"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653000.0,
+      "event.id": "evt-logon-010",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-010",
+      "user.name": "user10",
+      "host.id": "h-010"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-010",
+      "host.name": "host-10"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653001.0,
+      "event.id": "evt-hostip-010",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-010",
+      "host.name": "host-10"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.10.30"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653002.0,
+      "event.id": "evt-runs-010",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-010-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-010",
+      "host.name": "host-10"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653003.0,
+      "event.id": "evt-spawn-010",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-010-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-010-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653004.0,
+      "event.id": "evt-file-010",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-010-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-010",
+      "file.path": "C:\\Users\\user10\\AppData\\Local\\Temp\\dropper-10.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653005.0,
+      "event.id": "evt-dns-010",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 70,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-010-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-10.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653006.0,
+      "event.id": "evt-resolve-010",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-10.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.10"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653007.0,
+      "event.id": "evt-net-010",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 80,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-010-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.10"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653100.0,
+      "event.id": "evt-logon-011",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-011",
+      "user.name": "user11",
+      "host.id": "h-011"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-011",
+      "host.name": "host-11"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653101.0,
+      "event.id": "evt-hostip-011",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-011",
+      "host.name": "host-11"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.11.33"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653102.0,
+      "event.id": "evt-runs-011",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-011-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-011",
+      "host.name": "host-11"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653103.0,
+      "event.id": "evt-spawn-011",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-011-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-011-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653104.0,
+      "event.id": "evt-file-011",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-011-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-011",
+      "file.path": "C:\\Users\\user11\\AppData\\Local\\Temp\\dropper-11.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653105.0,
+      "event.id": "evt-dns-011",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-011-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-11.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653106.0,
+      "event.id": "evt-resolve-011",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-11.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.11"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653107.0,
+      "event.id": "evt-net-011",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-011-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.11"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653200.0,
+      "event.id": "evt-logon-012",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-012",
+      "user.name": "user12",
+      "host.id": "h-012"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-012",
+      "host.name": "host-12"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653201.0,
+      "event.id": "evt-hostip-012",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-012",
+      "host.name": "host-12"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.12.36"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653202.0,
+      "event.id": "evt-runs-012",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-012-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-012",
+      "host.name": "host-12"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653203.0,
+      "event.id": "evt-spawn-012",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-012-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-012-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653204.0,
+      "event.id": "evt-file-012",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-012-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-012",
+      "file.path": "C:\\Users\\user12\\AppData\\Local\\Temp\\dropper-12.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653205.0,
+      "event.id": "evt-dns-012",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-012-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-12.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653206.0,
+      "event.id": "evt-resolve-012",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-12.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.12"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653207.0,
+      "event.id": "evt-net-012",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-012-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.12"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653300.0,
+      "event.id": "evt-logon-013",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-013",
+      "user.name": "user13",
+      "host.id": "h-013"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-013",
+      "host.name": "host-13"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653301.0,
+      "event.id": "evt-hostip-013",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-013",
+      "host.name": "host-13"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.13.39"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653302.0,
+      "event.id": "evt-runs-013",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-013-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-013",
+      "host.name": "host-13"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653303.0,
+      "event.id": "evt-spawn-013",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-013-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-013-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653304.0,
+      "event.id": "evt-file-013",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-013-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-013",
+      "file.path": "C:\\Users\\user13\\AppData\\Local\\Temp\\dropper-13.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653305.0,
+      "event.id": "evt-dns-013",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-013-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-13.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653306.0,
+      "event.id": "evt-resolve-013",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-13.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.13"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653307.0,
+      "event.id": "evt-net-013",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-013-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.13"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653400.0,
+      "event.id": "evt-logon-014",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-014",
+      "user.name": "user14",
+      "host.id": "h-014"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-014",
+      "host.name": "host-14"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653401.0,
+      "event.id": "evt-hostip-014",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-014",
+      "host.name": "host-14"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.14.42"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653402.0,
+      "event.id": "evt-runs-014",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-014-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-014",
+      "host.name": "host-14"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653403.0,
+      "event.id": "evt-spawn-014",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-014-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-014-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653404.0,
+      "event.id": "evt-file-014",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-014-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-014",
+      "file.path": "C:\\Users\\user14\\AppData\\Local\\Temp\\dropper-14.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653405.0,
+      "event.id": "evt-dns-014",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-014-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-14.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653406.0,
+      "event.id": "evt-resolve-014",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-14.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.14"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653407.0,
+      "event.id": "evt-net-014",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-014-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.14"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653500.0,
+      "event.id": "evt-logon-015",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-015",
+      "user.name": "user15",
+      "host.id": "h-015"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-015",
+      "host.name": "host-15"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653501.0,
+      "event.id": "evt-hostip-015",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-015",
+      "host.name": "host-15"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.15.45"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653502.0,
+      "event.id": "evt-runs-015",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-015-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-015",
+      "host.name": "host-15"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653503.0,
+      "event.id": "evt-spawn-015",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-015-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-015-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653504.0,
+      "event.id": "evt-file-015",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-015-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-015",
+      "file.path": "C:\\Users\\user15\\AppData\\Local\\Temp\\dropper-15.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653505.0,
+      "event.id": "evt-dns-015",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 70,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-015-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-15.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653506.0,
+      "event.id": "evt-resolve-015",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-15.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.15"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653507.0,
+      "event.id": "evt-net-015",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 80,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-015-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.15"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653600.0,
+      "event.id": "evt-logon-016",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-016",
+      "user.name": "user16",
+      "host.id": "h-016"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-016",
+      "host.name": "host-16"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653601.0,
+      "event.id": "evt-hostip-016",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-016",
+      "host.name": "host-16"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.16.48"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653602.0,
+      "event.id": "evt-runs-016",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-016-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-016",
+      "host.name": "host-16"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653603.0,
+      "event.id": "evt-spawn-016",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-016-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-016-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653604.0,
+      "event.id": "evt-file-016",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-016-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-016",
+      "file.path": "C:\\Users\\user16\\AppData\\Local\\Temp\\dropper-16.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653605.0,
+      "event.id": "evt-dns-016",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-016-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-16.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653606.0,
+      "event.id": "evt-resolve-016",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-16.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.16"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653607.0,
+      "event.id": "evt-net-016",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-016-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.16"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653700.0,
+      "event.id": "evt-logon-017",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-017",
+      "user.name": "user17",
+      "host.id": "h-017"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-017",
+      "host.name": "host-17"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653701.0,
+      "event.id": "evt-hostip-017",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-017",
+      "host.name": "host-17"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.17.51"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653702.0,
+      "event.id": "evt-runs-017",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-017-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-017",
+      "host.name": "host-17"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653703.0,
+      "event.id": "evt-spawn-017",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-017-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-017-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653704.0,
+      "event.id": "evt-file-017",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-017-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-017",
+      "file.path": "C:\\Users\\user17\\AppData\\Local\\Temp\\dropper-17.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653705.0,
+      "event.id": "evt-dns-017",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-017-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-17.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653706.0,
+      "event.id": "evt-resolve-017",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-17.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.17"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653707.0,
+      "event.id": "evt-net-017",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-017-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.17"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653800.0,
+      "event.id": "evt-logon-018",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-018",
+      "user.name": "user18",
+      "host.id": "h-018"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-018",
+      "host.name": "host-18"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653801.0,
+      "event.id": "evt-hostip-018",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-018",
+      "host.name": "host-18"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.18.54"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653802.0,
+      "event.id": "evt-runs-018",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-018-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-018",
+      "host.name": "host-18"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653803.0,
+      "event.id": "evt-spawn-018",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-018-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-018-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653804.0,
+      "event.id": "evt-file-018",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-018-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-018",
+      "file.path": "C:\\Users\\user18\\AppData\\Local\\Temp\\dropper-18.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653805.0,
+      "event.id": "evt-dns-018",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-018-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-18.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653806.0,
+      "event.id": "evt-resolve-018",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-18.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.18"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653807.0,
+      "event.id": "evt-net-018",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-018-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.18"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736653900.0,
+      "event.id": "evt-logon-019",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-019",
+      "user.name": "user19",
+      "host.id": "h-019"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-019",
+      "host.name": "host-19"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736653901.0,
+      "event.id": "evt-hostip-019",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-019",
+      "host.name": "host-19"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.19.57"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736653902.0,
+      "event.id": "evt-runs-019",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-019-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-019",
+      "host.name": "host-19"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736653903.0,
+      "event.id": "evt-spawn-019",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-019-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-019-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736653904.0,
+      "event.id": "evt-file-019",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-019-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-019",
+      "file.path": "C:\\Users\\user19\\AppData\\Local\\Temp\\dropper-19.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736653905.0,
+      "event.id": "evt-dns-019",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-019-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-19.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736653906.0,
+      "event.id": "evt-resolve-019",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-19.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.19"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736653907.0,
+      "event.id": "evt-net-019",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-019-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.19"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654000.0,
+      "event.id": "evt-logon-020",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-020",
+      "user.name": "user20",
+      "host.id": "h-020"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-020",
+      "host.name": "host-20"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654001.0,
+      "event.id": "evt-hostip-020",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-020",
+      "host.name": "host-20"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.20.60"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654002.0,
+      "event.id": "evt-runs-020",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-020-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-020",
+      "host.name": "host-20"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654003.0,
+      "event.id": "evt-spawn-020",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-020-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-020-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654004.0,
+      "event.id": "evt-file-020",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-020-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-020",
+      "file.path": "C:\\Users\\user20\\AppData\\Local\\Temp\\dropper-20.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654005.0,
+      "event.id": "evt-dns-020",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 70,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-020-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-20.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654006.0,
+      "event.id": "evt-resolve-020",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-20.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.20"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654007.0,
+      "event.id": "evt-net-020",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 80,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-020-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.20"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654100.0,
+      "event.id": "evt-logon-021",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-021",
+      "user.name": "user21",
+      "host.id": "h-021"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-021",
+      "host.name": "host-21"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654101.0,
+      "event.id": "evt-hostip-021",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-021",
+      "host.name": "host-21"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.21.63"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654102.0,
+      "event.id": "evt-runs-021",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-021-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-021",
+      "host.name": "host-21"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654103.0,
+      "event.id": "evt-spawn-021",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-021-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-021-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654104.0,
+      "event.id": "evt-file-021",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-021-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-021",
+      "file.path": "C:\\Users\\user21\\AppData\\Local\\Temp\\dropper-21.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654105.0,
+      "event.id": "evt-dns-021",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-021-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-21.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654106.0,
+      "event.id": "evt-resolve-021",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-21.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.21"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654107.0,
+      "event.id": "evt-net-021",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-021-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.21"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654200.0,
+      "event.id": "evt-logon-022",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-022",
+      "user.name": "user22",
+      "host.id": "h-022"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-022",
+      "host.name": "host-22"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654201.0,
+      "event.id": "evt-hostip-022",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-022",
+      "host.name": "host-22"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.22.66"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654202.0,
+      "event.id": "evt-runs-022",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-022-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-022",
+      "host.name": "host-22"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654203.0,
+      "event.id": "evt-spawn-022",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-022-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-022-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654204.0,
+      "event.id": "evt-file-022",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-022-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-022",
+      "file.path": "C:\\Users\\user22\\AppData\\Local\\Temp\\dropper-22.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654205.0,
+      "event.id": "evt-dns-022",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-022-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-22.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654206.0,
+      "event.id": "evt-resolve-022",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-22.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.22"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654207.0,
+      "event.id": "evt-net-022",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-022-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.22"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654300.0,
+      "event.id": "evt-logon-023",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-023",
+      "user.name": "user23",
+      "host.id": "h-023"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-023",
+      "host.name": "host-23"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654301.0,
+      "event.id": "evt-hostip-023",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-023",
+      "host.name": "host-23"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.23.69"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654302.0,
+      "event.id": "evt-runs-023",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-023-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-023",
+      "host.name": "host-23"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654303.0,
+      "event.id": "evt-spawn-023",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-023-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-023-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654304.0,
+      "event.id": "evt-file-023",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-023-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-023",
+      "file.path": "C:\\Users\\user23\\AppData\\Local\\Temp\\dropper-23.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654305.0,
+      "event.id": "evt-dns-023",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-023-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-23.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654306.0,
+      "event.id": "evt-resolve-023",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-23.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.23"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654307.0,
+      "event.id": "evt-net-023",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-023-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.23"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654400.0,
+      "event.id": "evt-logon-024",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-024",
+      "user.name": "user24",
+      "host.id": "h-024"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-024",
+      "host.name": "host-24"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654401.0,
+      "event.id": "evt-hostip-024",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-024",
+      "host.name": "host-24"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.24.72"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654402.0,
+      "event.id": "evt-runs-024",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-024-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-024",
+      "host.name": "host-24"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654403.0,
+      "event.id": "evt-spawn-024",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-024-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-024-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654404.0,
+      "event.id": "evt-file-024",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-024-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-024",
+      "file.path": "C:\\Users\\user24\\AppData\\Local\\Temp\\dropper-24.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654405.0,
+      "event.id": "evt-dns-024",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "event.severity": 10,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-024-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-24.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654406.0,
+      "event.id": "evt-resolve-024",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-24.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.24"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654407.0,
+      "event.id": "evt-net-024",
+      "event.dataset": "netflow.flow",
+      "event.kind": "event",
+      "event.severity": 20,
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-024-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.24"
+    }
+  },
+  {
+    "rtype": "LOGON",
+    "rprops": {
+      "ts_float": 1736654500.0,
+      "event.id": "evt-logon-025",
+      "event.dataset": "hostlog.auth",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "User"
+    ],
+    "src_props": {
+      "user.id": "u-025",
+      "user.name": "user25",
+      "host.id": "h-025"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-025",
+      "host.name": "host-25"
+    }
+  },
+  {
+    "rtype": "HAS_IP",
+    "rprops": {
+      "ts_float": 1736654501.0,
+      "event.id": "evt-hostip-025",
+      "event.dataset": "hostlog.status",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Host"
+    ],
+    "src_props": {
+      "host.id": "h-025",
+      "host.name": "host-25"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "10.0.25.75"
+    }
+  },
+  {
+    "rtype": "RUNS_ON",
+    "rprops": {
+      "ts_float": 1736654502.0,
+      "event.id": "evt-runs-025",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-025-p"
+    },
+    "dst_labels": [
+      "Host"
+    ],
+    "dst_props": {
+      "host.id": "h-025",
+      "host.name": "host-25"
+    }
+  },
+  {
+    "rtype": "SPAWN",
+    "rprops": {
+      "ts_float": 1736654503.0,
+      "event.id": "evt-spawn-025",
+      "event.dataset": "hostlog.process",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-025-p"
+    },
+    "dst_labels": [
+      "Process"
+    ],
+    "dst_props": {
+      "process.entity_id": "p-025-c"
+    }
+  },
+  {
+    "rtype": "FILE_ACCESS",
+    "rprops": {
+      "ts_float": 1736654504.0,
+      "event.id": "evt-file-025",
+      "event.dataset": "hostbehavior.file",
+      "event.kind": "event",
+      "op": "write",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-025-c"
+    },
+    "dst_labels": [
+      "File"
+    ],
+    "dst_props": {
+      "host.id": "h-025",
+      "file.path": "C:\\Users\\user25\\AppData\\Local\\Temp\\dropper-25.bin"
+    }
+  },
+  {
+    "rtype": "DNS_QUERY",
+    "rprops": {
+      "ts_float": 1736654505.0,
+      "event.id": "evt-dns-025",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 70,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-025-c"
+    },
+    "dst_labels": [
+      "Domain"
+    ],
+    "dst_props": {
+      "domain.name": "evil-25.example"
+    }
+  },
+  {
+    "rtype": "RESOLVES_TO",
+    "rprops": {
+      "ts_float": 1736654506.0,
+      "event.id": "evt-resolve-025",
+      "event.dataset": "netflow.dns",
+      "event.kind": "event",
+      "is_alarm": false
+    },
+    "src_labels": [
+      "Domain"
+    ],
+    "src_props": {
+      "domain.name": "evil-25.example"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.25"
+    }
+  },
+  {
+    "rtype": "NET_CONNECT",
+    "rprops": {
+      "ts_float": 1736654507.0,
+      "event.id": "evt-net-025",
+      "event.dataset": "finding.canonical",
+      "event.kind": "alert",
+      "event.severity": 80,
+      "is_alarm": true
+    },
+    "src_labels": [
+      "Process"
+    ],
+    "src_props": {
+      "process.entity_id": "p-025-c"
+    },
+    "dst_labels": [
+      "IP"
+    ],
+    "dst_props": {
+      "ip": "93.184.216.25"
+    }
+  }
+]

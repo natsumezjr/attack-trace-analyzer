@@ -3,12 +3,13 @@
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:21:10.123Z",
+    "@timestamp": "2026-01-12T03:00:30.000Z",
     "event": {
-      "id": "evt-56489be4abef0ac5",
+      "id": "evt-79dac9d1706cc231",
       "kind": "event",
-      "created": "2026-01-12T03:21:12.001Z",
-      "ingested": "2026-01-12T03:21:12.900Z",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:00:30.000Z",
+      "ingested": "2026-01-12T03:00:31.000Z",
       "category": [
         "authentication"
       ],
@@ -16,38 +17,159 @@
         "start"
       ],
       "action": "user_login",
-      "dataset": "hostlog.auth",
-      "outcome": "success"
+      "outcome": "success",
+      "original": "raw: user login"
     },
     "host": {
       "id": "h-c84f121fc976de1a",
-      "name": "victim-01"
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
     },
     "user": {
+      "id": "u-18e0e55d730632a2",
       "name": "alice"
     },
     "source": {
-      "ip": "10.0.0.8"
+      "ip": "10.0.0.10"
     },
     "session": {
-      "id": "sess-b274ea402cea1ec0"
+      "id": "sess-47330e76a2976707"
     },
-    "agent": {
-      "name": "filebeat",
-      "version": "8.11.0"
-    },
-    "message": "User alice logged in from 10.0.0.8"
+    "message": "alice logged in from 10.0.0.10"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:21:15.321Z",
+    "@timestamp": "2026-01-12T03:01:30.000Z",
     "event": {
-      "id": "evt-8198522ff97bdb58",
+      "id": "evt-25160d7ab87dcc8b",
       "kind": "event",
-      "created": "2026-01-12T03:21:15.400Z",
-      "ingested": "2026-01-12T03:21:15.900Z",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:01:30.000Z",
+      "ingested": "2026-01-12T03:01:31.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "outcome": "success",
+      "original": "raw: user logout"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "user": {
+      "id": "u-18e0e55d730632a2",
+      "name": "alice"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "session": {
+      "id": "sess-47330e76a2976707"
+    },
+    "message": "alice logged out"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:00:40.000Z",
+    "event": {
+      "id": "evt-f9786bd590dce19d",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:00:40.000Z",
+      "ingested": "2026-01-12T03:00:41.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success",
+      "original": "raw: user login"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "user": {
+      "id": "u-76d84b0cf112e6f1",
+      "name": "bob"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "session": {
+      "id": "sess-39fa9e8bf38feaf3"
+    },
+    "message": "bob logged in from 10.0.0.10"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:01:40.000Z",
+    "event": {
+      "id": "evt-688b8ffa2176c2af",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:01:40.000Z",
+      "ingested": "2026-01-12T03:01:41.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "outcome": "success",
+      "original": "raw: user logout"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "user": {
+      "id": "u-76d84b0cf112e6f1",
+      "name": "bob"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "session": {
+      "id": "sess-39fa9e8bf38feaf3"
+    },
+    "message": "bob logged out"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:01:00.000Z",
+    "event": {
+      "id": "evt-c5b6e5d1ffce5d03",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:01:00.000Z",
+      "ingested": "2026-01-12T03:01:01.000Z",
       "category": [
         "process"
       ],
@@ -55,81 +177,164 @@
         "start"
       ],
       "action": "process_start",
-      "dataset": "hostlog.process"
+      "original": "raw: process start"
     },
     "host": {
       "id": "h-c84f121fc976de1a",
-      "name": "victim-01"
-    },
-    "user": {
-      "name": "alice"
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
     },
     "process": {
-      "entity_id": "p-2b8f7c01142ea740",
-      "pid": 1024,
+      "pid": 3200,
       "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-      "command_line": "powershell.exe -nop -w hidden -c whoami",
-      "name": "powershell.exe",
-      "start": "2026-01-12T03:21:15.321Z",
-      "parent": {
-        "entity_id": "p-23946da188cb9314",
-        "pid": 900,
-        "executable": "C:\\Windows\\explorer.exe"
-      }
+      "entity_id": "p-e72428e11fbdf376",
+      "start": "2026-01-12T03:01:00.000Z",
+      "command_line": "\"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" --mode=run",
+      "name": "powershell.exe"
     },
-    "agent": {
-      "name": "filebeat",
-      "version": "8.11.0"
-    }
+    "message": "Process start: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:21:18.000Z",
+    "@timestamp": "2026-01-12T03:01:20.000Z",
     "event": {
-      "id": "evt-0923473f76d910c4",
+      "id": "evt-92c3ad7dc9a55048",
       "kind": "event",
-      "created": "2026-01-12T03:21:18.050Z",
-      "ingested": "2026-01-12T03:21:18.300Z",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:01:20.000Z",
+      "ingested": "2026-01-12T03:01:21.000Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "original": "raw: process start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "pid": 3300,
+      "executable": "C:\\Windows\\System32\\curl.exe",
+      "entity_id": "p-45293c190784d696",
+      "start": "2026-01-12T03:01:20.000Z",
+      "command_line": "\"C:\\Windows\\System32\\curl.exe\" --mode=run",
+      "name": "curl.exe",
+      "parent": {
+        "entity_id": "p-e72428e11fbdf376"
+      }
+    },
+    "message": "Process start: C:\\Windows\\System32\\curl.exe"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:05:05.000Z",
+    "event": {
+      "id": "evt-cfed17b4f08822e3",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:05:05.000Z",
+      "ingested": "2026-01-12T03:05:06.000Z",
       "category": [
         "file"
       ],
       "type": [
         "access"
       ],
-      "action": "file_read",
-      "dataset": "hostlog.file_registry"
+      "action": "file_write",
+      "original": "raw: file access"
     },
     "host": {
       "id": "h-c84f121fc976de1a",
-      "name": "victim-01"
-    },
-    "user": {
-      "name": "alice"
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
     },
     "process": {
-      "entity_id": "p-2b8f7c01142ea740"
+      "entity_id": "p-e72428e11fbdf376"
     },
     "file": {
-      "path": "C:\\Users\\alice\\.ssh\\id_rsa",
-      "name": "id_rsa"
+      "path": "C:\\Users\\alice\\Documents\\shared-0.txt"
     },
-    "agent": {
-      "name": "filebeat",
-      "version": "8.11.0"
-    }
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-0.txt"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:24:50.000Z",
+    "@timestamp": "2026-01-12T03:05:15.000Z",
     "event": {
-      "id": "evt-dc72e17ed388f27c",
+      "id": "evt-1e3a450d71823046",
       "kind": "event",
-      "created": "2026-01-12T03:24:50.010Z",
-      "ingested": "2026-01-12T03:24:50.200Z",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:05:15.000Z",
+      "ingested": "2026-01-12T03:05:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:05:25.000Z",
+    "event": {
+      "id": "evt-4515acc4d9f3cf28",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:05:25.000Z",
+      "ingested": "2026-01-12T03:05:26.000Z",
       "category": [
         "network"
       ],
@@ -137,190 +342,5101 @@
         "start"
       ],
       "action": "flow_start",
-      "dataset": "netflow.flow"
+      "original": "raw: flow start"
     },
     "host": {
-      "id": "h-0ba32811578e289e",
-      "name": "sensor-01"
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
     },
     "source": {
-      "ip": "10.0.0.5",
-      "port": 51514
+      "ip": "10.0.0.10"
     },
     "destination": {
-      "ip": "8.8.8.8",
-      "port": 53
+      "ip": "93.184.216.34",
+      "port": 443
     },
     "network": {
-      "transport": "udp",
-      "protocol": "dns",
-      "community_id": "1:b07775c48ee730c0"
+      "transport": "tcp",
+      "protocol": "tcp"
     },
-    "flow": {
-      "id": "flow-40739ec9c5f87f61"
-    },
-    "agent": {
-      "name": "suricata",
-      "version": "7.0.0"
-    },
-    "related": {
-      "ip": [
-        "10.0.0.5",
-        "8.8.8.8"
-      ]
-    }
+    "message": "Flow start to 93.184.216.34"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:25:00.000Z",
+    "@timestamp": "2026-01-12T03:05:05.000Z",
     "event": {
-      "id": "evt-eaae9bea5af714d0",
+      "id": "evt-cb630cb3ffe1a1b0",
       "kind": "event",
-      "created": "2026-01-12T03:25:00.010Z",
-      "ingested": "2026-01-12T03:25:00.200Z",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:05:05.000Z",
+      "ingested": "2026-01-12T03:05:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-0.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-0.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:05:15.000Z",
+    "event": {
+      "id": "evt-2e61895772be8fcd",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:05:15.000Z",
+      "ingested": "2026-01-12T03:05:16.000Z",
       "category": [
         "network"
       ],
       "type": [
-        "info"
+        "protocol"
       ],
       "action": "dns_query",
-      "dataset": "netflow.dns"
+      "original": "raw: dns query"
     },
     "host": {
-      "id": "h-0ba32811578e289e",
-      "name": "sensor-01"
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
     },
     "source": {
-      "ip": "10.0.0.5",
-      "port": 51514
+      "ip": "10.0.0.10"
     },
     "destination": {
-      "ip": "8.8.8.8",
-      "port": 53
+      "ip": "8.8.8.8"
     },
     "network": {
       "transport": "udp",
-      "protocol": "dns",
-      "community_id": "1:b07775c48ee730c0"
-    },
-    "flow": {
-      "id": "flow-40739ec9c5f87f61"
+      "protocol": "dns"
     },
     "dns": {
       "question": {
         "name": "evil-c2.com",
         "type": "A"
-      }
-    },
-    "custom": {
-      "dns": {
-        "entropy": 4.2,
-        "query_length": 180,
-        "tunnel_score": 0.91
-      }
-    },
-    "agent": {
-      "name": "suricata",
-      "version": "7.0.0"
-    },
-    "related": {
-      "ip": [
-        "10.0.0.5",
-        "8.8.8.8"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
       ]
-    }
+    },
+    "message": "DNS query: evil-c2.com"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:25:02.000Z",
+    "@timestamp": "2026-01-12T03:05:25.000Z",
     "event": {
-      "id": "evt-b23d339a69f3ed60",
+      "id": "evt-7628df2ca6099e57",
       "kind": "event",
-      "created": "2026-01-12T03:25:02.010Z",
-      "ingested": "2026-01-12T03:25:02.200Z",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:05:25.000Z",
+      "ingested": "2026-01-12T03:05:26.000Z",
       "category": [
         "network"
       ],
       "type": [
-        "info"
+        "start"
       ],
-      "action": "http_request",
-      "dataset": "netflow.http"
+      "action": "flow_start",
+      "original": "raw: flow start"
     },
     "host": {
-      "id": "h-0ba32811578e289e",
-      "name": "sensor-01"
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
     },
     "source": {
-      "ip": "10.0.0.5",
-      "port": 51515
+      "ip": "10.0.0.10"
     },
     "destination": {
       "ip": "93.184.216.34",
-      "port": 80
+      "port": 443
     },
     "network": {
       "transport": "tcp",
-      "protocol": "http"
+      "protocol": "tcp"
     },
-    "http": {
-      "request": {
-        "method": "GET"
-      },
-      "response": {
-        "status_code": 200
-      }
-    },
-    "url": {
-      "full": "http://evil-c2.com/bootstrap",
-      "domain": "evil-c2.com"
-    },
-    "user_agent": {
-      "original": "curl/7.88.1"
-    },
-    "agent": {
-      "name": "suricata",
-      "version": "7.0.0"
-    },
-    "related": {
-      "ip": [
-        "10.0.0.5",
-        "93.184.216.34"
-      ]
-    }
+    "message": "Flow start to 93.184.216.34"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:25:01.000Z",
+    "@timestamp": "2026-01-12T03:08:05.000Z",
     "event": {
-      "id": "alrt-442d3b781f63cf0f",
-      "kind": "alert",
-      "created": "2026-01-12T03:25:01.010Z",
-      "ingested": "2026-01-12T03:25:01.200Z",
+      "id": "evt-543dfa95191cf22c",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:08:05.000Z",
+      "ingested": "2026-01-12T03:08:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:08:15.000Z",
+    "event": {
+      "id": "evt-4178625651b5608f",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:08:15.000Z",
+      "ingested": "2026-01-12T03:08:16.000Z",
       "category": [
         "network"
       ],
       "type": [
-        "info"
+        "protocol"
       ],
-      "action": "dns_tunnel_suspected",
-      "dataset": "finding.raw",
-      "severity": 70
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:08:25.000Z",
+    "event": {
+      "id": "evt-5f53cd848b97c981",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:08:25.000Z",
+      "ingested": "2026-01-12T03:08:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:08:05.000Z",
+    "event": {
+      "id": "evt-3cbf5f359090c218",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:08:05.000Z",
+      "ingested": "2026-01-12T03:08:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:08:15.000Z",
+    "event": {
+      "id": "evt-ee88317df7474a0c",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:08:15.000Z",
+      "ingested": "2026-01-12T03:08:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:08:25.000Z",
+    "event": {
+      "id": "evt-6bdbf24899a048e1",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:08:25.000Z",
+      "ingested": "2026-01-12T03:08:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:05.000Z",
+    "event": {
+      "id": "evt-480549b7a9f65401",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:11:05.000Z",
+      "ingested": "2026-01-12T03:11:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:15.000Z",
+    "event": {
+      "id": "evt-dc7f364db27b51b5",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:11:15.000Z",
+      "ingested": "2026-01-12T03:11:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:25.000Z",
+    "event": {
+      "id": "evt-fe86073f789381b3",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:11:25.000Z",
+      "ingested": "2026-01-12T03:11:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:05.000Z",
+    "event": {
+      "id": "evt-2e9659e0086ecec7",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:11:05.000Z",
+      "ingested": "2026-01-12T03:11:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:15.000Z",
+    "event": {
+      "id": "evt-a41df962fc3cc2aa",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:11:15.000Z",
+      "ingested": "2026-01-12T03:11:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:25.000Z",
+    "event": {
+      "id": "evt-d122dc0da809c650",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:11:25.000Z",
+      "ingested": "2026-01-12T03:11:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:05.000Z",
+    "event": {
+      "id": "evt-608d5c7dd4fa7870",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:14:05.000Z",
+      "ingested": "2026-01-12T03:14:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:15.000Z",
+    "event": {
+      "id": "evt-31efc9f65b927721",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:14:15.000Z",
+      "ingested": "2026-01-12T03:14:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:25.000Z",
+    "event": {
+      "id": "evt-37a5d7e3fbf6487d",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:14:25.000Z",
+      "ingested": "2026-01-12T03:14:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:05.000Z",
+    "event": {
+      "id": "evt-50cda57ee93b275e",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:14:05.000Z",
+      "ingested": "2026-01-12T03:14:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:15.000Z",
+    "event": {
+      "id": "evt-42701005ec82ce4d",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:14:15.000Z",
+      "ingested": "2026-01-12T03:14:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:14:25.000Z",
+    "event": {
+      "id": "evt-51388b80a89acabe",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:14:25.000Z",
+      "ingested": "2026-01-12T03:14:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:05.000Z",
+    "event": {
+      "id": "evt-34523842e32dac2d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:17:05.000Z",
+      "ingested": "2026-01-12T03:17:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:15.000Z",
+    "event": {
+      "id": "evt-1ea16566bd91a4cd",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:17:15.000Z",
+      "ingested": "2026-01-12T03:17:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:25.000Z",
+    "event": {
+      "id": "evt-7cb8e4d8cff24e80",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:17:25.000Z",
+      "ingested": "2026-01-12T03:17:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:05.000Z",
+    "event": {
+      "id": "evt-bbd9b065bee76576",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:17:05.000Z",
+      "ingested": "2026-01-12T03:17:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:15.000Z",
+    "event": {
+      "id": "evt-c05e52ae881b96a0",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:17:15.000Z",
+      "ingested": "2026-01-12T03:17:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:17:25.000Z",
+    "event": {
+      "id": "evt-f1c234f3e48d3f06",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:17:25.000Z",
+      "ingested": "2026-01-12T03:17:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:05.000Z",
+    "event": {
+      "id": "evt-8b41dc1fc0697a5d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:20:05.000Z",
+      "ingested": "2026-01-12T03:20:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:15.000Z",
+    "event": {
+      "id": "evt-b3c97d43b11a6c9e",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:20:15.000Z",
+      "ingested": "2026-01-12T03:20:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:25.000Z",
+    "event": {
+      "id": "evt-6fd16cb385610d14",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:20:25.000Z",
+      "ingested": "2026-01-12T03:20:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:05.000Z",
+    "event": {
+      "id": "evt-f2454eef4a56642b",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:20:05.000Z",
+      "ingested": "2026-01-12T03:20:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "file": {
+      "path": "C:\\Users\\alice\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\alice\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:15.000Z",
+    "event": {
+      "id": "evt-0770bd2b384ae197",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:20:15.000Z",
+      "ingested": "2026-01-12T03:20:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:25.000Z",
+    "event": {
+      "id": "evt-1a600d821d0a44a1",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:20:25.000Z",
+      "ingested": "2026-01-12T03:20:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:10:30.000Z",
+    "event": {
+      "id": "evt-fae8d939ffe0bed9",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:10:30.000Z",
+      "ingested": "2026-01-12T03:10:31.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success",
+      "original": "raw: user login"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "user": {
+      "id": "u-87a1c5e1c61a91c1",
+      "name": "carol"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "session": {
+      "id": "sess-777df9cc0b1a684c"
+    },
+    "message": "carol logged in from 10.0.0.20"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:30.000Z",
+    "event": {
+      "id": "evt-4ab350c9f421db63",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:11:30.000Z",
+      "ingested": "2026-01-12T03:11:31.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "outcome": "success",
+      "original": "raw: user logout"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "user": {
+      "id": "u-87a1c5e1c61a91c1",
+      "name": "carol"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "session": {
+      "id": "sess-777df9cc0b1a684c"
+    },
+    "message": "carol logged out"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:10:40.000Z",
+    "event": {
+      "id": "evt-d8b2bc882399cfa6",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:10:40.000Z",
+      "ingested": "2026-01-12T03:10:41.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success",
+      "original": "raw: user login"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "user": {
+      "id": "u-0c4ef25d7cb7d045",
+      "name": "dave"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "session": {
+      "id": "sess-3d2134f2ae3eaa0c"
+    },
+    "message": "dave logged in from 10.0.0.20"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:40.000Z",
+    "event": {
+      "id": "evt-68de1fe796add353",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:11:40.000Z",
+      "ingested": "2026-01-12T03:11:41.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "outcome": "success",
+      "original": "raw: user logout"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "user": {
+      "id": "u-0c4ef25d7cb7d045",
+      "name": "dave"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "session": {
+      "id": "sess-3d2134f2ae3eaa0c"
+    },
+    "message": "dave logged out"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:00.000Z",
+    "event": {
+      "id": "evt-92679beb14171ff6",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:11:00.000Z",
+      "ingested": "2026-01-12T03:11:01.000Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "original": "raw: process start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "pid": 4200,
+      "executable": "C:\\Windows\\System32\\cmd.exe",
+      "entity_id": "p-d5511dae24756678",
+      "start": "2026-01-12T03:11:00.000Z",
+      "command_line": "\"C:\\Windows\\System32\\cmd.exe\" --mode=run",
+      "name": "cmd.exe"
+    },
+    "message": "Process start: C:\\Windows\\System32\\cmd.exe"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:11:20.000Z",
+    "event": {
+      "id": "evt-18e43352ac94b441",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:11:20.000Z",
+      "ingested": "2026-01-12T03:11:21.000Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "original": "raw: process start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "pid": 4300,
+      "executable": "C:\\Windows\\System32\\bitsadmin.exe",
+      "entity_id": "p-fd59f0bf54be4cee",
+      "start": "2026-01-12T03:11:20.000Z",
+      "command_line": "\"C:\\Windows\\System32\\bitsadmin.exe\" --mode=run",
+      "name": "bitsadmin.exe",
+      "parent": {
+        "entity_id": "p-d5511dae24756678"
+      }
+    },
+    "message": "Process start: C:\\Windows\\System32\\bitsadmin.exe"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:05.000Z",
+    "event": {
+      "id": "evt-f7f24dbb6f3b5727",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:15:05.000Z",
+      "ingested": "2026-01-12T03:15:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-0.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-0.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:15.000Z",
+    "event": {
+      "id": "evt-e5f9b96c3f92695a",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:15:15.000Z",
+      "ingested": "2026-01-12T03:15:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:25.000Z",
+    "event": {
+      "id": "evt-5c2b8557599184d0",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:15:25.000Z",
+      "ingested": "2026-01-12T03:15:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:05.000Z",
+    "event": {
+      "id": "evt-104b5480d728ac9d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:15:05.000Z",
+      "ingested": "2026-01-12T03:15:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-0.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-0.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:15.000Z",
+    "event": {
+      "id": "evt-9b003c843f1f913c",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:15:15.000Z",
+      "ingested": "2026-01-12T03:15:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:15:25.000Z",
+    "event": {
+      "id": "evt-b2c79f5352367a5d",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:15:25.000Z",
+      "ingested": "2026-01-12T03:15:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:05.000Z",
+    "event": {
+      "id": "evt-1a0e3ee693de60eb",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:18:05.000Z",
+      "ingested": "2026-01-12T03:18:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:15.000Z",
+    "event": {
+      "id": "evt-a1cecd72e976f660",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:18:15.000Z",
+      "ingested": "2026-01-12T03:18:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:25.000Z",
+    "event": {
+      "id": "evt-0ea78566428e7f1d",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:18:25.000Z",
+      "ingested": "2026-01-12T03:18:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:05.000Z",
+    "event": {
+      "id": "evt-994925acd64fa505",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:18:05.000Z",
+      "ingested": "2026-01-12T03:18:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:15.000Z",
+    "event": {
+      "id": "evt-29f443a5bae3af0a",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:18:15.000Z",
+      "ingested": "2026-01-12T03:18:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:18:25.000Z",
+    "event": {
+      "id": "evt-1b0c075a1264d242",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:18:25.000Z",
+      "ingested": "2026-01-12T03:18:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:05.000Z",
+    "event": {
+      "id": "evt-6c612ba9738fbe91",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:21:05.000Z",
+      "ingested": "2026-01-12T03:21:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:15.000Z",
+    "event": {
+      "id": "evt-2662ac033e9722e0",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:21:15.000Z",
+      "ingested": "2026-01-12T03:21:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:25.000Z",
+    "event": {
+      "id": "evt-2d46256153160f59",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:21:25.000Z",
+      "ingested": "2026-01-12T03:21:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:05.000Z",
+    "event": {
+      "id": "evt-7f66acbed68e2698",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:21:05.000Z",
+      "ingested": "2026-01-12T03:21:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:15.000Z",
+    "event": {
+      "id": "evt-d58d1e746610adc3",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:21:15.000Z",
+      "ingested": "2026-01-12T03:21:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:25.000Z",
+    "event": {
+      "id": "evt-4f83440df9800043",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:21:25.000Z",
+      "ingested": "2026-01-12T03:21:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:05.000Z",
+    "event": {
+      "id": "evt-635ee4de6e48cf9a",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:24:05.000Z",
+      "ingested": "2026-01-12T03:24:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:15.000Z",
+    "event": {
+      "id": "evt-a21faa15c37ea04d",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:24:15.000Z",
+      "ingested": "2026-01-12T03:24:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:25.000Z",
+    "event": {
+      "id": "evt-04654b57330ab983",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:24:25.000Z",
+      "ingested": "2026-01-12T03:24:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:05.000Z",
+    "event": {
+      "id": "evt-798c964788a395a0",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:24:05.000Z",
+      "ingested": "2026-01-12T03:24:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:15.000Z",
+    "event": {
+      "id": "evt-fa29ff27f3a90605",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:24:15.000Z",
+      "ingested": "2026-01-12T03:24:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:24:25.000Z",
+    "event": {
+      "id": "evt-3db80dc0db0433e1",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:24:25.000Z",
+      "ingested": "2026-01-12T03:24:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:05.000Z",
+    "event": {
+      "id": "evt-96a050b7a630a803",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:27:05.000Z",
+      "ingested": "2026-01-12T03:27:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:15.000Z",
+    "event": {
+      "id": "evt-496724465d5d0e98",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:27:15.000Z",
+      "ingested": "2026-01-12T03:27:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:25.000Z",
+    "event": {
+      "id": "evt-e4ca71ec827c4f13",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:27:25.000Z",
+      "ingested": "2026-01-12T03:27:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:05.000Z",
+    "event": {
+      "id": "evt-712bcf3971f4b17a",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:27:05.000Z",
+      "ingested": "2026-01-12T03:27:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:15.000Z",
+    "event": {
+      "id": "evt-dfac8c1f4d8e8fb2",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:27:15.000Z",
+      "ingested": "2026-01-12T03:27:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:27:25.000Z",
+    "event": {
+      "id": "evt-a5d78a048dd0edb7",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:27:25.000Z",
+      "ingested": "2026-01-12T03:27:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:05.000Z",
+    "event": {
+      "id": "evt-738d7cea9fb117b4",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:30:05.000Z",
+      "ingested": "2026-01-12T03:30:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:15.000Z",
+    "event": {
+      "id": "evt-c3c38d0b096217e8",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:30:15.000Z",
+      "ingested": "2026-01-12T03:30:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:25.000Z",
+    "event": {
+      "id": "evt-4acfd4eaa0559ea0",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:30:25.000Z",
+      "ingested": "2026-01-12T03:30:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-d5511dae24756678"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:05.000Z",
+    "event": {
+      "id": "evt-9c2710857be47872",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:30:05.000Z",
+      "ingested": "2026-01-12T03:30:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "file": {
+      "path": "C:\\Users\\carol\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\carol\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:15.000Z",
+    "event": {
+      "id": "evt-a176c938efffe2bb",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:30:15.000Z",
+      "ingested": "2026-01-12T03:30:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:30:25.000Z",
+    "event": {
+      "id": "evt-8afaf6dbeec8e42c",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:30:25.000Z",
+      "ingested": "2026-01-12T03:30:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-106828085c038ad2",
+      "name": "victim-02",
+      "ip": [
+        "10.0.0.20"
+      ]
+    },
+    "process": {
+      "entity_id": "p-fd59f0bf54be4cee"
+    },
+    "source": {
+      "ip": "10.0.0.20"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:20:30.000Z",
+    "event": {
+      "id": "evt-2a57e2a1edff65e4",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:20:30.000Z",
+      "ingested": "2026-01-12T03:20:31.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success",
+      "original": "raw: user login"
     },
     "host": {
       "id": "h-0ba32811578e289e",
-      "name": "sensor-01"
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "user": {
+      "id": "u-66b9456ca36c980d",
+      "name": "admin"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "session": {
+      "id": "sess-3816701b98973ac5"
+    },
+    "message": "admin logged in from 10.0.0.30"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:30.000Z",
+    "event": {
+      "id": "evt-eaa144aedb7376bb",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T03:21:30.000Z",
+      "ingested": "2026-01-12T03:21:31.000Z",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "end"
+      ],
+      "action": "user_logout",
+      "outcome": "success",
+      "original": "raw: user logout"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "user": {
+      "id": "u-66b9456ca36c980d",
+      "name": "admin"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "session": {
+      "id": "sess-3816701b98973ac5"
+    },
+    "message": "admin logged out"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:00.000Z",
+    "event": {
+      "id": "evt-c98584a4b891d9c2",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:21:00.000Z",
+      "ingested": "2026-01-12T03:21:01.000Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "original": "raw: process start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "pid": 5200,
+      "executable": "C:\\Windows\\System32\\svchost.exe",
+      "entity_id": "p-900fbfe56d03767f",
+      "start": "2026-01-12T03:21:00.000Z",
+      "command_line": "\"C:\\Windows\\System32\\svchost.exe\" --mode=run",
+      "name": "svchost.exe"
+    },
+    "message": "Process start: C:\\Windows\\System32\\svchost.exe"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:21:20.000Z",
+    "event": {
+      "id": "evt-da3bae9e79d6cba6",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T03:21:20.000Z",
+      "ingested": "2026-01-12T03:21:21.000Z",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start",
+      "original": "raw: process start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "pid": 5300,
+      "executable": "C:\\Windows\\System32\\rundll32.exe",
+      "entity_id": "p-f7af0f928e25019d",
+      "start": "2026-01-12T03:21:20.000Z",
+      "command_line": "\"C:\\Windows\\System32\\rundll32.exe\" --mode=run",
+      "name": "rundll32.exe",
+      "parent": {
+        "entity_id": "p-900fbfe56d03767f"
+      }
+    },
+    "message": "Process start: C:\\Windows\\System32\\rundll32.exe"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:05.000Z",
+    "event": {
+      "id": "evt-56a07582cb1293ee",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:25:05.000Z",
+      "ingested": "2026-01-12T03:25:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-0.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-0.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:15.000Z",
+    "event": {
+      "id": "evt-fb7f5cd0497eccf8",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:25:15.000Z",
+      "ingested": "2026-01-12T03:25:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:25.000Z",
+    "event": {
+      "id": "evt-f01402608048542a",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:25:25.000Z",
+      "ingested": "2026-01-12T03:25:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:05.000Z",
+    "event": {
+      "id": "evt-fb69627f05016f1d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:25:05.000Z",
+      "ingested": "2026-01-12T03:25:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-0.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-0.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:15.000Z",
+    "event": {
+      "id": "evt-6d1b8e5f3b091157",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:25:15.000Z",
+      "ingested": "2026-01-12T03:25:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:25:25.000Z",
+    "event": {
+      "id": "evt-af7c7aa01ec41657",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:25:25.000Z",
+      "ingested": "2026-01-12T03:25:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:05.000Z",
+    "event": {
+      "id": "evt-acedfd6c4a25584d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:28:05.000Z",
+      "ingested": "2026-01-12T03:28:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:15.000Z",
+    "event": {
+      "id": "evt-72eaf8852d3ce6f0",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:28:15.000Z",
+      "ingested": "2026-01-12T03:28:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:25.000Z",
+    "event": {
+      "id": "evt-2867e575a586b985",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:28:25.000Z",
+      "ingested": "2026-01-12T03:28:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:05.000Z",
+    "event": {
+      "id": "evt-8ac14cd507f5e3c9",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:28:05.000Z",
+      "ingested": "2026-01-12T03:28:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-1.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-1.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:15.000Z",
+    "event": {
+      "id": "evt-f67cb48956292f42",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:28:15.000Z",
+      "ingested": "2026-01-12T03:28:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:28:25.000Z",
+    "event": {
+      "id": "evt-ca53edde52b5e618",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:28:25.000Z",
+      "ingested": "2026-01-12T03:28:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:05.000Z",
+    "event": {
+      "id": "evt-8ef19f92408b60b8",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:31:05.000Z",
+      "ingested": "2026-01-12T03:31:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:15.000Z",
+    "event": {
+      "id": "evt-ba6a8b4cdb6707c1",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:31:15.000Z",
+      "ingested": "2026-01-12T03:31:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:25.000Z",
+    "event": {
+      "id": "evt-c5c34a274324489b",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:31:25.000Z",
+      "ingested": "2026-01-12T03:31:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:05.000Z",
+    "event": {
+      "id": "evt-e562b707ee310ad8",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:31:05.000Z",
+      "ingested": "2026-01-12T03:31:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-2.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-2.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:15.000Z",
+    "event": {
+      "id": "evt-581679218b454375",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:31:15.000Z",
+      "ingested": "2026-01-12T03:31:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:31:25.000Z",
+    "event": {
+      "id": "evt-e50cbb494f19daea",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:31:25.000Z",
+      "ingested": "2026-01-12T03:31:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:05.000Z",
+    "event": {
+      "id": "evt-76459d4c249eb6ae",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:34:05.000Z",
+      "ingested": "2026-01-12T03:34:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:15.000Z",
+    "event": {
+      "id": "evt-8c785cd2c800215a",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:34:15.000Z",
+      "ingested": "2026-01-12T03:34:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:25.000Z",
+    "event": {
+      "id": "evt-bdcb88ebd3d414b8",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:34:25.000Z",
+      "ingested": "2026-01-12T03:34:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:05.000Z",
+    "event": {
+      "id": "evt-e48f22738db395ca",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:34:05.000Z",
+      "ingested": "2026-01-12T03:34:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-3.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-3.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:15.000Z",
+    "event": {
+      "id": "evt-84777e96de4d29b9",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:34:15.000Z",
+      "ingested": "2026-01-12T03:34:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "93.184.216.34"
+        }
+      ]
+    },
+    "message": "DNS query: evil-c2.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:34:25.000Z",
+    "event": {
+      "id": "evt-19aa25852f601a02",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:34:25.000Z",
+      "ingested": "2026-01-12T03:34:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "93.184.216.34",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 93.184.216.34"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:05.000Z",
+    "event": {
+      "id": "evt-debdb48583e5622d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:37:05.000Z",
+      "ingested": "2026-01-12T03:37:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:15.000Z",
+    "event": {
+      "id": "evt-3c96787a28e87fc5",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:37:15.000Z",
+      "ingested": "2026-01-12T03:37:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:25.000Z",
+    "event": {
+      "id": "evt-1cb7edb2d77f6b34",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:37:25.000Z",
+      "ingested": "2026-01-12T03:37:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:05.000Z",
+    "event": {
+      "id": "evt-4f8055b76276709f",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:37:05.000Z",
+      "ingested": "2026-01-12T03:37:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_write",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-4.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-4.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:15.000Z",
+    "event": {
+      "id": "evt-4bb0ef255eaffbf4",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:37:15.000Z",
+      "ingested": "2026-01-12T03:37:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "203.0.113.5"
+        }
+      ]
+    },
+    "message": "DNS query: cdn.example.com"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:37:25.000Z",
+    "event": {
+      "id": "evt-4afcb6be8dea7ba5",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:37:25.000Z",
+      "ingested": "2026-01-12T03:37:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "203.0.113.5",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 203.0.113.5"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:05.000Z",
+    "event": {
+      "id": "evt-38fb07661734c044",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:40:05.000Z",
+      "ingested": "2026-01-12T03:40:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:15.000Z",
+    "event": {
+      "id": "evt-c64ccca36c5cecdd",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:40:15.000Z",
+      "ingested": "2026-01-12T03:40:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:25.000Z",
+    "event": {
+      "id": "evt-cbc30d062a825b55",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:40:25.000Z",
+      "ingested": "2026-01-12T03:40:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-900fbfe56d03767f"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:05.000Z",
+    "event": {
+      "id": "evt-505a490849da0669",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T03:40:05.000Z",
+      "ingested": "2026-01-12T03:40:06.000Z",
+      "category": [
+        "file"
+      ],
+      "type": [
+        "access"
+      ],
+      "action": "file_read",
+      "original": "raw: file access"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "file": {
+      "path": "C:\\Users\\admin\\Documents\\shared-5.txt"
+    },
+    "message": "File access: C:\\Users\\admin\\Documents\\shared-5.txt"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:15.000Z",
+    "event": {
+      "id": "evt-12c528b6adc1fa69",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-12T03:40:15.000Z",
+      "ingested": "2026-01-12T03:40:16.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query",
+      "original": "raw: dns query"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "A"
+      },
+      "answers": [
+        {
+          "data": "198.51.100.9"
+        }
+      ]
+    },
+    "message": "DNS query: update.corp.local"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T03:40:25.000Z",
+    "event": {
+      "id": "evt-0afe359160b3624c",
+      "kind": "event",
+      "dataset": "netflow.flow",
+      "created": "2026-01-12T03:40:25.000Z",
+      "ingested": "2026-01-12T03:40:26.000Z",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "flow_start",
+      "original": "raw: flow start"
+    },
+    "host": {
+      "id": "h-0ba32811578e289e",
+      "name": "sensor-01",
+      "ip": [
+        "10.0.0.30"
+      ]
+    },
+    "process": {
+      "entity_id": "p-f7af0f928e25019d"
+    },
+    "source": {
+      "ip": "10.0.0.30"
+    },
+    "destination": {
+      "ip": "198.51.100.9",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "message": "Flow start to 198.51.100.9"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:00:00.000Z",
+    "event": {
+      "id": "alrt-87912115f8bbdae9",
+      "kind": "alert",
+      "dataset": "finding.raw.falco",
+      "created": "2026-01-12T09:00:00.000Z",
+      "ingested": "2026-01-12T09:00:01.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 60,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
     },
     "rule": {
-      "id": "R-DNS-001",
-      "name": "DNS Tunnel Suspected",
+      "id": "RULE-FALCO-000",
+      "name": "falco detection 0",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1000",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-142ff49119fcfe440e22f2174deccdd648befc2c"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-1e3a450d71823046"
+        ]
+      }
+    },
+    "message": "Raw finding from falco"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:00:20.000Z",
+    "event": {
+      "id": "alrt-ca9edc74fbbea583",
+      "kind": "alert",
+      "dataset": "finding.raw.suricata",
+      "created": "2026-01-12T09:00:20.000Z",
+      "ingested": "2026-01-12T09:00:21.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 61,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "rule": {
+      "id": "RULE-SURICATA-001",
+      "name": "suricata detection 1",
       "ruleset": "suricata"
     },
     "threat": {
@@ -330,14 +5446,8 @@
         "name": "Command and Control"
       },
       "technique": {
-        "id": "T1071",
+        "id": "T1001",
         "name": "Application Layer Protocol"
-      }
-    },
-    "dns": {
-      "question": {
-        "name": "evil-c2.com",
-        "type": "TXT"
       }
     },
     "custom": {
@@ -346,50 +5456,227 @@
         "providers": [
           "suricata"
         ],
-        "fingerprint": "fp-367dc3498b5948e8"
+        "fingerprint": "fp-d22afcaed8b5221abe93c0167b398059cfcd7a3a"
       },
       "evidence": {
         "event_ids": [
-          "evt-eaae9bea5af714d0"
+          "evt-4515acc4d9f3cf28"
         ]
       }
     },
-    "agent": {
-      "name": "suricata",
-      "version": "7.0.0"
-    },
-    "tags": [
-      "attack.ta0011",
-      "attack.t1071"
-    ]
+    "message": "Raw finding from suricata"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:25:05.000Z",
+    "@timestamp": "2026-01-12T09:00:40.000Z",
     "event": {
-      "id": "calrt-731ebadcf1808cf5",
+      "id": "alrt-0eaa2498af7e43b6",
       "kind": "alert",
-      "created": "2026-01-12T03:25:05.010Z",
-      "ingested": "2026-01-12T03:25:05.200Z",
+      "dataset": "finding.raw.filebeat_sigma",
+      "created": "2026-01-12T09:00:40.000Z",
+      "ingested": "2026-01-12T09:00:41.000Z",
       "category": [
-        "network"
+        "intrusion_detection"
       ],
       "type": [
-        "info"
+        "alert"
       ],
-      "action": "dns_tunnel_suspected",
-      "dataset": "finding.canonical",
-      "severity": 70
+      "action": "rule_match",
+      "severity": 62,
+      "original": "raw: finding"
     },
     "host": {
-      "id": "h-0ba32811578e289e",
-      "name": "sensor-01"
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
     },
     "rule": {
-      "id": "R-DNS-001",
-      "name": "DNS Tunnel Suspected",
+      "id": "RULE-FILEBEAT_SIGMA-002",
+      "name": "filebeat_sigma detection 2",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1002",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-2503c5c512cd532487b0d8770c6d0f044bb8c41e"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-2e61895772be8fcd"
+        ]
+      }
+    },
+    "message": "Raw finding from filebeat_sigma"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:01:00.000Z",
+    "event": {
+      "id": "alrt-a87a7f298f3095d6",
+      "kind": "alert",
+      "dataset": "finding.raw.security_analytics",
+      "created": "2026-01-12T09:01:00.000Z",
+      "ingested": "2026-01-12T09:01:01.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 63,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "rule": {
+      "id": "RULE-SECURITY_ANALYTICS-003",
+      "name": "security_analytics detection 3",
+      "ruleset": "security_analytics"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1003",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "security_analytics"
+        ],
+        "fingerprint": "fp-2cb38feb3bff721d2008ceb50f3786ff3dee57a9"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-7628df2ca6099e57"
+        ]
+      }
+    },
+    "message": "Raw finding from security_analytics"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:01:20.000Z",
+    "event": {
+      "id": "alrt-573236dfded24918",
+      "kind": "alert",
+      "dataset": "finding.raw.falco",
+      "created": "2026-01-12T09:01:20.000Z",
+      "ingested": "2026-01-12T09:01:21.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 64,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "rule": {
+      "id": "RULE-FALCO-004",
+      "name": "falco detection 4",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1004",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-b266fbcacc1d21cb61f573bc42539c511f8369f7"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-4178625651b5608f"
+        ]
+      }
+    },
+    "message": "Raw finding from falco"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:01:40.000Z",
+    "event": {
+      "id": "alrt-5bff72d4edca5fff",
+      "kind": "alert",
+      "dataset": "finding.raw.suricata",
+      "created": "2026-01-12T09:01:40.000Z",
+      "ingested": "2026-01-12T09:01:41.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 65,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "rule": {
+      "id": "RULE-SURICATA-005",
+      "name": "suricata detection 5",
       "ruleset": "suricata"
     },
     "threat": {
@@ -399,9 +5686,424 @@
         "name": "Command and Control"
       },
       "technique": {
-        "id": "T1071",
+        "id": "T1005",
         "name": "Application Layer Protocol"
       }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-5be1c242ee3b501f9f5f859939c8c178fcf21004"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-5f53cd848b97c981"
+        ]
+      }
+    },
+    "message": "Raw finding from suricata"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:02:00.000Z",
+    "event": {
+      "id": "alrt-373b785ea18a7991",
+      "kind": "alert",
+      "dataset": "finding.raw.filebeat_sigma",
+      "created": "2026-01-12T09:02:00.000Z",
+      "ingested": "2026-01-12T09:02:01.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 66,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "rule": {
+      "id": "RULE-FILEBEAT_SIGMA-006",
+      "name": "filebeat_sigma detection 6",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1006",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-3ffb81645c7c84e7ddd21986385d07a41afd84c2"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-ee88317df7474a0c"
+        ]
+      }
+    },
+    "message": "Raw finding from filebeat_sigma"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:02:20.000Z",
+    "event": {
+      "id": "alrt-b52d754db4d4e16b",
+      "kind": "alert",
+      "dataset": "finding.raw.security_analytics",
+      "created": "2026-01-12T09:02:20.000Z",
+      "ingested": "2026-01-12T09:02:21.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 67,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "rule": {
+      "id": "RULE-SECURITY_ANALYTICS-007",
+      "name": "security_analytics detection 7",
+      "ruleset": "security_analytics"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1007",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "security_analytics"
+        ],
+        "fingerprint": "fp-8f01596fb101c88a856af261240b676aa021a5d9"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-6bdbf24899a048e1"
+        ]
+      }
+    },
+    "message": "Raw finding from security_analytics"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:02:40.000Z",
+    "event": {
+      "id": "alrt-5e9cb1b0e9fc1e7d",
+      "kind": "alert",
+      "dataset": "finding.raw.falco",
+      "created": "2026-01-12T09:02:40.000Z",
+      "ingested": "2026-01-12T09:02:41.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 68,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "rule": {
+      "id": "RULE-FALCO-008",
+      "name": "falco detection 8",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1008",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-7f06f671b513ca87e3177fc6a213b957b53f5ed3"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-dc7f364db27b51b5"
+        ]
+      }
+    },
+    "message": "Raw finding from falco"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:03:00.000Z",
+    "event": {
+      "id": "alrt-6804ecc2a7ed1380",
+      "kind": "alert",
+      "dataset": "finding.raw.suricata",
+      "created": "2026-01-12T09:03:00.000Z",
+      "ingested": "2026-01-12T09:03:01.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 69,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "rule": {
+      "id": "RULE-SURICATA-009",
+      "name": "suricata detection 9",
+      "ruleset": "suricata"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1009",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-b1335c3bfcfb43a0a86ee569fbb36d2ca1471153"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-fe86073f789381b3"
+        ]
+      }
+    },
+    "message": "Raw finding from suricata"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:03:20.000Z",
+    "event": {
+      "id": "alrt-8f334e09f316c561",
+      "kind": "alert",
+      "dataset": "finding.raw.filebeat_sigma",
+      "created": "2026-01-12T09:03:20.000Z",
+      "ingested": "2026-01-12T09:03:21.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 70,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "rule": {
+      "id": "RULE-FILEBEAT_SIGMA-010",
+      "name": "filebeat_sigma detection 10",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1010",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-8d5bcf4b6ed14de936bccf70d0155b07253d0547"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-a41df962fc3cc2aa"
+        ]
+      }
+    },
+    "message": "Raw finding from filebeat_sigma"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T09:03:40.000Z",
+    "event": {
+      "id": "alrt-852bb0ed60ff0451",
+      "kind": "alert",
+      "dataset": "finding.raw.security_analytics",
+      "created": "2026-01-12T09:03:40.000Z",
+      "ingested": "2026-01-12T09:03:41.000Z",
+      "category": [
+        "intrusion_detection"
+      ],
+      "type": [
+        "alert"
+      ],
+      "action": "rule_match",
+      "severity": 71,
+      "original": "raw: finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "rule": {
+      "id": "RULE-SECURITY_ANALYTICS-011",
+      "name": "security_analytics detection 11",
+      "ruleset": "security_analytics"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1011",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "raw",
+        "providers": [
+          "security_analytics"
+        ],
+        "fingerprint": "fp-bf5a6528cac8dc8510f5facbdcce1b8829b970a9"
+      },
+      "evidence": {
+        "event_ids": [
+          "evt-d122dc0da809c650"
+        ]
+      }
+    },
+    "message": "Raw finding from security_analytics"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:00:00.000Z",
+    "event": {
+      "id": "canonical-4eeb4a792fba25c7",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:00:00.000Z",
+      "ingested": "2026-01-12T10:00:01.000Z",
+      "category": [
+        "network",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "severity": 61,
+      "original": "raw: canonical finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.99"
+    },
+    "destination": {
+      "ip": "93.184.216.34"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
     },
     "dns": {
       "question": {
@@ -409,65 +6111,439 @@
         "type": "TXT"
       }
     },
+    "rule": {
+      "id": "RULE-FALCO-000",
+      "name": "falco detection 0",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1000",
+        "name": "Application Layer Protocol"
+      }
+    },
     "custom": {
       "finding": {
         "stage": "canonical",
         "providers": [
+          "falco",
           "suricata"
         ],
-        "fingerprint": "fp-367dc3498b5948e8"
+        "fingerprint": "fp-c22a5ec4b49baa486d53a96b9385ad39db9167db"
       },
+      "confidence": 0.8,
       "evidence": {
         "event_ids": [
-          "evt-eaae9bea5af714d0"
+          "evt-1e3a450d71823046",
+          "evt-4515acc4d9f3cf28"
         ]
       }
     },
-    "agent": {
-      "name": "suricata",
-      "version": "7.0.0"
-    },
-    "tags": [
-      "attack.ta0011",
-      "attack.t1071"
-    ]
+    "message": "Canonical finding generated by merge"
   },
   {
     "ecs": {
       "version": "9.2.0"
     },
-    "@timestamp": "2026-01-12T03:30:00.000Z",
+    "@timestamp": "2026-01-12T10:00:35.000Z",
     "event": {
-      "id": "evt-b5f63ec8ea105435",
-      "kind": "event",
-      "created": "2026-01-12T03:30:00.010Z",
-      "ingested": "2026-01-12T03:30:00.200Z",
+      "id": "canonical-dd13927af33b1285",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:00:35.000Z",
+      "ingested": "2026-01-12T10:00:36.000Z",
       "category": [
-        "authentication"
+        "network",
+        "intrusion_detection"
       ],
       "type": [
-        "end"
+        "info"
       ],
-      "action": "user_logout",
-      "dataset": "hostlog.auth",
-      "outcome": "success"
+      "action": "dns_tunnel_suspected",
+      "severity": 63,
+      "original": "raw: canonical finding"
     },
     "host": {
       "id": "h-c84f121fc976de1a",
       "name": "victim-01"
     },
-    "user": {
-      "name": "alice"
+    "process": {
+      "entity_id": "p-45293c190784d696"
     },
     "source": {
-      "ip": "10.0.0.8"
+      "ip": "10.0.0.99"
     },
-    "session": {
-      "id": "sess-b274ea402cea1ec0"
+    "destination": {
+      "ip": "93.184.216.34"
     },
-    "agent": {
-      "name": "filebeat",
-      "version": "8.11.0"
-    }
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "evil-c2.com",
+        "type": "TXT"
+      }
+    },
+    "rule": {
+      "id": "RULE-FILEBEAT_SIGMA-002",
+      "name": "filebeat_sigma detection 2",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1002",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "filebeat_sigma",
+          "security_analytics"
+        ],
+        "fingerprint": "fp-1a033ac85c150a465d0511b8d2b7a78e604f36a4"
+      },
+      "confidence": 0.8,
+      "evidence": {
+        "event_ids": [
+          "evt-2e61895772be8fcd",
+          "evt-7628df2ca6099e57"
+        ]
+      }
+    },
+    "message": "Canonical finding generated by merge"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:10.000Z",
+    "event": {
+      "id": "canonical-68f79560a08e1966",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:10.000Z",
+      "ingested": "2026-01-12T10:01:11.000Z",
+      "category": [
+        "network",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "severity": 65,
+      "original": "raw: canonical finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.99"
+    },
+    "destination": {
+      "ip": "203.0.113.5"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "TXT"
+      }
+    },
+    "rule": {
+      "id": "RULE-FALCO-004",
+      "name": "falco detection 4",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1004",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-fefe483dd7f6bd968436aa7160e3418b61c491e3"
+      },
+      "confidence": 0.8,
+      "evidence": {
+        "event_ids": [
+          "evt-4178625651b5608f",
+          "evt-5f53cd848b97c981"
+        ]
+      }
+    },
+    "message": "Canonical finding generated by merge"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:45.000Z",
+    "event": {
+      "id": "canonical-a3099885b387be91",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:45.000Z",
+      "ingested": "2026-01-12T10:01:46.000Z",
+      "category": [
+        "network",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "severity": 67,
+      "original": "raw: canonical finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.99"
+    },
+    "destination": {
+      "ip": "203.0.113.5"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "cdn.example.com",
+        "type": "TXT"
+      }
+    },
+    "rule": {
+      "id": "RULE-FILEBEAT_SIGMA-006",
+      "name": "filebeat_sigma detection 6",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1006",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "filebeat_sigma",
+          "security_analytics"
+        ],
+        "fingerprint": "fp-4a22b76f696d5370dae7b15ee3dffdd569147926"
+      },
+      "confidence": 0.8,
+      "evidence": {
+        "event_ids": [
+          "evt-6bdbf24899a048e1",
+          "evt-ee88317df7474a0c"
+        ]
+      }
+    },
+    "message": "Canonical finding generated by merge"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:02:20.000Z",
+    "event": {
+      "id": "canonical-14acabe6a3aee2a2",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:02:20.000Z",
+      "ingested": "2026-01-12T10:02:21.000Z",
+      "category": [
+        "network",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "severity": 69,
+      "original": "raw: canonical finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-e72428e11fbdf376"
+    },
+    "source": {
+      "ip": "10.0.0.99"
+    },
+    "destination": {
+      "ip": "198.51.100.9"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "TXT"
+      }
+    },
+    "rule": {
+      "id": "RULE-FALCO-008",
+      "name": "falco detection 8",
+      "ruleset": "falco"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1008",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-4edb91f21891e5aeee473a3aad6df711e7d26cb9"
+      },
+      "confidence": 0.8,
+      "evidence": {
+        "event_ids": [
+          "evt-dc7f364db27b51b5",
+          "evt-fe86073f789381b3"
+        ]
+      }
+    },
+    "message": "Canonical finding generated by merge"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:02:55.000Z",
+    "event": {
+      "id": "canonical-acddb76fdf1ef0aa",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:02:55.000Z",
+      "ingested": "2026-01-12T10:02:56.000Z",
+      "category": [
+        "network",
+        "intrusion_detection"
+      ],
+      "type": [
+        "info"
+      ],
+      "action": "dns_tunnel_suspected",
+      "severity": 71,
+      "original": "raw: canonical finding"
+    },
+    "host": {
+      "id": "h-c84f121fc976de1a",
+      "name": "victim-01"
+    },
+    "process": {
+      "entity_id": "p-45293c190784d696"
+    },
+    "source": {
+      "ip": "10.0.0.99"
+    },
+    "destination": {
+      "ip": "198.51.100.9"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "update.corp.local",
+        "type": "TXT"
+      }
+    },
+    "rule": {
+      "id": "RULE-FILEBEAT_SIGMA-010",
+      "name": "filebeat_sigma detection 10",
+      "ruleset": "filebeat_sigma"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1010",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "filebeat_sigma",
+          "security_analytics"
+        ],
+        "fingerprint": "fp-a41d95750daf89dfd4e48f8973feb876139a77ed"
+      },
+      "confidence": 0.8,
+      "evidence": {
+        "event_ids": [
+          "evt-a41df962fc3cc2aa",
+          "evt-d122dc0da809c650"
+        ]
+      }
+    },
+    "message": "Canonical finding generated by merge"
   }
 ]

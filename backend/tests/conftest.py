@@ -15,13 +15,16 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 
-def _env_flag(name: str) -> bool:
-    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "y", "on"}
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     # Keep unit tests runnable on a developer machine without bringing up infra.
     if "requires_opensearch" in item.keywords and not _env_flag("RUN_OPENSEARCH_TESTS"):
         pytest.skip("Set RUN_OPENSEARCH_TESTS=1 to run OpenSearch-dependent tests.")
-    if "requires_neo4j" in item.keywords and not _env_flag("RUN_NEO4J_TESTS"):
-        pytest.skip("Set RUN_NEO4J_TESTS=1 to run Neo4j-dependent tests.")
+    if "requires_neo4j" in item.keywords and not _env_flag("RUN_NEO4J_TESTS", default=True):
+        pytest.skip("Set RUN_NEO4J_TESTS=0 to skip Neo4j-dependent tests.")
