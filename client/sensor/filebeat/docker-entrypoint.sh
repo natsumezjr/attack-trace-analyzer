@@ -18,7 +18,7 @@ cleanup() {
         echo "✓ Filebeat 已停止"
     fi
 
-    echo "数据库已保存在: ${DB_PATH:-/app/output/data.db}"
+    echo "数据已发送到 RabbitMQ 队列: ${RABBITMQ_QUEUE:-data.filebeat}"
     exit 0
 }
 

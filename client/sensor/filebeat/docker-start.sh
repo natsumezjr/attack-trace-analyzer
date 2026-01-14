@@ -69,7 +69,7 @@ echo ""
 echo "[4/6] 清理旧的 JSON 输出文件..."
 mkdir -p output
 rm -f output/ecs_logs_with_anomalies.json output/anomalies.json
-echo "✓ JSON 输出文件已清理（保留数据库）"
+echo "✓ JSON 输出文件已清理"
 echo ""
 
 # 5. 启动容器（后台运行）
@@ -105,10 +105,7 @@ echo ""
 echo "📁 输出目录:"
 echo "   ./output/ecs_logs_with_anomalies.json  # 所有日志（含异常标记）"
 echo "   ./output/anomalies.json                # 仅异常日志"
-echo "   ./output/data.db                       # SQLite 数据库"
-echo ""
-echo "🔍 查询数据库:"
-echo "   python3 query_database.py"
+echo "   RabbitMQ 队列: ${RABBITMQ_QUEUE:-data.filebeat}"
 echo ""
 echo "🛑 停止系统:"
 if docker compose version &> /dev/null; then

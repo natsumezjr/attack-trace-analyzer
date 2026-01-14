@@ -1,22 +1,21 @@
 import json
 import math
 import os
-import sqlite3
 import threading
 import time
 import traceback
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from flask import Flask, Response, jsonify, stream_with_context
+from flask import Flask, jsonify
 
 APP_VERSION = "0.1.0"
 
 EVE_FILE = os.getenv("EVE_FILE", "/data/eve.json")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/data/output")
 STATE_DIR = os.getenv("STATE_DIR", "/data/state")
-DB_FILE = os.getenv("DB_FILE", "/data/data.db")
-TABLE_NAME = os.getenv("TABLE_NAME", "suricata")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+QUEUE_NAME = os.getenv("RABBITMQ_QUEUE", "data.suricata")
 
 HOST_ID = os.getenv("HOST_ID", "sensor-01")
 HOST_NAME = os.getenv("HOST_NAME", "suricata-sensor")
@@ -24,9 +23,7 @@ AGENT_NAME = os.getenv("AGENT_NAME", "netflow-exporter")
 AGENT_VERSION = os.getenv("AGENT_VERSION", APP_VERSION)
 
 OFFSET_FILE = os.path.join(STATE_DIR, "offset.json")
-EXPORT_OFFSET_FILE = os.path.join(STATE_DIR, "export_offset.json")
-
-db_lock = threading.Lock()
+publisher_lock = threading.Lock()
 
 app = Flask(__name__)
 
@@ -46,38 +43,10 @@ def normalize_timestamp(ts: Optional[str]) -> str:
 def ensure_dirs() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(STATE_DIR, exist_ok=True)
-    os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
     print(
-        f"INFO: init exporter DB_FILE={DB_FILE} TABLE_NAME={TABLE_NAME} EVE_FILE={EVE_FILE}",
+        f"INFO: init exporter RABBITMQ_QUEUE={QUEUE_NAME} EVE_FILE={EVE_FILE}",
         flush=True,
     )
-    init_db()
-
-
-def connect_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA busy_timeout=5000;")
-    return conn
-
-
-def init_db() -> None:
-    with db_lock:
-        conn = connect_db()
-        try:
-            conn.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.commit()
-            print(f"INFO: ensured table {TABLE_NAME}", flush=True)
-        finally:
-            conn.close()
 
 
 def load_offset() -> Dict[str, Any]:
@@ -96,21 +65,44 @@ def save_offset(offset: int, inode: Optional[int]) -> None:
         json.dump(tmp, f)
 
 
-def load_export_offset() -> int:
-    if not os.path.exists(EXPORT_OFFSET_FILE):
-        return 0
+def build_publisher():
     try:
-        with open(EXPORT_OFFSET_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return int(data.get("last_id", 0))
-    except Exception:
-        return 0
+        import pika
+    except ImportError:
+        print("ERROR: pika not installed. Add it to requirements.txt", flush=True)
+        raise
 
+    def _connect():
+        params = pika.URLParameters(RABBITMQ_URL)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
+        channel.queue_declare(queue=QUEUE_NAME, durable=True)
+        return connection, channel
 
-def save_export_offset(last_id: int) -> None:
-    tmp = {"last_id": int(last_id)}
-    with open(EXPORT_OFFSET_FILE, "w", encoding="utf-8") as f:
-        json.dump(tmp, f)
+    connection, channel = _connect()
+
+    def publish(payload: Dict[str, Any]) -> None:
+        nonlocal connection, channel
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        try:
+            if connection.is_closed or channel.is_closed:
+                connection, channel = _connect()
+            channel.basic_publish(
+                exchange="",
+                routing_key=QUEUE_NAME,
+                body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+        except Exception:
+            connection, channel = _connect()
+            channel.basic_publish(
+                exchange="",
+                routing_key=QUEUE_NAME,
+                body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+
+    return publish
 
 
 def safe_list_add(items, value):
@@ -389,48 +381,32 @@ def build_dns_tunnel_alert(event: Dict[str, Any], raw_line: str) -> Optional[Dic
     return ecs
 
 
-def insert_event(payload: Dict[str, Any]) -> None:
-    line = json.dumps(payload, ensure_ascii=True)
-    max_retries = 6
-    for attempt in range(max_retries):
-        with db_lock:
-            conn = connect_db()
-            try:
-                conn.execute(
-                    f"INSERT INTO {TABLE_NAME} (event_json) VALUES (?)",
-                    (line,),
-                )
-                conn.commit()
-                return
-            except sqlite3.OperationalError as exc:
-                if "locked" not in str(exc).lower() or attempt == max_retries - 1:
-                    raise
-            finally:
-                conn.close()
-        time.sleep(0.1 * (attempt + 1))
+def insert_event(publish, payload: Dict[str, Any]) -> None:
+    publish(payload)
 
 
-def process_event(event: Dict[str, Any], raw_line: str) -> None:
+def process_event(publish, event: Dict[str, Any], raw_line: str) -> None:
     etype = event.get("event_type")
     if etype == "flow":
-        insert_event(map_flow(event, raw_line))
+        insert_event(publish, map_flow(event, raw_line))
     elif etype == "dns":
-        insert_event(map_dns(event, raw_line))
+        insert_event(publish, map_dns(event, raw_line))
         alert = build_dns_tunnel_alert(event, raw_line)
         if alert:
-            insert_event(alert)
+            insert_event(publish, alert)
     elif etype == "http":
-        insert_event(map_http(event, raw_line))
+        insert_event(publish, map_http(event, raw_line))
     elif etype == "tls":
-        insert_event(map_tls(event, raw_line))
+        insert_event(publish, map_tls(event, raw_line))
     elif etype == "icmp":
-        insert_event(map_icmp(event, raw_line))
+        insert_event(publish, map_icmp(event, raw_line))
     elif etype == "alert":
-        insert_event(map_alert(event, raw_line))
+        insert_event(publish, map_alert(event, raw_line))
 
 
 def tail_eve() -> None:
     ensure_dirs()
+    publish = build_publisher()
     state = load_offset()
     offset = int(state.get("offset", 0))
     inode = state.get("inode")
@@ -473,47 +449,12 @@ def tail_eve() -> None:
                     except json.JSONDecodeError:
                         continue
 
-                    process_event(event, raw_line)
+                    with publisher_lock:
+                        process_event(publish, event, raw_line)
         except Exception:
             print("ERROR: tail_eve loop exception", flush=True)
             traceback.print_exc()
             time.sleep(0.5)
-
-
-def stream_events() -> Response:
-    ensure_dirs()
-    status = {"ok": False}
-    lines = []
-    max_id = 0
-
-    with db_lock:
-        conn = connect_db()
-        last_id = load_export_offset()
-        rows = conn.execute(
-            f"SELECT id, event_json FROM {TABLE_NAME} WHERE id > ? ORDER BY id",
-            (last_id,),
-        ).fetchall()
-        conn.close()
-
-    for row_id, payload in rows:
-        lines.append(payload.encode("utf-8") + b"\n")
-        if row_id > max_id:
-            max_id = row_id
-
-    def generate():
-        for chunk in lines:
-            yield chunk
-        status["ok"] = True
-
-    resp = Response(stream_with_context(generate()), mimetype="application/x-ndjson")
-
-    @resp.call_on_close
-    def _mark_exported():
-        if not status["ok"] or max_id == 0:
-            return
-        save_export_offset(max_id)
-
-    return resp
 
 
 def start_tail_thread() -> None:
@@ -524,11 +465,6 @@ def start_tail_thread() -> None:
 @app.get("/healthz")
 def healthz():
     return jsonify({"status": "ok", "version": APP_VERSION})
-
-
-@app.get("/export/networksql")
-def export_networksql():
-    return stream_events()
 
 
 if __name__ == "__main__":

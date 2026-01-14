@@ -3,6 +3,7 @@ FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/xinghanxu/mcsm:ubuntu22.
 # 安装基础依赖
 RUN apt-get update && apt-get install -y \
     python3 \
+    python3-pip \
     python3-yaml \
     wget \
     curl \
@@ -22,6 +23,8 @@ COPY filebeat-docker.yml /etc/filebeat/filebeat.yml
 COPY rules/ /app/rules/
 COPY detector.py /app/
 COPY requirements.txt /app/
+
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # 创建必要的目录
 RUN mkdir -p /tmp/filebeat-output /app/output /var/log/host
