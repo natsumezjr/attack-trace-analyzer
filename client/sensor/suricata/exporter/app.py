@@ -4,6 +4,7 @@ import os
 import sqlite3
 import threading
 import time
+import traceback
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -46,6 +47,10 @@ def ensure_dirs() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(STATE_DIR, exist_ok=True)
     os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+    print(
+        f"INFO: init exporter DB_FILE={DB_FILE} TABLE_NAME={TABLE_NAME} EVE_FILE={EVE_FILE}",
+        flush=True,
+    )
     init_db()
 
 
@@ -60,16 +65,19 @@ def connect_db() -> sqlite3.Connection:
 def init_db() -> None:
     with db_lock:
         conn = connect_db()
-        conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_json TEXT NOT NULL
+        try:
+            conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_json TEXT NOT NULL
+                )
+                """
             )
-            """
-        )
-        conn.commit()
-        conn.close()
+            conn.commit()
+            print(f"INFO: ensured table {TABLE_NAME}", flush=True)
+        finally:
+            conn.close()
 
 
 def load_offset() -> Dict[str, Any]:
@@ -383,14 +391,23 @@ def build_dns_tunnel_alert(event: Dict[str, Any], raw_line: str) -> Optional[Dic
 
 def insert_event(payload: Dict[str, Any]) -> None:
     line = json.dumps(payload, ensure_ascii=True)
-    with db_lock:
-        conn = connect_db()
-        conn.execute(
-            f"INSERT INTO {TABLE_NAME} (event_json) VALUES (?)",
-            (line,),
-        )
-        conn.commit()
-        conn.close()
+    max_retries = 6
+    for attempt in range(max_retries):
+        with db_lock:
+            conn = connect_db()
+            try:
+                conn.execute(
+                    f"INSERT INTO {TABLE_NAME} (event_json) VALUES (?)",
+                    (line,),
+                )
+                conn.commit()
+                return
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or attempt == max_retries - 1:
+                    raise
+            finally:
+                conn.close()
+        time.sleep(0.1 * (attempt + 1))
 
 
 def process_event(event: Dict[str, Any], raw_line: str) -> None:
@@ -417,10 +434,15 @@ def tail_eve() -> None:
     state = load_offset()
     offset = int(state.get("offset", 0))
     inode = state.get("inode")
+    last_missing_log = 0.0
 
     while True:
         try:
             if not os.path.exists(EVE_FILE):
+                now = time.time()
+                if now - last_missing_log > 5:
+                    print(f"WARN: EVE file not found: {EVE_FILE}", flush=True)
+                    last_missing_log = now
                 time.sleep(0.5)
                 continue
 
@@ -453,6 +475,8 @@ def tail_eve() -> None:
 
                     process_event(event, raw_line)
         except Exception:
+            print("ERROR: tail_eve loop exception", flush=True)
+            traceback.print_exc()
             time.sleep(0.5)
 
 
@@ -507,9 +531,6 @@ def export_networksql():
     return stream_events()
 
 
-start_tail_thread()
-
 if __name__ == "__main__":
     ensure_dirs()
-    start_tail_thread()
-    app.run(host="0.0.0.0", port=8080)
+    tail_eve()
