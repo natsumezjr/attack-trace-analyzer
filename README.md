@@ -6,11 +6,13 @@
 
 ## 文档导航
 
-- `docs/00-文档索引.md`
-- `docs/10-课程设计要求文档.md`
-- `docs/20-整体需求文档.md`
-- `docs/30-系统规格说明书.md`
-- `docs/冲突汇总.md`
+本仓库的正式文档体系统一在 `new-docs/`：
+
+- 总览入口：`new-docs/README.md`
+- 文档索引：`new-docs/00-总览/00-文档索引.md`
+- 交付打包：`new-docs/10-交付与答辩/11-交付物清单与打包结构.md`
+- 一键启动：`new-docs/90-运维与靶场/92-一键编排.md`
+- 验收与复现：`new-docs/20-需求与验收/21-验收标准与验收用例.md`、`new-docs/20-需求与验收/22-攻击场景与复现剧本.md`
 
 ## 系统概览（中心机侧关键机制）
 
@@ -28,8 +30,7 @@
 ### 前置
 
 - Docker & Docker Compose
-- Node.js 18+
-- Go 1.21+
+- Node.js 18+（前端）
 - Python 3.12+
 - uv
 
@@ -39,7 +40,6 @@
 
 ```bash
 cd backend
-cp .env.example .env
 docker compose up -d
 ```
 
@@ -47,6 +47,14 @@ docker compose up -d
 
 ```bash
 cd backend
+export OPENSEARCH_NODE="https://localhost:9200"
+export OPENSEARCH_USERNAME="admin"
+export OPENSEARCH_PASSWORD="OpenSearch@2024!Dev"
+export OPENSEARCH_URL="https://localhost:9200"
+export OPENSEARCH_USER="admin"
+export NEO4J_URI="bolt://localhost:7687"
+export NEO4J_USER="neo4j"
+export NEO4J_PASSWORD="password"
 uv sync
 uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -76,7 +84,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-若靶机有多网卡/多网段，或需要强制指定 Suricata 的 `HOME_NET`（影响 `$HOME_NET/$EXTERNAL_NET` 方向规则），可在 `client/.env` 里设置：`SURICATA_INTERFACE` / `SURICATA_HOME_NET`（详见 `docs/53-环境变量规范.md`）。
+客户机与中心机的完整部署方式、环境变量与靶场网络规划见：`new-docs/80-规范/89-环境变量与配置规范.md`、`new-docs/90-运维与靶场/`。
 
 ## 目录结构
 
@@ -85,7 +93,7 @@ docker compose up -d --build
 | `client/` | Docker + RabbitMQ + Go | 客户机侧采集/转换/缓冲与对外拉取接口 |
 | `backend/` | Python FastAPI + uv | 中心机后端：流水线调度、OpenSearch/Neo4j/Analysis 模块与 API |
 | `frontend/` | Next.js + TypeScript | 中心机前端：可视化与报告导出 |
-| `docs/` | Markdown | 规格与规范（权威口径） |
+| `new-docs/` | Markdown | 课程交付文档体系（唯一正式文档） |
 
 ## 测试
 
@@ -93,5 +101,6 @@ docker compose up -d --build
 
 ```bash
 cd backend
-uv run pytest
+RUN_NEO4J_TESTS=0 uv run pytest -q
+RUN_OPENSEARCH_TESTS=1 RUN_NEO4J_TESTS=1 KEEP_NEO4J_TEST_DATA=0 uv run pytest -q
 ```
