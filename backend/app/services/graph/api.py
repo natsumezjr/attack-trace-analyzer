@@ -303,9 +303,39 @@ def get_edges_in_window(
     *,
     t_min: float,
     t_max: float,
+    allowed_reltypes: Optional[Sequence[str]] = None,
+    only_alarm: bool = False,
 ) -> List[GraphEdge]:
-    """Fetch edges with numeric timestamp within [t_min, t_max]."""
-    pass
+    """查询一个时间窗口内的所有边（可选关系类型/告警过滤）"""
+    with _get_session() as session:
+        rows = _execute_read(
+            session,
+            _fetch_edges_in_window,
+            float(t_min),
+            float(t_max),
+            allowed_reltypes,
+            only_alarm,
+        )
+
+    edges: List[GraphEdge] = []
+    for row in rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(
+            GraphEdge(
+                src_uid=src_uid,
+                dst_uid=dst_uid,
+                rtype=rtype,
+                props=dict(row["rprops"]),
+            )
+        )
+    return edges
 
 
 def _fetch_edges_in_window(
