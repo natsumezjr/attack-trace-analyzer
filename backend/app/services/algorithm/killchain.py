@@ -475,6 +475,7 @@ def _get_edges_inter_nodes(
     
     注意：max_hops 和 k 参数在此函数中不使用，因为路径枚举由调用方处理。
     本函数只负责获取 src_anchor 和 dst_anchor 之间的边池。
+    我们认为，直接使用 get_edges_in_window 即可，按照时间顺序增长即为所有边。
     """
     # 使用底层 API 查询两个节点之间的边
     # graph_api.get_edges_inter_nodes 接受节点列表，查询这些节点之间的边
@@ -1125,7 +1126,16 @@ def run_killchain_pipeline(
 
 
 if __name__ == "__main__":
-    kcs = run_killchain_pipeline(persist=False)
+    # 示例：使用 LLM client（如果配置了 OPENAI_API_KEY 环境变量）
+    # 否则自动回退到 MockChooser
+    try:
+        from .killchain_llm import create_llm_client
+        llm_client = create_llm_client()
+    except Exception as e:
+        print(f"[killchain] 无法创建 LLM client: {e}，使用 fallback")
+        llm_client = None
+
+    kcs = run_killchain_pipeline(llm_client=llm_client, persist=False)
     print(f"[killchain] produced killchains: {len(kcs)}")
     for i, kc in enumerate(kcs[:3]):
         print(f"--- kc #{i} ---")
