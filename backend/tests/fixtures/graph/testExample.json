@@ -311,7 +311,7 @@
         "info"
       ],
       "action": "dns_tunnel_suspected",
-      "dataset": "finding.raw",
+      "dataset": "finding.raw.security_analytics",
       "severity": 70
     },
     "host": {

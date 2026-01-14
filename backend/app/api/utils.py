@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.core.time import format_rfc3339, utc_now as core_utc_now
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return core_utc_now()
 
 
 def utc_now_rfc3339() -> str:
     # Go client uses time.RFC3339Nano; Python only supports microseconds.
-    return utc_now().isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return format_rfc3339(utc_now(), timespec="microseconds")
 
 
 def ok(**data: object) -> dict[str, object]:
@@ -24,4 +26,3 @@ def err(code: str, message: str) -> dict[str, object]:
             "message": message,
         },
     }
-

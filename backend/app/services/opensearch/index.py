@@ -1,7 +1,7 @@
 # OpenSearch 索引管理相关功能
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from .client import ensure_index
@@ -30,7 +30,7 @@ def get_index_name(pattern: str, date: Optional[datetime] = None) -> str:
     - 新格式（正确）：ecs-events-2026-01-13（连字符，doc-level monitor接受）
     """
     if date is None:
-        date = datetime.now()
+        date = datetime.now(timezone.utc)
     # 使用连字符而非点号，避免doc-level monitor的pattern检测问题
     date_str = date.strftime("%Y-%m-%d")
     return f"{pattern}-{date_str}"
@@ -43,7 +43,7 @@ def hash_token(token: str) -> str:
 
 def initialize_indices() -> None:
     """初始化所有需要的索引"""
-    today = datetime.now()
+    today = datetime.now(timezone.utc)
 
     # 创建今日索引
     ensure_index(
