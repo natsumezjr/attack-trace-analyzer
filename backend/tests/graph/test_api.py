@@ -7,7 +7,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from app.services.neo4j import api as graph_api
+from app.services.neo4j import db as graph_db
 from app.services.neo4j.models import RelType
 
 
@@ -49,10 +49,10 @@ def test_get_edges_in_window_maps_rows_to_edges(monkeypatch: pytest.MonkeyPatch)
     def fake_execute_read(session, func, t_min, t_max, allowed_reltypes, only_alarm):
         return rows
 
-    monkeypatch.setattr(graph_api, "_get_session", lambda: _dummy_session())
-    monkeypatch.setattr(graph_api, "_execute_read", fake_execute_read)
+    monkeypatch.setattr(graph_db, "_get_session", lambda: _dummy_session())
+    monkeypatch.setattr(graph_db, "_execute_read", fake_execute_read)
 
-    edges = graph_api.get_edges_in_window(t_min=0.0, t_max=9999999999.0)
+    edges = graph_db.get_edges_in_window(t_min=0.0, t_max=9999999999.0)
 
     # 不依赖顺序：按 event.id 建索引，验证特定边的类型与端点映射。
     by_event_id = {
@@ -94,10 +94,10 @@ def test_get_edges_in_window_forwards_filters(monkeypatch: pytest.MonkeyPatch) -
         captured["only_alarm"] = only_alarm
         return rows
 
-    monkeypatch.setattr(graph_api, "_get_session", lambda: _dummy_session())
-    monkeypatch.setattr(graph_api, "_execute_read", fake_execute_read)
+    monkeypatch.setattr(graph_db, "_get_session", lambda: _dummy_session())
+    monkeypatch.setattr(graph_db, "_execute_read", fake_execute_read)
 
-    edges = graph_api.get_edges_in_window(
+    edges = graph_db.get_edges_in_window(
         t_min=10.0,
         t_max=20.0,
         allowed_reltypes=["NET_CONNECT"],

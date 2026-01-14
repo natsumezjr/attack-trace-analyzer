@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 
-from app.services.neo4j import api as graph_api
+from app.services.neo4j import db as graph_db
+from app.services.neo4j import ingest as graph_ingest
 
 
 def _fixtures_dir() -> Path:
@@ -82,7 +83,7 @@ def _canonical_event_ids(events: list[dict[str, Any]]) -> set[str]:
 def _delete_edges_by_event_ids(event_ids: list[str]) -> None:
     if not event_ids:
         return
-    with graph_api._get_session() as session:
+    with graph_db._get_session() as session:
         session.run(
             "MATCH ()-[r]->() WHERE r.`event.id` IN $ids DELETE r",
             ids=event_ids,
@@ -113,7 +114,7 @@ def _delete_nodes_by_host_and_user(
 ) -> None:
     if not host_ids and not user_ids:
         return
-    with graph_api._get_session() as session:
+    with graph_db._get_session() as session:
         if user_ids:
             session.run(
                 "MATCH (n:User) WHERE n.`user.id` IN $user_ids DETACH DELETE n",
@@ -162,10 +163,10 @@ def test_ingest_fixture_events_into_neo4j() -> None:
     _delete_nodes_by_host_and_user(host_ids, user_ids)
 
     try:
-        _, edge_count = graph_api.ingest_ecs_events(events)
+        _, edge_count = graph_ingest.ingest_ecs_events(events)
         assert edge_count > 0
 
-        with graph_api._get_session() as session:
+        with graph_db._get_session() as session:
             records = list(
                 session.run(
                     "MATCH ()-[r]->() "
@@ -183,4 +184,4 @@ def test_ingest_fixture_events_into_neo4j() -> None:
         if not keep_data:
             _delete_edges_by_event_ids(eligible_ids)
             _delete_nodes_by_host_and_user(host_ids, user_ids)
-        graph_api.close()
+        graph_db.close()
