@@ -246,7 +246,11 @@ class TestSegmentSummaries:
                 rtype=RelType.LOGON,
                 timestamp="2026-01-12T03:21:10.123Z",
                 event_id="evt-001",
-                **{"event.action": "user_login", "host.name": "victim-01"}
+                **{
+                    "event.action": "user_login",
+                    "host.name": "victim-01",
+                    "threat": {"tactic": {"name": "Initial Access"}}
+                }
             ),
             create_test_edge(
                 src_uid="Process:p-001",
@@ -254,7 +258,10 @@ class TestSegmentSummaries:
                 rtype=RelType.SPAWN,
                 timestamp="2026-01-12T03:21:15.321Z",
                 event_id="evt-002",
-                **{"process.name": "powershell.exe"}
+                **{
+                    "process.name": "powershell.exe",
+                    "threat": {"tactic": {"name": "Execution"}}
+                }
             ),
         ]
         
@@ -277,11 +284,12 @@ class TestSegmentSummaries:
     
     def test_build_segment_summaries_top_n_limit(self):
         """测试 top_n 限制"""
-        # 创建多条边
+        # 创建多条边（需要 attack_tag 才能形成段）
         edges = [
             create_test_edge(
                 timestamp=f"2026-01-12T03:21:{10+i}.000Z",
-                event_id=f"evt-{i:03d}"
+                event_id=f"evt-{i:03d}",
+                **{"threat": {"tactic": {"name": "Execution"}}}
             )
             for i in range(20)
         ]
@@ -485,11 +493,15 @@ class TestPhaseBCandidatePaths:
     def test_connect_fsa_segments_to_candidates_no_path(self, mock_get_edges):
         """测试无路径的情况（应返回 None）"""
         # 创建两个段，但锚点之间无连接
+        # 注意：第一个段的 anchor_out_uid 是 Process:p-001
+        # 第二个段的 anchor_in_uid 是 Host:h-999
+        # 它们之间没有连接，所以应该返回 None
         edges1 = [
             create_test_edge(
                 src_uid="Host:h-001",
                 dst_uid="Process:p-001",
                 timestamp="2026-01-12T03:21:10.123Z",
+                **{"threat": {"tactic": {"name": "Initial Access"}}}
             )
         ]
         edges2 = [
@@ -497,6 +509,7 @@ class TestPhaseBCandidatePaths:
                 src_uid="Host:h-999",  # 不同的节点
                 dst_uid="Process:p-999",
                 timestamp="2026-01-12T03:22:10.123Z",
+                **{"threat": {"tactic": {"name": "Execution"}}}
             )
         ]
         
@@ -505,21 +518,18 @@ class TestPhaseBCandidatePaths:
         nodes1 = [EdgeNode(e) for e in edges1]
         nodes2 = [EdgeNode(e) for e in edges2]
         
-        segments = [
-            StateSegment(
-                state=AttackState.INITIAL_ACCESS,
-                nodes=nodes1,
-            ),
-            StateSegment(
-                state=AttackState.EXECUTION,
-                nodes=nodes2,
-            ),
-        ]
+        # 验证节点状态
+        assert nodes1[0].state == AttackState.INITIAL_ACCESS
+        assert nodes2[0].state == AttackState.EXECUTION
         
         fsa_graph = FSAGraph(
             nodes=nodes1 + nodes2,
             trace=[],
         )
+        
+        # 验证 segments 确实有两个
+        segments = fsa_graph.segments()
+        assert len(segments) == 2, f"Expected 2 segments, got {len(segments)}"
         
         # Mock 返回空边列表（无连接）
         mock_get_edges.return_value = []
@@ -531,8 +541,8 @@ class TestPhaseBCandidatePaths:
             allowed_reltypes=ALLOWED_RELTYPES,
         )
         
-        # 无路径时应返回 None
-        assert result is None
+        # 无路径时应返回 None（因为枚举候选路径失败）
+        assert result is None, f"Expected None when no path found, got {result}"
     
     def test_build_semantic_candidate_subgraphs(self):
         """测试批量构建语义候选子图"""
