@@ -300,28 +300,12 @@ def _fetch_alarm_edges(tx) -> List[Dict[str, Any]]:
 
 # 按时间窗查询边集合（可选关系类型/告警过滤）
 def get_edges_in_window(
+    *,
     t_min: float,
     t_max: float,
-    *,
-    allowed_reltypes: Optional[Sequence[str]] = None,
-    only_alarm: bool = False,
 ) -> List[GraphEdge]:
     """Fetch edges with numeric timestamp within [t_min, t_max]."""
-    with _get_session() as session:
-        rows = _execute_read(session, _fetch_edges_in_window, t_min, t_max, allowed_reltypes, only_alarm)
-
-    edges: List[GraphEdge] = []
-    for row in rows:
-        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
-        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
-        if src_uid is None or dst_uid is None:
-            continue
-        try:
-            rtype = RelType(row["rtype"])
-        except ValueError:
-            continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
-    return edges
+    pass
 
 
 def _fetch_edges_in_window(
@@ -348,6 +332,9 @@ def _fetch_edges_in_window(
         "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
     )
     return list(tx.run(cypher, **params))
+
+
+
 
 
 # 基于 GDS 的时间窗最短路
@@ -805,34 +792,6 @@ def ingest_from_opensearch(
     return total_events, total_nodes, total_edges
 
 
-# 查询一组节点之间的边（用于补全）
-def get_edges_inter_nodes(
-    node_uids: List[str],
-    t_start: float,
-    t_end: float,
-) -> List[GraphEdge]:
-    """Query edges among a set of node uids within a time window.
-
-    Note:
-        - This is used by Phase B graph completion to stitch FSA segments.
-        - It returns directed edges, but callers may treat them as undirected.
-    """
-    if not node_uids or len(node_uids) < 2:
-        return []
-    with _get_session() as session:
-        rows = _execute_read(session, _fetch_edges_inter_nodes, list(node_uids), float(t_start), float(t_end))
-    edges: List[GraphEdge] = []
-    for row in rows:
-        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
-        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
-        if src_uid is None or dst_uid is None:
-            continue
-        try:
-            rtype = RelType(row["rtype"])
-        except ValueError:
-            continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
-    return edges
 
 
 def _fetch_edges_inter_nodes(tx, node_uids: List[str], t_start: float, t_end: float) -> List[Dict[str, Any]]:

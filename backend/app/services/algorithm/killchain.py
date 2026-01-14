@@ -464,6 +464,33 @@ def _build_candidate_from_edges(
     )
 
 
+def _get_edges_inter_nodes(
+    *,
+    t_min: float,
+    t_max: float,
+    allowed_reltypes: Sequence[Any]
+) -> List[GraphEdge]:
+    """
+    查询两个 anchor 节点之间的边（返回边池，由调用方使用 _enumerate_paths_locally_bfs 枚举路径）。
+    
+    注意：max_hops 和 k 参数在此函数中不使用，因为路径枚举由调用方处理。
+    本函数只负责获取 src_anchor 和 dst_anchor 之间的边池。
+    """
+    # 使用底层 API 查询两个节点之间的边
+    # graph_api.get_edges_inter_nodes 接受节点列表，查询这些节点之间的边
+    edges = graph_api.get_edges_in_window(
+        t_min=t_min,
+        t_max=t_max,
+    )
+    
+    # 过滤关系类型（如果底层 API 不支持，则在这里过滤）
+    if allowed_reltypes:
+        allowed = _normalize_reltypes(allowed_reltypes)
+        edges = [e for e in edges if e.rtype.value in allowed]
+    
+    return edges
+
+
 def _coerce_api_result_to_paths(res: Any) -> Optional[List[List[GraphEdge]]]:
     """
     适配 get_edges_inter_nodes 返回值形态：
@@ -617,14 +644,10 @@ def enumerate_candidate_paths_multi_stage(
     if cached is not None:
         return _dedup_paths(cached, limit=MAX_PATHS_PER_PAIR)
 
-    res = graph_api.get_edges_inter_nodes(
-        src_anchor,
-        dst_anchor,
-        t_min,
-        t_max,
-        allowed_reltypes=list(allowed_reltypes),
-        max_hops=max_hops,
-        k=FIRST_K,
+    res = _get_edges_inter_nodes(
+        t_min=t_min,
+        t_max=t_max,
+        allowed_reltypes=allowed_reltypes
     )
 
     # API 可能返回“路径集合”或“边池”
@@ -660,14 +683,10 @@ def enumerate_candidate_paths_multi_stage(
     if cached2 is not None:
         return _dedup_paths(cached2, limit=MAX_PATHS_PER_PAIR)
 
-    res2 = graph_api.get_edges_inter_nodes(
-        src_anchor,
-        dst_anchor,
-        t_min,
-        t_max,
-        allowed_reltypes=list(allowed_reltypes),
-        max_hops=max_hops2,
-        k=SECOND_K,
+    res2 = _get_edges_inter_nodes(
+        t_min=t_min,
+        t_max=t_max,
+        allowed_reltypes=allowed_reltypes
     )
 
     paths2 = _coerce_api_result_to_paths(res2)
@@ -1069,11 +1088,6 @@ def match_vector_features(vectors: Any) -> Any:
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-def fetch_abnormal_edges_from_db() -> List[GraphEdge]:
-    """Phase A 输入：仅拉取 is_alarm=true 的边（由 graph_api 实现）。"""
-    return graph_api.get_alarm_edges()
-
-
 def run_killchain_pipeline(
     *,
     llm_client: Any = None,
@@ -1083,7 +1097,7 @@ def run_killchain_pipeline(
     完整流水线：
       abnormal -> PhaseA(FSA) -> PhaseB(candidate) -> PhaseC(LLM choose) -> persist kc_uuid -> return killchains
     """
-    abnormal = fetch_abnormal_edges_from_db()
+    abnormal = graph_api.get_alarm_edges()
 
     # Phase A
     fsa_graphs = behavior_state_machine(abnormal)
