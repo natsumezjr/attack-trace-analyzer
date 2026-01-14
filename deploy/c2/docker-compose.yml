@@ -1,0 +1,31 @@
+services:
+  c2-dns:
+    image: coredns/coredns:1.11.1
+    container_name: c2-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./coredns/Corefile:/etc/coredns/Corefile:ro
+      - ./coredns/zones:/etc/coredns/zones:ro
+    networks:
+      c2-macvlan:
+        ipv4_address: 10.92.35.50
+    restart: unless-stopped
+
+  c2-http:
+    image: nginx:1.27-alpine
+    container_name: c2-http
+    network_mode: service:c2-dns
+    depends_on:
+      - c2-dns
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+networks:
+  c2-macvlan:
+    driver: macvlan
+    driver_opts:
+      parent: ${C2_PARENT_IFACE:-ens5f1}
+    ipam:
+      config:
+        - subnet: 10.92.35.0/24
