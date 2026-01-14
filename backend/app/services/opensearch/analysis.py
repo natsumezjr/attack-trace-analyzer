@@ -345,6 +345,113 @@ def deduplicate_findings() -> dict[str, Any]:
         raise
 
 
+# ========== ATT&CK Tactic映射表（从technique ID到tactic ID）==========
+
+# ATT&CK Tactic映射表（从technique ID到tactic ID）
+TECHNIQUE_TO_TACTIC_MAP = {
+    # Initial Access (TA0001)
+    "T1078": "TA0001",  # Valid Accounts
+    "T1190": "TA0001",  # Exploit Public-Facing Application
+    # Execution (TA0002)
+    "T1059": "TA0002",  # Command and Scripting Interpreter
+    "T1106": "TA0002",  # Native API
+    # Persistence (TA0003)
+    "T1546": "TA0003",  # Event Triggered Execution
+    "T1547": "TA0003",  # Boot or Logon Autostart Execution
+    "T1133": "TA0003",  # External Remote Services
+    # Privilege Escalation (TA0004)
+    "T1055": "TA0004",  # Process Injection
+    "T1548": "TA0004",  # Abuse Elevation Control Mechanism
+    # Defense Evasion (TA0005)
+    "T1562": "TA0005",  # Impair Defenses
+    "T1070": "TA0005",  # Indicator Removal on Host
+    # Credential Access (TA0006)
+    "T1003": "TA0006",  # OS Credential Dumping
+    "T1110": "TA0006",  # Brute Force
+    # Discovery (TA0007)
+    "T1083": "TA0007",  # File and Directory Discovery
+    "T1018": "TA0007",  # Remote System Discovery
+    # Lateral Movement (TA0008)
+    "T1021": "TA0008",  # Remote Services
+    "T1072": "TA0008",  # Software Deployment Tools
+    # Collection (TA0009)
+    "T1074": "TA0009",  # Data Staged
+    "T1005": "TA0009",  # Data from Local System
+    # Exfiltration (TA0010)
+    "T1041": "TA0010",  # Exfiltration Over C2 Channel
+    "T1020": "TA0010",  # Automated Exfiltration
+    # Command and Control (TA0011)
+    "T1071": "TA0011",  # Application Layer Protocol
+    "T1095": "TA0011",  # Non-Application Layer Protocol
+    # Impact (TA0040)
+    "T1531": "TA0040",  # Account Access Removal
+    "T1565": "TA0040",  # Data Manipulation
+    "T1489": "TA0040",  # Service Stop
+}
+
+# ATT&CK Tactic名称映射
+TACTIC_NAME_TO_ID_MAP = {
+    "initial_access": "TA0001",
+    "execution": "TA0002",
+    "persistence": "TA0003",
+    "privilege_escalation": "TA0004",
+    "defense_evasion": "TA0005",
+    "credential_access": "TA0006",
+    "discovery": "TA0007",
+    "lateral_movement": "TA0008",
+    "collection": "TA0009",
+    "command_and_control": "TA0011",
+    "exfiltration": "TA0010",
+    "impact": "TA0040",
+}
+
+TACTIC_ID_TO_NAME_MAP = {
+    "TA0001": "Initial Access",
+    "TA0002": "Execution",
+    "TA0003": "Persistence",
+    "TA0004": "Privilege Escalation",
+    "TA0005": "Defense Evasion",
+    "TA0006": "Credential Access",
+    "TA0007": "Discovery",
+    "TA0008": "Lateral Movement",
+    "TA0009": "Collection",
+    "TA0010": "Exfiltration",
+    "TA0011": "Command and Control",
+    "TA0040": "Impact",
+}
+
+
+def _get_tactic_from_technique(technique_id: str) -> str:
+    """从technique ID推断tactic ID"""
+    # 先尝试完整ID（如T1546.013）
+    if technique_id in TECHNIQUE_TO_TACTIC_MAP:
+        return TECHNIQUE_TO_TACTIC_MAP[technique_id]
+    
+    # 尝试基础ID（如T1546）
+    base_id = technique_id.split('.')[0] if '.' in technique_id else technique_id
+    if base_id in TECHNIQUE_TO_TACTIC_MAP:
+        return TECHNIQUE_TO_TACTIC_MAP[base_id]
+    
+    # 如果映射表中没有，根据technique ID的前缀推断（简化版）
+    # T1546属于Persistence (TA0003)
+    if base_id.startswith('T1546'):
+        return "TA0003"  # Persistence
+    
+    return "TA0000"
+
+
+def _get_tactic_id_from_name(tactic_name: str) -> str:
+    """从tactic名称获取tactic ID"""
+    return TACTIC_NAME_TO_ID_MAP.get(tactic_name.lower(), "TA0000")
+
+
+def _get_tactic_name(tactic_id: str) -> str:
+    """从tactic ID获取tactic名称"""
+    return TACTIC_ID_TO_NAME_MAP.get(tactic_id, "Unknown")
+
+
+# ========== 威胁信息提取改进 ==========
+
 def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[str, Any]:
     """
     将 Security Analytics 的 finding 转换为 ECS 格式的 Finding
@@ -377,40 +484,83 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
             "version": "1.0",
         }
     
-    # 提取威胁信息（如果有）
-    threat_info = {}
+    # 提取tactic信息（优先从queries中的tags提取）
+    tactic_id = None
+    tactic_name = None
+    technique_id = None
+    
+    # 方法1：从finding的tags字段提取（如果Security Analytics传递了tags）
     tags = finding.get('tags', [])
     for tag in tags:
-        # 尝试从标签中提取 ATT&CK 信息
         if isinstance(tag, str) and tag.startswith('attack.'):
             parts = tag.split('.')
-            if len(parts) >= 3:
-                tactic_id = parts[1] if parts[1].startswith('TA') else None
-                technique_id = parts[2] if parts[2].startswith('T') else None
-                if technique_id:
-                    threat_info = {
-                        "tactic": {
-                            "id": tactic_id or "TA0000",
-                            "name": "Unknown"
-                        },
-                        "technique": {
-                            "id": technique_id,
-                            "name": "Security Analytics Detection"
-                        }
-                    }
+            if len(parts) >= 2:
+                # 格式: attack.credential_access (tactic名称)
+                tactic_name_from_tag = parts[1]
+                tactic_id = _get_tactic_id_from_name(tactic_name_from_tag)
+                if tactic_id and tactic_id != "TA0000":
+                    tactic_name = _get_tactic_name(tactic_id)
                     break
     
-    # 如果没有从标签提取到，使用默认值
-    if not threat_info:
-        threat_info = {
-            "tactic": {
-                "id": "TA0000",
-                "name": "Unknown"
-            },
-            "technique": {
-                "id": "T0000",
-                "name": "Security Analytics Detection"
-            }
+    # 方法2：从queries[0].tags中提取（优先从technique ID映射到tactic）
+    if not tactic_id and queries:
+        first_query = queries[0]
+        query_tags = first_query.get('tags', [])
+        
+        # 优先查找technique ID（如attack.t1546.013），从technique映射到tactic
+        technique_tags = []
+        tactic_name_tags = []
+        
+        for tag in query_tags:
+            if isinstance(tag, str) and tag.startswith('attack.'):
+                parts = tag.split('.')
+                if len(parts) >= 2:
+                    tag_value = parts[1]
+                    
+                    # 检查是否是technique ID（如attack.t1546.013）
+                    if tag_value.startswith('t') and len(tag_value) > 1:
+                        technique_tags.append(tag_value)
+                    # 检查是否是tactic ID（如attack.ta0001）- 这些应该忽略，因为不是technique
+                    elif tag_value.startswith('ta') and len(tag_value) > 2:
+                        # 这是tactic ID标签，跳过（因为我们需要从technique映射到tactic）
+                        continue
+                    else:
+                        # 可能是tactic名称（如attack.credential_access）
+                        # 但优先使用technique映射，所以先收集起来
+                        tactic_name_tags.append(tag_value)
+        
+        # 优先处理technique ID，从technique映射到tactic
+        for tag_value in technique_tags:
+            # 提取technique ID（如T1546.013）
+            technique_id_candidate = 'T' + tag_value[1:] if tag_value[0] == 't' else tag_value.upper()
+            # 从映射表获取tactic
+            tactic_id = _get_tactic_from_technique(technique_id_candidate)
+            if tactic_id and tactic_id != "TA0000":
+                tactic_name = _get_tactic_name(tactic_id)
+                technique_id = technique_id_candidate
+                break
+        
+        # 如果没有找到technique，才使用tactic名称（作为后备）
+        if not tactic_id and tactic_name_tags:
+            for tag_value in tactic_name_tags:
+                tactic_id = _get_tactic_id_from_name(tag_value)
+                if tactic_id and tactic_id != "TA0000":
+                    tactic_name = _get_tactic_name(tactic_id)
+                    break
+    
+    # 构建threat信息
+    threat_info = {
+        "tactic": {
+            "id": tactic_id or "TA0000",
+            "name": tactic_name or "Unknown"
+        }
+    }
+    
+    # 如果有technique ID，也添加到threat_info
+    if technique_id:
+        threat_info["technique"] = {
+            "id": technique_id,
+            "name": "Security Analytics Detection"
         }
     
     # 提取文档信息（原始事件）
@@ -551,19 +701,19 @@ def _get_workflow_id_for_detector(client, detector_id: str) -> Optional[str]:
                 hit_id = hit.get('_id') if '_id' in hit else hit.get('id')
                 print(f"[DEBUG] Monitor {i+1}: id={hit_id}, name={source.get('name')}, type={source.get('type')}, monitor_type={source.get('monitor_type')}, owner={source.get('owner')}")
         
-        # 查询workflow：兼容keyword/text字段，使用should+minimum_should_match
-        # 注意：workflow的type=workflow，monitor_type可能是None或composite
+        # 查询workflow：兼容keyword/text字段
+        # 注意：workflow的type=workflow，monitor_type可能是None（不是composite）
+        # 所以只查询type和owner，不查询monitor_type
         workflow_query = {
             "query": {
                 "bool": {
-                    "filter": [
+                    "must": [
                         {
                             "bool": {
                                 "should": [
-                                    {"term": {"type.keyword": "workflow"}},  # 优先用keyword
-                                    {"match": {"type": "workflow"}},  # fallback到match
-                                    {"term": {"monitor_type.keyword": "composite"}},
-                                    {"match": {"monitor_type": "composite"}}
+                                    {"term": {"type": "workflow"}},  # 先尝试非keyword
+                                    {"term": {"type.keyword": "workflow"}},  # 再尝试keyword
+                                    {"match": {"type": "workflow"}}  # 最后用match
                                 ],
                                 "minimum_should_match": 1
                             }
@@ -571,8 +721,9 @@ def _get_workflow_id_for_detector(client, detector_id: str) -> Optional[str]:
                         {
                             "bool": {
                                 "should": [
-                                    {"term": {"owner.keyword": "security_analytics"}},
-                                    {"match": {"owner": "security_analytics"}}
+                                    {"term": {"owner": "security_analytics"}},  # 先尝试非keyword
+                                    {"term": {"owner.keyword": "security_analytics"}},  # 再尝试keyword
+                                    {"match": {"owner": "security_analytics"}}  # 最后用match
                                 ],
                                 "minimum_should_match": 1
                             }
@@ -592,57 +743,19 @@ def _get_workflow_id_for_detector(client, detector_id: str) -> Optional[str]:
         
         hits = workflow_resp.get('hits', {}).get('hits', [])
         
-        # 如果严格查询没结果，尝试更宽松的查询：只匹配type=workflow和owner=security_analytics
+        # 如果严格查询没结果，直接从所有monitors中筛选（fallback）
+        # 这可能是因为字段映射问题（type/owner字段可能是text类型，term查询需要精确匹配）
         if not hits:
-            print(f"[DEBUG] 严格查询无结果，尝试更宽松的查询（只匹配type=workflow和owner）...")
-            # 尝试多种查询方式：term/match，keyword/非keyword
-            relaxed_query = {
-                "query": {
-                    "bool": {
-                        "must": [
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"term": {"type": "workflow"}},  # 先尝试非keyword
-                                        {"term": {"type.keyword": "workflow"}},  # 再尝试keyword
-                                        {"match": {"type": "workflow"}}  # 最后用match
-                                    ],
-                                    "minimum_should_match": 1
-                                }
-                            },
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"term": {"owner": "security_analytics"}},  # 先尝试非keyword
-                                        {"term": {"owner.keyword": "security_analytics"}},  # 再尝试keyword
-                                        {"match": {"owner": "security_analytics"}}  # 最后用match
-                                    ],
-                                    "minimum_should_match": 1
-                                }
-                            }
-                        ]
-                    }
-                },
-                "size": 50
-            }
-            workflow_resp = client.transport.perform_request(
-                'POST',
-                ALERTING_MONITORS_SEARCH_API,
-                body=relaxed_query
-            )
-            hits = workflow_resp.get('hits', {}).get('hits', [])
-            
-            # 如果还是没结果，直接从所有monitors中筛选（fallback）
-            if not hits:
-                print(f"[DEBUG] 宽松查询也无结果，直接从所有monitors中筛选workflow...")
-                for hit in all_hits:
-                    source = hit.get('_source', {}) if '_source' in hit else hit
-                    hit_type = source.get('type')
-                    hit_owner = source.get('owner')
-                    if hit_type == 'workflow' and hit_owner == 'security_analytics':
-                        print(f"[DEBUG] 从所有monitors中找到workflow: {hit.get('_id')}")
-                        hits = [hit]
-                        break
+            print(f"[DEBUG] 严格查询无结果，直接从所有monitors中筛选workflow...")
+            print(f"[DEBUG] 可能原因：字段映射问题（type/owner可能是text类型，term查询需要精确匹配）")
+            for hit in all_hits:
+                source = hit.get('_source', {}) if '_source' in hit else hit
+                hit_type = source.get('type')
+                hit_owner = source.get('owner')
+                if hit_type == 'workflow' and hit_owner == 'security_analytics':
+                    print(f"[DEBUG] 从所有monitors中找到workflow: {hit.get('_id')}")
+                    hits = [hit]
+                    break
         
         print(f"[DEBUG] monitors搜索API（workflow查询）返回了 {len(hits)} 个结果")
         if hits:
@@ -975,36 +1088,11 @@ def _temporarily_shorten_schedule(client, detector_id: str, detector: dict) -> t
             print(f"[WARNING] 设置临时schedule失败: {e}")
             return original_schedule, False
     
-    # 如果schedule已经是分钟级别，通过临时禁用再启用来强制触发
+    # 如果schedule已经是分钟级别，说明schedule已经较短，无需修改
+    # 直接返回，让轮询逻辑等待自动扫描
     if original_unit == 'MINUTES':
-        print(f"[INFO] Schedule已较短，通过禁用再启用来强制触发扫描...")
-        try:
-            cleaned_detector = _clean_detector_for_update(detector)
-            
-            # 临时禁用
-            cleaned_detector_disabled = cleaned_detector.copy()
-            cleaned_detector_disabled['enabled'] = False
-            client.transport.perform_request(
-                'PUT',
-                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                body=cleaned_detector_disabled
-            )
-            import time
-            time.sleep(1)  # 等待1秒确保禁用生效
-            
-            # 重新启用（这会触发一次扫描）
-            cleaned_detector_enabled = cleaned_detector.copy()
-            cleaned_detector_enabled['enabled'] = True
-            client.transport.perform_request(
-                'PUT',
-                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                body=cleaned_detector_enabled
-            )
-            print(f"[INFO] Detector已重新启用，应触发扫描")
-            return original_schedule, True
-        except Exception as e:
-            print(f"[WARNING] 强制触发扫描失败: {e}")
-            return original_schedule, False
+        print(f"[INFO] Schedule已较短（{original_interval}分钟），等待自动扫描...")
+        return original_schedule, False
     
     return original_schedule, False
 
@@ -1050,11 +1138,15 @@ def _poll_for_scan_completion(
     max_wait_seconds: int
 ) -> tuple[bool, int]:
     """
-    轮询确认扫描完成（通过时间戳判断，更准确）
+    轮询确认扫描完成（优先检查findings数量变化）
+    
+    核心策略：
+    - 优先检查findings数量是否增加（最可靠）
+    - 即使超时返回False，后续仍会查询findings（因为扫描可能已完成，只是轮询未及时检测到）
     
     参数：
-    - baseline_timestamp_ms: 基准时间戳（毫秒），新findings的时间戳应该大于此值
-    - baseline_count: 基准数量，用于fallback判断
+    - baseline_timestamp_ms: 基准时间戳（毫秒），用于辅助判断
+    - baseline_count: 基准数量，主要判断依据
     
     返回: (scan_completed, scan_wait_ms)
     """
@@ -1066,27 +1158,28 @@ def _poll_for_scan_completion(
     while (time.time() - start_time) < max_wait_seconds:
         time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
         
-        # 优先使用时间戳判断（更准确）
-        current_timestamp_ms, current_count = _get_latest_findings_timestamp(client, detector_id)
+        # 优先检查findings数量变化（最可靠）
+        current_count = _get_latest_findings_count(client, detector_id)
         
-        # 如果有新时间戳且大于基准时间戳，说明有新findings
-        if baseline_timestamp_ms > 0 and current_timestamp_ms > baseline_timestamp_ms:
-            scan_wait_ms = int((time.time() - start_time) * 1000)
-            print(f"[INFO] 扫描完成！发现新findings（时间戳: {baseline_timestamp_ms} -> {current_timestamp_ms}）")
-            return True, scan_wait_ms
-        
-        # Fallback: 如果时间戳判断不可用，使用数量判断
-        if baseline_timestamp_ms == 0 and current_count > baseline_count:
+        if current_count > baseline_count:
             scan_wait_ms = int((time.time() - start_time) * 1000)
             print(f"[INFO] 扫描完成！Findings更新: {baseline_count} -> {current_count}")
             return True, scan_wait_ms
+        
+        # 辅助检查：如果有时间戳信息，也检查时间戳变化
+        if baseline_timestamp_ms > 0:
+            current_timestamp_ms, _ = _get_latest_findings_timestamp(client, detector_id)
+            if current_timestamp_ms > baseline_timestamp_ms:
+                scan_wait_ms = int((time.time() - start_time) * 1000)
+                print(f"[INFO] 扫描完成！发现新findings（时间戳: {baseline_timestamp_ms} -> {current_timestamp_ms}）")
+                return True, scan_wait_ms
         
         elapsed = int(time.time() - start_time)
         if elapsed % 10 == 0:
             print(f"[INFO] 等待扫描完成... ({elapsed}/{max_wait_seconds}秒)")
     
     scan_wait_ms = int((time.time() - start_time) * 1000)
-    print(f"[WARNING] 扫描超时（{scan_wait_ms}ms），可能未完成")
+    print(f"[WARNING] 扫描超时（{scan_wait_ms}ms），可能未完成，但仍会查询findings")
     return False, scan_wait_ms
 
 
@@ -1183,15 +1276,21 @@ def _trigger_scan_with_lock(
                     )
                     source = "triggered_scan_schedule" if scan_completed else "cached_findings"
                 else:
-                    # schedule较短或强制触发失败，等待一个扫描周期
-                    print("[INFO] Detector schedule较短或强制触发失败，等待自动扫描...")
+                    # schedule较短，等待一个扫描周期后轮询
+                    print("[INFO] Detector schedule较短，等待自动扫描...")
                     # 等待一个扫描周期（至少30秒）
                     wait_seconds = max(DEFAULT_POLL_INTERVAL_SECONDS, 30)
                     time.sleep(wait_seconds)
-                    # 轮询确认是否有新findings
-                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
-                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds - wait_seconds
-                    )
+                    # 轮询确认是否有新findings（即使超时也会继续查询findings）
+                    remaining_wait = max_wait_seconds - wait_seconds
+                    if remaining_wait > 0:
+                        scan_completed, scan_wait_ms = _poll_for_scan_completion(
+                            client, detector_id, baseline_timestamp_ms, baseline_count, remaining_wait
+                        )
+                    else:
+                        # 如果等待时间已用完，直接标记为未完成，但仍会查询findings
+                        scan_completed = False
+                        scan_wait_ms = wait_seconds * 1000
                     source = "triggered_scan_schedule" if scan_completed else "cached_findings"
         
         return {
@@ -1561,6 +1660,8 @@ def run_security_analytics(
                 print(f"[WARNING] 无法获取detector详情，跳过触发")
         
         # 步骤5: 查询并存储findings（增量处理，自动跳过已处理的）
+        # 重要：即使扫描超时（scan_completed=False），也要查询findings
+        # 因为扫描可能已完成，只是轮询未及时检测到
         storage_result = _fetch_and_store_findings(client, detector_id, only_new=True)
         
         return {
@@ -1594,16 +1695,149 @@ def run_security_analytics(
         }
 
 
+def _check_and_setup_rules_detectors() -> bool:
+    """
+    检查规则和detector，如果没有则提示用户手动导入和创建
+    
+    返回：
+    - True: 规则和detector已就绪
+    - False: 缺少规则或detector
+    """
+    client = get_client()
+    
+    try:
+        # 1. 检查是否有规则
+        rules_resp = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/rules/_search',
+            body={"query": {"match_all": {}}, "size": 1}
+        )
+        rules_total = rules_resp.get('hits', {}).get('total', {}).get('value', 0)
+        
+        # 2. 检查是否有detector
+        detectors_resp = client.transport.perform_request(
+            'POST',
+            '/_plugins/_security_analytics/detectors/_search',
+            body={"query": {"match_all": {}}, "size": 1}
+        )
+        detectors_total = detectors_resp.get('hits', {}).get('total', {}).get('value', 0)
+        
+        # 如果规则和detector都存在，直接返回
+        if rules_total > 0 and detectors_total > 0:
+            print(f"[INFO] 规则和detector已就绪（规则: {rules_total}, Detector: {detectors_total}）")
+            return True
+        
+        # 如果没有规则或detector，提示用户
+        print(f"\n[WARNING] 检测到规则或detector缺失:")
+        print(f"  规则数量: {rules_total}")
+        print(f"  Detector数量: {detectors_total}")
+        
+        if rules_total == 0:
+            print(f"\n[INFO] 需要导入规则，请运行:")
+            print(f"  cd backend/app/services/opensearch/scripts")
+            print(f"  uv run python import_sigma_rules.py --auto")
+        
+        if detectors_total == 0:
+            print(f"\n[INFO] 需要创建detector，请运行:")
+            print(f"  cd backend/app/services/opensearch/scripts")
+            print(f"  uv run python setup_security_analytics.py --multiple")
+        
+        # 尝试自动调用脚本（如果scripts目录存在）
+        import sys
+        import os
+        import subprocess
+        from pathlib import Path
+        
+        scripts_dir = Path(__file__).parent / "scripts"
+        if scripts_dir.exists():
+            print(f"\n[INFO] 尝试自动导入规则和创建detector...")
+            
+            try:
+                # 如果没有规则，先导入规则
+                if rules_total == 0:
+                    print("[INFO] 正在导入Sigma规则...")
+                    env = os.environ.copy()
+                    env['PYTHONIOENCODING'] = 'utf-8'
+                    result = subprocess.run(
+                        [sys.executable, str(scripts_dir / "import_sigma_rules.py"), "--auto"],
+                        cwd=str(scripts_dir),
+                        capture_output=False,
+                        timeout=300,  # 5分钟超时
+                        env=env
+                    )
+                    if result.returncode == 0:
+                        print("[OK] 规则导入成功")
+                    else:
+                        print("[WARNING] 规则导入可能失败，请检查输出")
+                
+                # 如果没有detector，创建detector
+                if detectors_total == 0:
+                    print("[INFO] 正在创建detector...")
+                    env = os.environ.copy()
+                    env['PYTHONIOENCODING'] = 'utf-8'
+                    result = subprocess.run(
+                        [sys.executable, str(scripts_dir / "setup_security_analytics.py"), "--multiple"],
+                        cwd=str(scripts_dir),
+                        capture_output=False,
+                        timeout=300,  # 5分钟超时
+                        env=env
+                    )
+                    if result.returncode == 0:
+                        print("[OK] Detector创建成功")
+                    else:
+                        print("[WARNING] Detector创建可能失败，请检查输出")
+                
+                # 再次检查
+                rules_resp = client.transport.perform_request(
+                    'POST',
+                    '/_plugins/_security_analytics/rules/_search',
+                    body={"query": {"match_all": {}}, "size": 1}
+                )
+                rules_total_after = rules_resp.get('hits', {}).get('total', {}).get('value', 0)
+                
+                detectors_resp = client.transport.perform_request(
+                    'POST',
+                    '/_plugins/_security_analytics/detectors/_search',
+                    body={"query": {"match_all": {}}, "size": 1}
+                )
+                detectors_total_after = detectors_resp.get('hits', {}).get('total', {}).get('value', 0)
+                
+                if rules_total_after > 0 and detectors_total_after > 0:
+                    print(f"[OK] 规则和detector设置完成（规则: {rules_total_after}, Detector: {detectors_total_after}）")
+                    return True
+                else:
+                    print(f"[WARNING] 自动设置后仍缺少规则或detector")
+                    return False
+                    
+            except subprocess.TimeoutExpired:
+                print(f"[WARNING] 自动设置超时，请手动运行上述命令")
+                return False
+            except Exception as e:
+                print(f"[WARNING] 自动设置失败: {e}")
+                print(f"[WARNING] 请手动运行上述命令")
+                return False
+        else:
+            return False
+            
+    except Exception as e:
+        print(f"[WARNING] 检查规则和detector失败: {e}")
+        return False
+
+
 def run_data_analysis(trigger_scan: bool = True, force_scan: bool = False) -> dict[str, Any]:
     """
     数据分析主函数
-    1. 运行 Security Analytics 检测（按需触发）
-    2. 告警融合去重（Raw → Canonical）
+    1. 检查规则和detector（如果没有则自动导入和创建）
+    2. 运行 Security Analytics 检测（按需触发）
+    3. 告警融合去重（Raw → Canonical）
     
     参数：
     - trigger_scan: 是否允许触发Security Analytics扫描（默认True，按需触发模式）
     - force_scan: 是否强制触发一次扫描（默认False）
     """
+    # Step 0: 检查规则和detector
+    _check_and_setup_rules_detectors()
+    
     # Step 1: 运行 Security Analytics 检测（按需触发）
     detection_result = run_security_analytics(trigger_scan=trigger_scan, force_scan=force_scan)
 
