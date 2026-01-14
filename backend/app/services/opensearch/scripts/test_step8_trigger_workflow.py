@@ -89,7 +89,7 @@ if __name__ == '__main__':
         print("  Security Analytics detector 存在，但没有找到对应的workflow")
         print("  这可能是因为:")
         print("    1. Detector创建时没有自动创建workflow")
-        print("    2. 可以使用 run_security_analytics(trigger_scan=True) 触发扫描")
+        print("    2. 可以使用 run_security_analytics(force_scan=True) 触发扫描")
         print("      它会fallback到临时改schedule的方式")
         print("\n跳过workflow手动触发测试，直接测试完整流程...")
         print("=" * 60)

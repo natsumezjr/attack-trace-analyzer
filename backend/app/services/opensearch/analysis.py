@@ -1433,7 +1433,11 @@ def _fetch_and_store_findings(client, detector_id: str, only_new: bool = True) -
     }
 
 
-def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60) -> dict[str, Any]:
+def run_security_analytics(
+    trigger_scan: bool = True,
+    max_wait_seconds: int = 60,
+    force_scan: bool = False,
+) -> dict[str, Any]:
     """
     运行 OpenSearch Security Analytics 检测并读取结果写入 raw-findings-*
     
@@ -1446,8 +1450,9 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
     6. **增量处理**：自动跳过已处理的findings，只处理新的（基于时间戳）
     
     参数：
-    - trigger_scan: 是否允许触发新扫描（默认True）
+    - trigger_scan: 是否允许触发新扫描（默认True，按需触发）
     - max_wait_seconds: 触发扫描后的最大等待时间（默认60秒）
+    - force_scan: 是否强制触发一次扫描（默认False）。当你明确需要“立刻触发”时使用。
     
     返回：
     - success: 是否成功
@@ -1457,7 +1462,7 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
     - scan_requested: 是否请求了新扫描
     - scan_completed: 扫描是否完成（通过轮询确认）
     - scan_wait_ms: 实际等待时间（毫秒）
-    - source: "fresh_scan" | "cached_findings" | "no_findings"
+    - source: "triggered_scan_execute" | "triggered_scan_schedule" | "cached_findings" | "no_findings"
     
     增量处理说明：
     - 函数会自动查询raw-findings索引中该detector的最新finding时间戳
@@ -1497,29 +1502,25 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
                 print(f"[INFO] 最新finding时间戳: {baseline_timestamp_ms}（{findings_age_minutes:.1f}分钟前）")
         
         # 步骤3: 判断是否需要触发新扫描
-        # 如果trigger_scan=True，强制触发（不管findings是否存在或新旧）
-        # 如果trigger_scan=False，只在没有findings或findings过旧（>5分钟）时触发
         need_trigger = False
-        if trigger_scan:
-            if baseline_count == 0:
-                print(f"[INFO] 没有findings，需要触发新扫描")
-                need_trigger = True
-            elif findings_age_minutes and findings_age_minutes > 5:
-                print(f"[INFO] Findings过旧（{findings_age_minutes:.1f}分钟前），需要触发新扫描")
-                need_trigger = True
-            else:
-                # trigger_scan=True 时，即使findings较新也强制触发
-                print(f"[INFO] 强制触发新扫描（trigger_scan=True）")
-                need_trigger = True
+        if not trigger_scan:
+            print("[INFO] trigger_scan=False，跳过触发扫描，仅使用已有findings（如有）")
+            need_trigger = False
+        elif force_scan:
+            print("[INFO] force_scan=True，强制触发一次新扫描")
+            need_trigger = True
         else:
             if baseline_count == 0:
-                print(f"[INFO] 没有findings，需要触发新扫描")
+                print("[INFO] 没有findings，需要触发新扫描")
                 need_trigger = True
-            elif findings_age_minutes and findings_age_minutes > 5:
+            elif findings_age_minutes is not None and findings_age_minutes > 5:
                 print(f"[INFO] Findings过旧（{findings_age_minutes:.1f}分钟前），需要触发新扫描")
                 need_trigger = True
             else:
-                print(f"[INFO] Findings较新（{findings_age_minutes:.1f}分钟前），使用已有findings")
+                if findings_age_minutes is not None:
+                    print(f"[INFO] Findings较新（{findings_age_minutes:.1f}分钟前），使用已有findings")
+                else:
+                    print("[INFO] Findings时间戳不可用，使用已有findings；如需强制触发请使用 force_scan=True")
         
         source = "cached_findings" if baseline_count > 0 else "no_findings"
         
@@ -1578,17 +1579,18 @@ def run_security_analytics(trigger_scan: bool = True, max_wait_seconds: int = 60
         }
 
 
-def run_data_analysis(trigger_scan: bool = True) -> dict[str, Any]:
+def run_data_analysis(trigger_scan: bool = True, force_scan: bool = False) -> dict[str, Any]:
     """
     数据分析主函数
     1. 运行 Security Analytics 检测（按需触发）
     2. 告警融合去重（Raw → Canonical）
     
     参数：
-    - trigger_scan: 是否触发Security Analytics扫描（默认True，按需触发模式）
+    - trigger_scan: 是否允许触发Security Analytics扫描（默认True，按需触发模式）
+    - force_scan: 是否强制触发一次扫描（默认False）
     """
     # Step 1: 运行 Security Analytics 检测（按需触发）
-    detection_result = run_security_analytics(trigger_scan=trigger_scan)
+    detection_result = run_security_analytics(trigger_scan=trigger_scan, force_scan=force_scan)
 
     # Step 2: 告警融合去重
     deduplication_result = deduplicate_findings()

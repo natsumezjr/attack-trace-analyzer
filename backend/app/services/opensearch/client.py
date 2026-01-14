@@ -12,10 +12,30 @@ except ImportError:
     )
 
 # OpenSearch客户端配置
-def _get_opensearch_config():
-    # 默认使用 HTTP（如果禁用了安全插件）
-    # 如果启用了安全插件，请设置环境变量 OPENSEARCH_NODE=https://localhost:9200
-    node_url = os.getenv("OPENSEARCH_NODE", "http://localhost:9200")
+DEFAULT_OPENSEARCH_NODE_HTTPS = "https://localhost:9200"
+DEFAULT_OPENSEARCH_NODE_HTTP = "http://localhost:9200"
+
+
+def _normalize_node_url(node_url: str) -> str:
+    """Normalize OPENSEARCH_NODE value to include a scheme."""
+    node_url = (node_url or "").strip()
+    if not node_url:
+        return DEFAULT_OPENSEARCH_NODE_HTTPS
+    if "://" not in node_url:
+        return f"https://{node_url}"
+    return node_url
+
+
+def _get_opensearch_config(node_url: Optional[str] = None) -> dict[str, Any]:
+    """
+    Build OpenSearch client config.
+
+    Notes:
+    - docs/53-环境变量规范.md 约定默认 OPENSEARCH_NODE 为 https://localhost:9200
+    - 后端不会自动加载 .env；若未显式导出 OPENSEARCH_NODE，会走默认探测逻辑（见 get_client）
+    """
+    # 默认使用 HTTPS（安全插件默认开启）；如果禁用了安全插件，可设置 OPENSEARCH_NODE=http://localhost:9200
+    node_url = _normalize_node_url(node_url or os.getenv("OPENSEARCH_NODE", DEFAULT_OPENSEARCH_NODE_HTTPS))
     # 解析URL，提取host和port
     from urllib.parse import urlparse
     parsed = urlparse(node_url)
@@ -23,21 +43,23 @@ def _get_opensearch_config():
     port = parsed.port or 9200
     use_ssl = parsed.scheme == "https"
     
-    config = {
+    config: dict[str, Any] = {
         "hosts": [{"host": host, "port": port}],
         "use_ssl": use_ssl,
         "connection_class": RequestsHttpConnection,
     }
     
+    # 认证信息：无论 http/https，只要对端启用了安全插件都可能需要 Basic Auth
+    #（将认证与 TLS 解绑，避免 http+auth 场景下意外匿名访问导致 403）
+    username = os.getenv("OPENSEARCH_USERNAME", "admin")
+    password = os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev")
+    if username and password:
+        config["http_auth"] = (username, password)
+
     # 只有在启用 SSL 时才设置 SSL 相关配置
     if use_ssl:
         config["verify_certs"] = False  # 开发环境可关闭证书验证
         config["ssl_show_warn"] = False
-        # 只有在启用 SSL 时才需要认证（安全插件启用时）
-        config["http_auth"] = (
-            os.getenv("OPENSEARCH_USERNAME", "admin"),
-            os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev"),
-        )
     
     return config
 
@@ -50,30 +72,45 @@ def get_client() -> OpenSearch:
     """获取OpenSearch客户端单例"""
     global _opensearch_client
     if _opensearch_client is None:
-        config = _get_opensearch_config()
-        # 添加超时设置
-        config["timeout"] = 30  # 总超时30秒（包括连接和读取）
-        config["max_retries"] = 2  # 最多重试2次
-        config["retry_on_timeout"] = True  # 超时时重试
-        config["retry_on_status"] = [502, 503, 504]  # 这些状态码时重试
-        
-        try:
-            _opensearch_client = OpenSearch(**config)
-            # 测试连接
-            _opensearch_client.info()
-        except Exception as e:
-            error_msg = str(e)
-            if 'connection' in error_msg.lower() or 'connect' in error_msg.lower():
-                node_url = os.getenv("OPENSEARCH_NODE", "http://localhost:9200")
-                raise ConnectionError(
-                    f"无法连接到 OpenSearch ({node_url}): {error_msg}\n"
-                    f"请检查：\n"
-                    f"  1. OpenSearch 服务是否运行\n"
-                    f"  2. OPENSEARCH_NODE 环境变量是否正确\n"
-                    f"  3. 网络连接是否正常\n"
-                    f"  4. 防火墙/SSL证书配置"
-                ) from e
-            raise
+        node_url_env = os.environ.get("OPENSEARCH_NODE")
+        candidate_urls = (
+            [_normalize_node_url(node_url_env)]
+            if node_url_env
+            else [DEFAULT_OPENSEARCH_NODE_HTTPS, DEFAULT_OPENSEARCH_NODE_HTTP]
+        )
+
+        last_error: Optional[Exception] = None
+        for node_url in candidate_urls:
+            config = _get_opensearch_config(node_url=node_url)
+            # 添加超时设置
+            config["timeout"] = 30  # 总超时30秒（包括连接和读取）
+            config["max_retries"] = 2  # 最多重试2次
+            config["retry_on_timeout"] = True  # 超时时重试
+            config["retry_on_status"] = [502, 503, 504]  # 这些状态码时重试
+
+            try:
+                client = OpenSearch(**config)
+                # 测试连接
+                client.info()
+                _opensearch_client = client
+                break
+            except Exception as e:
+                last_error = e
+                continue
+
+        if _opensearch_client is None:
+            node_url = node_url_env or DEFAULT_OPENSEARCH_NODE_HTTPS
+            error_msg = str(last_error) if last_error else "unknown error"
+            raise ConnectionError(
+                f"无法连接到 OpenSearch ({node_url}): {error_msg}\n"
+                f"已尝试候选地址: {candidate_urls}\n"
+                f"请检查：\n"
+                f"  1. OpenSearch 服务是否运行（backend/docker-compose.yml）\n"
+                f"  2. 是否已显式导出 OPENSEARCH_NODE/OPENSEARCH_USERNAME/OPENSEARCH_PASSWORD\n"
+                f"     注意：后端不会自动加载 backend/.env（见 docs/53-环境变量规范.md）\n"
+                f"  3. 若安全插件启用，通常需要 https:// + 认证；若禁用则用 http://\n"
+                f"  4. 证书/防火墙/端口映射是否正常"
+            ) from last_error
     return _opensearch_client
 
 
