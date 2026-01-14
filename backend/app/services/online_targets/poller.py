@@ -7,6 +7,7 @@ import os
 import httpx
 
 from app.services.online_targets.registry import list_targets, remove_target
+from app.services.opensearch import store_events
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,8 +75,10 @@ async def _poll_target_routes(
             continue
 
         # 直接使用靶机返回的原始数据，不做封装
-        # TODO: 后续在这里接入原始数据处理/存储逻辑
-        _LOGGER.debug("target response from %s: %s", url, raw_data)
+        if isinstance(raw_data, dict) and isinstance(raw_data.get("data"), list):
+            store_events(raw_data["data"])
+        else:
+            _LOGGER.debug("target response from %s: %s", url, raw_data)
     return False
 
 
