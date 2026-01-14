@@ -1,7 +1,7 @@
-import { Example } from "@/components/dashboard-with-collapsible-sidebar";
+import React from "react";
 
 const page = () => {
-  return <Example />;
+  return <div>page</div>;
 };
 
 export default page;

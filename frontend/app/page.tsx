@@ -1,122 +1,94 @@
-"use client";
+import Link from "next/link";
 
-import { motion, type DOMMotionComponents, type Variants } from "framer-motion";
-import { FlowButton } from "@/components/index/flow-button";
-import { ElegantShape } from "@/components/index/shape-landing-hero";
-import DashBoardView from "@/components/dashboard-overview";
-
-const MotionDiv: DOMMotionComponents["div"] = motion.div;
+import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Globe } from "@/components/ui/globe";
+import {
+  AnimatedProfileCard,
+  ProfileCardContent,
+} from "@/components/ui/animated-profile-card";
 
 export default function Home() {
-  const fadeUpVariants: Variants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 1,
-        delay: 0.5 + i * 0.2,
-        ease: [0.25, 0.4, 0.25, 1] as const,
-      },
-    }),
-  };
+  const cards = [
+    {
+      name: "主机日志采集",
+      location: "统一汇聚关键系统事件",
+      bio: "覆盖登录、进程、文件改动等关键指标，构建完整审计视图。",
+    },
+    {
+      name: "主机行为画像",
+      location: "刻画异常操作轨迹",
+      bio: "识别权限提升、横向移动等行为链路，快速锁定威胁路径。",
+    },
+    {
+      name: "网络流量分析",
+      location: "洞察外联与渗透",
+      bio: "追踪异常流量与 C2 通信，关联终端与网络证据。",
+    },
+    {
+      name: "溯源时间线",
+      location: "还原攻击全流程",
+      bio: "将多源数据汇总成攻击时间线，辅助快速处置与复盘。",
+    },
+  ];
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-linear-to-br from-indigo-500/5 via-transparent to-rose-500/5 blur-3xl" />
-      <div className="absolute inset-0 overflow-hidden">
-        <ElegantShape
-          delay={0.3}
-          width={600}
-          height={140}
-          rotate={12}
-          gradient="from-indigo-500/[0.15]"
-          className="left-[-10%] md:left-[-5%] top-[15%] md:top-[20%]"
-        />
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-0 opacity-70 [background:radial-gradient(120%_140%_at_0%_0%,hsl(var(--secondary))_0%,transparent_55%),radial-gradient(120%_140%_at_100%_0%,hsl(var(--accent))_0%,transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-50 [background:linear-gradient(120deg,transparent_0%,hsl(var(--muted-foreground)/0.12)_25%,transparent_50%)]" />
+      <div className="pointer-events-none absolute -left-24 top-12 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 bottom-10 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
 
-        <ElegantShape
-          delay={0.5}
-          width={500}
-          height={120}
-          rotate={-15}
-          gradient="from-rose-500/[0.15]"
-          className="right-[-5%] md:right-[0%] top-[70%] md:top-[75%]"
-        />
-
-        <ElegantShape
-          delay={0.4}
-          width={300}
-          height={80}
-          rotate={-8}
-          gradient="from-violet-500/[0.15]"
-          className="left-[5%] md:left-[10%] bottom-[5%] md:bottom-[10%]"
-        />
-
-        <ElegantShape
-          delay={0.6}
-          width={200}
-          height={60}
-          rotate={20}
-          gradient="from-amber-500/[0.15]"
-          className="right-[15%] md:right-[20%] top-[10%] md:top-[15%]"
-        />
-
-        <ElegantShape
-          delay={0.7}
-          width={150}
-          height={40}
-          rotate={-25}
-          gradient="from-cyan-500/[0.15]"
-          className="left-[20%] md:left-[25%] top-[5%] md:top-[10%]"
-        />
-      </div>
-
-      <div className="relative z-10 container mx-auto -mt-30 px-4 md:px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <MotionDiv
-            custom={1}
-            variants={fadeUpVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-6 md:mb-8 tracking-tight">
-              <span className="bg-clip-text text-transparent bg-linear-to-b from-foreground to-foreground/80">
-                AttackTraceAnalyzer
-              </span>
-              <br />
-            </h1>
-          </MotionDiv>
-
-          <MotionDiv
-            custom={2}
-            variants={fadeUpVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-4">
-              基于
-              <span className="text-foreground font-medium">
-                主机日志、行为监控
-              </span>
-              与<span className="text-foreground font-medium">网络流量</span>的
-              <span className="text-foreground font-medium">多源数据融合</span>
-              分析平台。实时构建攻击链路，将孤立的异常拼凑成
-              <span className="text-foreground font-semibold drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
-                完整的入侵真相
-              </span>
-              。
-            </p>
-          </MotionDiv>
-          <div className="mt-2 flex justify-center">
-            <FlowButton text="进入分析控制台" href="/dashboard" />
+      <main className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 py-24">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <Globe className="scale-125 opacity-60 blur-[0.2px]" />
+        </div>
+        <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+          <ModeToggle />
+        </div>
+        <section className="relative z-10 flex w-full animate-in flex-col items-center text-center fade-in-0 slide-in-from-bottom-4 duration-700">
+          <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+            AttackTraceAnalyzer
+          </h1>
+          <p className="mt-5 max-w-3xl text-base leading-7 text-muted-foreground dark:text-foreground/80 sm:text-lg">
+            基于主机日志、主机行为、网络流量的恶意攻击行为溯源分析系统
+          </p>
+          <div className="mt-8">
+            <Button
+              asChild
+              size="lg"
+              className="rounded-full px-8 shadow-lg transition-transform duration-200 ease-out hover:-translate-y-1"
+            >
+              <Link href="/dashboard">Go Dashboard</Link>
+            </Button>
           </div>
-        </div>
-        <div className="mt-20 w-full max-w-5xl mx-auto">
-          <DashBoardView />
-        </div>
-      </div>
+        </section>
 
-      <div className="absolute inset-0 bg-linear-to-t from-white/70 via-transparent to-white/40 dark:from-[#0b0b0b] dark:via-transparent dark:to-[#0b0b0b]/70 pointer-events-none" />
+        <section className="relative z-10 mt-14 grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {cards.map((card) => (
+            <AnimatedProfileCard
+              key={card.name}
+              className="h-full min-h-[260px] w-full"
+              baseCard={
+                <ProfileCardContent
+                  name={card.name}
+                  location={card.location}
+                  bio={card.bio}
+                />
+              }
+              overlayCard={
+                <ProfileCardContent
+                  name={card.name}
+                  location={card.location}
+                  bio={card.bio}
+                  variant="on-accent"
+                  cardStyle={{ background: "var(--accent-color)" }}
+                />
+              }
+            />
+          ))}
+        </section>
+      </main>
     </div>
   );
 }
