@@ -38,7 +38,10 @@ PRIORITY_SEVERITY = {
 def iso_utc(ts: Optional[str]) -> Optional[str]:
     if not ts:
         return None
-    return ts
+    s = ts.strip()
+    if not s:
+        return None
+    return s.replace("+00:00", "Z")
 
 
 def to_int(x):
@@ -60,7 +63,10 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     out_fields = evt.get("output_fields") or {}
     ecs: Dict = {}
 
-    ecs["@timestamp"] = iso_utc(evt.get("time")) or datetime.now(timezone.utc).isoformat()
+    ecs["@timestamp"] = (
+        iso_utc(evt.get("time"))
+        or datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
     ecs["ecs"] = {"version": "8.11.0"}
     ecs.setdefault("event", {})["dataset"] = "falco"
 
@@ -312,5 +318,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 

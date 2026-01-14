@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.services.online_targets import start_polling, stop_polling
+from app.services.client_poller import start_polling, stop_polling
 
 configure_logging(settings.log_level)
 

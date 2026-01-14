@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
+from app.core.time import format_rfc3339
 from app.services.opensearch.internal import INDEX_PATTERNS, get_client
 
 
@@ -33,9 +34,8 @@ class EventsSearchRequest(BaseModel):
 
 
 def _iso(dt: datetime) -> str:
-    # OpenSearch accepts ISO 8601 timestamps.
-    s = dt.isoformat()
-    return s.replace("+00:00", "Z")
+    # OpenSearch accepts ISO 8601 timestamps. Normalize to UTC RFC3339.
+    return format_rfc3339(dt)
 
 
 def _wildcard_or_term(field: str, value: str) -> dict[str, Any]:
