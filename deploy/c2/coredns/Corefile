@@ -1,0 +1,11 @@
+lab.local:53 {
+  log
+  errors
+  file /etc/coredns/zones/db.lab.local lab.local
+}
+
+.:53 {
+  log
+  errors
+  forward . /etc/resolv.conf
+}

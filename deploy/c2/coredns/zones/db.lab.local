@@ -1,0 +1,13 @@
+$ORIGIN lab.local.
+$TTL 60
+@   IN SOA ns.lab.local. admin.lab.local. (
+        2026011401 ; serial
+        7200       ; refresh
+        3600       ; retry
+        1209600    ; expire
+        60         ; minimum
+)
+    IN NS  ns.lab.local.
+
+ns  IN A   10.92.35.50
+c2  IN A   10.92.35.50
