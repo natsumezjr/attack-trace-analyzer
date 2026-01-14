@@ -81,7 +81,10 @@
 1) 嵌套对象：`{"event": {"id": "...", "kind": "event"}}`  
 2) 点号扁平键：`{"event.id": "...", "event.kind": "event"}`  
 
-中心机入库前必须把输入规范化为“嵌套对象优先”的形态，并保证最终语义一致。
+中心机入库前必须把输入规范化为“嵌套对象形态”，并满足以下规则：
+
+1) 当嵌套对象与点号扁平键同时存在且语义冲突时，以嵌套对象的值为准。  
+2) 规范化完成后，点号扁平键必须从文档中移除，避免出现一份文档同时携带两套字段表达。
 
 ## 1. 公共字段（所有事件必须具备）
 
@@ -177,7 +180,7 @@
 | `destination.ip` | ip | 必须存在 |
 | `dns.question.name` | keyword | 必须存在 |
 
-> 其它 `hostbehavior.*` 与 `netflow.*` datasets 的字段口径遵循相同原则：保证可用于实体抽取与证据回溯。具体字段扩展在实现阶段增加时，必须同步更新本文件并与 `52-实体图谱规范.md` 对齐。
+> 其它 `hostbehavior.*` 与 `netflow.*` datasets 的字段口径遵循相同原则：保证可用于实体抽取与证据回溯。字段扩展必须同步更新本文件，并与 `84-Neo4j实体图谱规范.md` 的抽取规则保持一致。
 
 ## 3. Findings datasets（告警/发现）
 
@@ -211,7 +214,7 @@ Canonical Finding 由中心机融合生成，字段必须满足：
 | `event.dataset` | keyword | 固定为 `finding.canonical` |
 | `custom.finding.stage` | keyword | 固定为 `canonical` |
 | `custom.finding.providers[]` | keyword[] | 为多来源去重合并后的数组 |
-| `custom.finding.fingerprint` | keyword | 指纹（见 `31-OpenSearch模块规格说明书.md`） |
+| `custom.finding.fingerprint` | keyword | 指纹（见 `83-告警数据规范.md`） |
 | `custom.confidence` | float | 取值 0–1 |
 | `custom.evidence.event_ids[]` | keyword[] | 合并去重后的证据引用 |
 

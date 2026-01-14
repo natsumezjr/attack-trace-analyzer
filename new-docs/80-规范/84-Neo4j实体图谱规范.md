@@ -59,13 +59,13 @@ UID 的构造与解析规则必须与后端实现一致（见 `backend/app/servi
   - `host.id`
   - `host.name`
 - 生成规则：
-  - 若事件中缺失 `host.id`，必须按 `51-ECS字段规范.md` 生成并回填。
+  - 若事件中缺失 `host.id`，必须按 `81-ECS字段规范.md` 生成并回填。
 
 #### 1.2.2 User
 
-- Key 选择规则（严格优先级）：
-  1) 当存在 `user.id`：Key = `user.id`
-  2) 当缺失 `user.id`：Key = `host.id + user.name`
+- Key 选择规则（固定）：
+  - 当事件包含 `user.id`：Key = `user.id`
+  - 当事件不包含 `user.id`：Key = `host.id + user.name`
 - 必须属性：
   - `user.name`
   - `host.id`（当使用复合键时必须存在）
@@ -78,7 +78,7 @@ UID 的构造与解析规则必须与后端实现一致（见 `backend/app/servi
   - `process.pid`
   - `process.executable`（或等价字段）
 - 生成规则：
-  - 当缺失 `process.entity_id` 时必须按 `51-ECS字段规范.md` 生成并回填。
+  - 当缺失 `process.entity_id` 时必须按 `81-ECS字段规范.md` 生成并回填。
 
 #### 1.2.4 File
 
