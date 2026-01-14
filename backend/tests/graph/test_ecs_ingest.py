@@ -164,6 +164,7 @@ def test_ecs_get_in_supports_dotted_fallback_for_event_kind() -> None:
         "event.kind": "event",
         "event.dataset": "hostlog.auth",
         "event.category": ["authentication"],
+        "event.id": "evt-auth-002",
         "@timestamp": "2026-01-12T03:21:10.123Z",
         "host": {"id": "h-001"},
         "user": {"name": "alice"},
