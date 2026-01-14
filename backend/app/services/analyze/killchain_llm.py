@@ -280,29 +280,51 @@ def build_choose_prompt(payload: Mapping[str, Any], *, require_pair_explanations
     """
     schema_hint = {
         "chosen_path_ids": ["p-... (one per pair, in pair order)"],
-        "explanation": "global explanation, 3-8 sentences",
+        "explanation": "详细的全局解释，使用中文，10-20 句话，详细描述整个攻击链的完整过程，必须说明每个关键节点的主谓宾结构",
+        "confidence": 0.85,  # 可信度评分 (0.0-1.0)，表示对整个 killchain 的置信度
         "pair_explanations": [
-            {"pair_idx": 0, "path_id": "p-...", "why": "1-2 sentences"},
+            {"pair_idx": 0, "path_id": "p-...", "why": "使用中文，1-3 句话解释为什么选择此路径"},
         ] if require_pair_explanations else [],
     }
 
     system = (
-        "You are a senior incident responder. "
-        "Given an attack timeline segmented by MITRE ATT&CK tactics, "
-        "choose exactly ONE candidate path for EACH adjacent segment pair. "
-        "Your choices must be globally consistent (entities/process/host continuity) and time-consistent. "
-        "Return STRICT JSON only (no markdown)."
+        "你是一位资深的安全事件响应专家。"
+        "给定一个按 MITRE ATT&CK 战术分段的攻击时间线，"
+        "为每个相邻的段对选择恰好一条候选路径。"
+        "你的选择必须在全局上保持一致（实体/进程/主机的连续性）和时间一致性。"
+        "同时提供一个可信度评分 (0.0-1.0)，表示你对这个攻击链分析的置信程度。"
+        "如果攻击涉及权限提升或 C2（命令与控制），你必须分析并解释："
+        "初始入侵点、攻击者在内部网络中的横向移动路径、"
+        "权限提升路径、从存储的完整数据泄露路径、"
+        "通过提取攻击工具/脚本/配置文件的指纹特征进行攻击者归因、"
+        "以及攻击者和 C2 服务器 IP 地址的分析。"
+        "所有解释必须使用中文，并且要详细（10-20 句话）。"
+        "在 explanation 字段中，你必须为每个关键节点明确说明主谓宾结构，"
+        "即：谁（主语）做了什么（谓语）对什么/在哪里（宾语/状语）。"
+        "重要：在描述网络连接时，必须严格区分攻击者 IP（source.ip）和受害主机 IP（destination.ip 或 host.ip）。"
+        "在 Initial Access 阶段，攻击者 IP 是发起连接的源 IP，受害主机 IP 是目标 IP。"
+        "在攻击者归因部分，必须使用正确的攻击者 IP 地址（通常是 Initial Access 阶段的 source.ip），而不是受害主机的 IP。"
+        "返回严格的 JSON 格式（不要使用 markdown），确保 JSON 格式完整且正确，explanation 字段必须完整输出，不要截断。"
     )
 
     user = {
-        "task": "Choose one path_id per pair to form the most plausible killchain connections.",
+        "task": "为每个段对选择一条路径以形成最合理的攻击链连接，并提供可信度评分。所有输出必须使用中文。",
         "output_schema": schema_hint,
         "input": payload,
         "rules": [
-            "Must choose exactly one path_id for each pair, in the same order as pairs[]",
-            "Chosen path_id must exist in that pair's candidates",
-            "Prefer paths that maintain entity continuity across pairs (same process.entity_id/host.id/user.name when plausible)",
-            "If multiple plausible, prefer simpler (shorter hop) and more semantically aligned with segment abnormal summaries",
+            "必须为每个段对选择恰好一个 path_id，顺序与 pairs[] 相同",
+            "选择的 path_id 必须存在于该段对的 candidates 中",
+            "优先选择在段对之间保持实体连续性的路径（在合理的情况下，相同的 process.entity_id/host.id/user.name）",
+            "如果有多条合理路径，优先选择更简单（跳数更少）且与段异常摘要更语义对齐的路径",
+            "提供可信度评分 (0.0-1.0)：连接良好、一致的攻击链评分更高；模糊或不完整的链评分更低",
+            "如果检测到权限提升或 C2，解释必须包括：(1) 初始入侵点识别，(2) 攻击者在内部网络中的横向移动路径，(3) 权限提升路径分析，(4) 从存储的完整数据泄露路径，(5) 通过提取攻击工具、脚本和配置文件的指纹特征进行攻击者归因，(6) 攻击者和 C2 服务器 IP 地址分析",
+            "explanation 字段必须使用中文，详细描述整个攻击链的完整过程，长度应在 10-20 句话之间",
+            "explanation 字段中，对于每个关键节点（进程、主机、IP、域名等实体），必须明确说明主谓宾结构：主语（谁/什么实体）+ 谓语（执行了什么动作）+ 宾语/状语（对什么/在哪里/通过什么方式）",
+            "在描述 Initial Access 阶段时，必须明确区分：攻击者 IP（source.ip，发起连接的源 IP）和受害主机 IP（destination.ip 或 host.ip，被攻击的目标 IP）。例如：'攻击者从外部 IP 地址 [source.ip] 连接到受害主机 [host.name] (IP: [host.ip])'",
+            "在攻击者归因部分，必须使用正确的攻击者 IP 地址（通常是 Initial Access 阶段的 source.ip），而不是受害主机的 IP 地址。如果数据中没有明确的攻击者 IP，应说明无法确定攻击者 IP",
+            "在描述网络连接时，必须明确说明连接的源和目标：谁（主语，攻击者/进程）从哪个 IP（源 IP）连接到哪个 IP/主机（目标 IP/主机）",
+            "explanation 字段必须完整输出，不要截断，确保 JSON 格式正确（如果 explanation 中包含引号，请使用转义字符）",
+            "pair_explanations 中的 why 字段也必须使用中文，解释为什么选择该路径，长度应在 1-3 句话之间",
         ],
     }
 
@@ -312,29 +334,62 @@ def build_choose_prompt(payload: Mapping[str, Any], *, require_pair_explanations
     ]
 
 
-_JSON_OBJ_RE = re.compile(r"\{.*\}", re.S)
+_JSON_OBJ_RE = re.compile(r"\{.*\}", re.S | re.DOTALL)
 
 def _extract_json_obj(text: str) -> Optional[Dict[str, Any]]:
     """
     尝试从模型输出中提取 JSON 对象（即使模型夹带解释文字也尽量救回来）。
+    改进：使用更可靠的方法提取 JSON，确保长文本不会被截断。
     """
     text = text.strip()
+    
+    # 首先尝试直接解析整个文本
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
             return obj
     except Exception:
         pass
-
-    m = _JSON_OBJ_RE.search(text)
-    if not m:
+    
+    # 如果直接解析失败，尝试找到 JSON 对象的开始和结束
+    # 查找第一个 { 和最后一个 }
+    start_idx = text.find('{')
+    if start_idx == -1:
         return None
+    
+    # 从后往前查找匹配的 }
+    brace_count = 0
+    end_idx = -1
+    for i in range(start_idx, len(text)):
+        if text[i] == '{':
+            brace_count += 1
+        elif text[i] == '}':
+            brace_count -= 1
+            if brace_count == 0:
+                end_idx = i
+                break
+    
+    if end_idx == -1:
+        # 如果找不到匹配的 }，尝试使用正则表达式（作为后备）
+        m = _JSON_OBJ_RE.search(text)
+        if m:
+            try:
+                obj = json.loads(m.group(0))
+                if isinstance(obj, dict):
+                    return obj
+            except Exception:
+                pass
+        return None
+    
+    # 提取完整的 JSON 对象
+    json_str = text[start_idx:end_idx + 1]
     try:
-        obj = json.loads(m.group(0))
+        obj = json.loads(json_str)
         if isinstance(obj, dict):
             return obj
     except Exception:
-        return None
+        pass
+    
     return None
 
 
@@ -378,7 +433,14 @@ def fallback_choose(payload: Mapping[str, Any]) -> Dict[str, Any]:
 
     return {
         "chosen_path_ids": chosen_ids,
-        "explanation": "fallback: selected shortest-hop path per pair (LLM unavailable or invalid).",
+        "explanation": (
+            "由于大语言模型不可用或无效，系统使用回退策略选择了攻击链路径。"
+            "回退策略为每个段对选择了跳数最短的路径，以确保攻击链的基本连通性。"
+            "这种方法虽然能够构建完整的攻击链，但由于缺乏智能分析，可能无法识别最优路径。"
+            "建议在配置大语言模型 API 密钥后重新运行分析，以获得更准确和详细的攻击链解释。"
+            "当前选择的路径基于最短路径启发式算法，优先考虑了路径的简洁性和直接性。"
+        ),
+        "confidence": 0.5,  # fallback 模式默认可信度
         "pair_explanations": [],
     }
 
@@ -411,16 +473,29 @@ class LLMChooser(KillChainLLMClient):
         入口：兼容 killchain.py 的调用方式。
         返回 dict：{"chosen_path_ids":[...], "explanation":"...", "pair_explanations":[...]}
         """
+        
         reduced = self.reducer.reduce(payload)
+
+        
         if self.enable_preselect:
             reduced = self.preselector.preselect(reduced)
 
+        # 如果 pairs 为空，直接使用 fallback，不调用 LLM
+        if not reduced.get('pairs'):
+            result = fallback_choose(reduced)
+            return result
+
         # 如果没有注入真实 LLM，则直接 fallback
         if self.chat_complete is None:
-            return fallback_choose(reduced)
+            result = fallback_choose(reduced)
+            return result
 
         messages = build_choose_prompt(reduced, require_pair_explanations=self.cfg.require_pair_explanations)
-        text = self.chat_complete(messages)
+        try:
+            text = self.chat_complete(messages)
+        except Exception as e:
+            result = fallback_choose(reduced)
+            return result
 
         obj = _extract_json_obj(text if isinstance(text, str) else str(text))
         if obj is None:
@@ -438,6 +513,13 @@ class LLMChooser(KillChainLLMClient):
             "chosen_path_ids": obj.get("chosen_path_ids"),
             "explanation": obj.get("explanation", ""),
         }
+        # 提取可信度评分
+        conf = obj.get("confidence")
+        if isinstance(conf, (int, float)):
+            out["confidence"] = max(0.0, min(1.0, float(conf)))  # 确保在 0.0-1.0 范围内
+        else:
+            out["confidence"] = 0.5  # 默认可信度
+        
         if isinstance(obj.get("pair_explanations"), list):
             out["pair_explanations"] = obj.get("pair_explanations")
         else:
@@ -460,22 +542,23 @@ class MockChooser(KillChainLLMClient):
     def choose(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
         reduced = self.reducer.reduce(payload)
         reduced = self.preselector.preselect(reduced)
-        return fallback_choose(reduced)
+        result = fallback_choose(reduced)
+        return result
 
 
 # ---------------------------------------------------------------------
-# OpenAI integration & factory functions
+# DeepSeek LLM integration & factory functions
 # ---------------------------------------------------------------------
 
-def _create_openai_chat_complete(
+def _create_llm_chat_complete(
     api_key: str,
-    base_url: str = "https://api.openai.com/v1",
-    model: str = "gpt-3.5-turbo",
+    base_url: str = "https://api.deepseek.com/v1",
+    model: str = "deepseek-chat",
     timeout: float = 30.0,
     max_retries: int = 2,
 ) -> Any:
     """
-    创建 OpenAI chat_complete 函数。
+    创建 LLM chat_complete 函数（兼容 OpenAI API 格式，支持 DeepSeek）。
     返回 callable(messages: List[Dict[str, str]]) -> str
     """
     try:
@@ -494,7 +577,7 @@ def _create_openai_chat_complete(
 
     def chat_complete(messages: List[Dict[str, str]]) -> str:
         """
-        调用 OpenAI ChatCompletion API。
+        调用 LLM ChatCompletion API（DeepSeek 兼容 OpenAI API 格式）。
         messages: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
         返回: 模型生成的文本（应包含 JSON）
         """
@@ -506,18 +589,31 @@ def _create_openai_chat_complete(
                 "temperature": 0.3,  # 较低温度，更确定性输出
             }
             
-            # response_format 仅在 gpt-3.5-turbo-1106 及以后版本支持
-            # 对于旧版本，依赖 prompt 中的 JSON 格式要求
-            if "1106" in model or "gpt-4" in model.lower() or "gpt-4o" in model.lower():
+            # DeepSeek 支持 JSON 格式输出
+            # 对于支持 response_format 的模型，启用 JSON 模式
+            if "deepseek" in model.lower() or "gpt-4" in model.lower():
                 kwargs["response_format"] = {"type": "json_object"}
             
             response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
             if content is None:
-                raise ValueError("OpenAI 返回空内容")
+                raise ValueError("LLM 返回空内容")
             return content
         except Exception as e:
-            raise RuntimeError(f"OpenAI API 调用失败: {e}") from e
+            # 提供更友好的错误信息
+            error_msg = str(e)
+            if "402" in error_msg or "Insufficient Balance" in error_msg or "余额" in error_msg:
+                raise RuntimeError(
+                    f"DeepSeek API 余额不足 (402): 请前往 https://platform.deepseek.com/ 充值或等待免费额度重置。"
+                    f" 原始错误: {e}"
+                ) from e
+            elif "429" in error_msg or "quota" in error_msg.lower():
+                raise RuntimeError(
+                    f"DeepSeek API 配额超限 (429): 已达到使用限制，请稍后重试或升级账户。"
+                    f" 原始错误: {e}"
+                ) from e
+            else:
+                raise RuntimeError(f"LLM API 调用失败: {e}") from e
 
     return chat_complete
 
@@ -537,10 +633,10 @@ def create_llm_client(
     工厂函数：根据配置创建 LLM client。
 
     参数:
-        provider: "openai" 或 "mock"（默认从环境变量 LLM_PROVIDER 读取）
-        api_key: OpenAI API key（默认从环境变量 OPENAI_API_KEY 读取）
-        base_url: OpenAI base URL（默认从环境变量 OPENAI_BASE_URL 读取）
-        model: 模型名称（默认从环境变量 OPENAI_MODEL 读取，默认 "gpt-3.5-turbo"）
+        provider: "deepseek" 或 "mock"（默认从环境变量 LLM_PROVIDER 读取）
+        api_key: DeepSeek API key（默认从环境变量 DEEPSEEK_API_KEY 读取）
+        base_url: DeepSeek base URL（默认从环境变量 DEEPSEEK_BASE_URL 读取）
+        model: 模型名称（默认从环境变量 DEEPSEEK_MODEL 读取，默认 "deepseek-chat"）
         timeout: 超时时间（秒）
         max_retries: 最大重试次数
         config: LLMChooseConfig 实例
@@ -555,9 +651,9 @@ def create_llm_client(
 
         # 显式指定
         client = create_llm_client(
-            provider="openai",
+            provider="deepseek",
             api_key="sk-...",
-            model="gpt-3.5-turbo"
+            model="deepseek-chat"
         )
 
         # 使用 mock（本地调试）
@@ -569,27 +665,27 @@ def create_llm_client(
         # 如果无法导入 settings，使用默认值
         _provider = provider or "mock"
         _api_key = api_key or ""
-        _base_url = base_url or "https://api.openai.com/v1"
-        _model = model or "gpt-3.5-turbo"
+        _base_url = base_url or "https://api.deepseek.com/v1"
+        _model = model or "deepseek-chat"
         _timeout = timeout if timeout is not None else 30.0
         _max_retries = max_retries if max_retries is not None else 2
     else:
         _provider = provider or settings.llm_provider
-        _api_key = api_key or settings.openai_api_key
-        _base_url = base_url or settings.openai_base_url
-        _model = model or settings.openai_model
-        _timeout = timeout if timeout is not None else settings.openai_timeout
-        _max_retries = max_retries if max_retries is not None else settings.openai_max_retries
+        _api_key = api_key or settings.llm_api_key
+        _base_url = base_url or settings.llm_base_url
+        _model = model or settings.llm_model
+        _timeout = timeout if timeout is not None else settings.llm_timeout
+        _max_retries = max_retries if max_retries is not None else settings.llm_max_retries
 
     if _provider.lower() == "mock":
         return MockChooser(config=config)
 
-    if _provider.lower() == "openai":
+    if _provider.lower() == "deepseek":
         if not _api_key:
             # 如果没有 API key，回退到 mock
             return MockChooser(config=config)
 
-        chat_complete_fn = _create_openai_chat_complete(
+        chat_complete_fn = _create_llm_chat_complete(
             api_key=_api_key,
             base_url=_base_url,
             model=_model,

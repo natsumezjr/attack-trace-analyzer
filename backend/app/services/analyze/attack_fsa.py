@@ -455,6 +455,22 @@ def _can_transition(policy: TransitionPolicy, from_state: Optional[AttackState],
     return to_state in policy.allowed_next.get(from_state, set())
 
 
+def _log_fsa_graphs(fsa_graphs: List[FSAGraph]) -> None:
+    """
+    统一的 FSA 日志输出函数。
+    如果 list 中有 FSA，输出所有 FSA 的段的状态；如果没有，警告未知错误。
+    """
+    if not fsa_graphs:
+        print(f"[WARN] behavior_state_machine: 发生未知错误，未生成任何 FSA 图")
+        return
+    
+    print(f"[INFO] behavior_state_machine: 生成了 {len(fsa_graphs)} 个 FSA 图")
+    for idx, graph in enumerate(fsa_graphs):
+        segments = graph.segments()
+        segment_states = [seg.state.value for seg in segments]
+        print(f"[INFO] FSA[{idx}]: 包含 {len(segments)} 个段，状态序列: {' -> '.join(segment_states)}")
+
+
 def behavior_state_machine(
     abnormal_edges: List[GraphEdge],
     *,
@@ -479,9 +495,9 @@ def behavior_state_machine(
     if policy is None:
         policy = default_transition_policy()
     if accept_states is None:
-        accept_states = {AttackState.EXFILTRATION, AttackState.IMPACT, AttackState.COMMAND_AND_CONTROL}
+        accept_states = {AttackState.EXFILTRATION, AttackState.IMPACT}
 
-    # 1) 先按时间排序，保证处理是顺序的（更接近“真实事件链”）
+    # 1) 先按时间排序，保证处理是顺序的（更接近"真实事件链"）
     edges_sorted = sorted(
         abnormal_edges,
         key=lambda e: _parse_ts_to_float(e.get_ts() if hasattr(e, "get_ts") else None),
@@ -538,7 +554,126 @@ def behavior_state_machine(
         # 4) 对 candidates 去重 + beam 截断，得到下一轮 active
         active = _dedup_and_beam(candidates, i=i, beam_width=beam_width)
 
+    # 5) 精确过滤：使用综合评分算法
+    if len(accepted) > 1:
+        filtered = _filter_fsa_graphs(accepted)
+        if filtered:  # 如果过滤后还有图，则返回过滤后的结果
+            _log_fsa_graphs(filtered)
+            return filtered
+        # 如果过滤后没有图了，则返回原始结果（避免全部过滤掉）
+    
+    _log_fsa_graphs(accepted)
     return accepted
+
+
+def _score_fsa_graph(graph: FSAGraph) -> float:
+    """
+    为 FSA 图计算综合评分，用于过滤和排序。
+    
+    评分因素：
+    1. 节点数量（越多越好，表示链条更完整）
+    2. 状态多样性（不同状态的数量，越多越好）
+    3. 状态序列长度（状态段的数量，越多越好）
+    4. POP/DROP 惩罚（trace 中的 POP/DROP 决策越少越好）
+    5. 时间跨度合理性（避免异常长或异常短的时间跨度）
+    
+    返回：
+        float: 评分（越高越好）
+    """
+    if not graph.nodes:
+        return 0.0
+    
+    # 1. 节点数量得分（归一化到 0-1，假设最多 100 个节点）
+    node_count = len(graph.nodes)
+    node_score = min(1.0, node_count / 100.0) * 0.3  # 权重 30%
+    
+    # 2. 状态多样性得分
+    unique_states = set()
+    for node in graph.nodes:
+        if hasattr(node, 'state') and node.state:
+            unique_states.add(node.state)
+    state_diversity = len(unique_states)
+    # 归一化：假设最多 14 个 ATT&CK 状态
+    diversity_score = min(1.0, state_diversity / 14.0) * 0.25  # 权重 25%
+    
+    # 3. 状态序列长度得分（segments 数量）
+    segments = graph.segments()
+    segment_count = len(segments)
+    # 归一化：假设最多 20 个状态段
+    segment_score = min(1.0, segment_count / 20.0) * 0.2  # 权重 20%
+    
+    # 4. POP/DROP 惩罚（越少越好）
+    pop_count = sum(1 for t in graph.trace if t.get("decision") == "POP")
+    drop_count = sum(1 for t in graph.trace if t.get("decision") == "DROP")
+    total_adjustments = pop_count + drop_count
+    # 惩罚：每有一个 POP/DROP，扣 0.05 分（最多扣 0.2）
+    adjustment_penalty = min(0.2, total_adjustments * 0.05)
+    adjustment_score = (1.0 - adjustment_penalty) * 0.15  # 权重 15%
+    
+    # 5. 时间跨度合理性得分
+    try:
+        time_span = graph.t_end - graph.t_start
+        if time_span > 0:
+            # 合理的时间跨度：1 分钟到 24 小时之间
+            # 太短（< 1 分钟）或太长（> 24 小时）都会扣分
+            if time_span < 60:  # 小于 1 分钟
+                time_score = 0.3  # 扣分
+            elif time_span > 86400:  # 大于 24 小时
+                time_score = 0.5  # 扣分
+            else:
+                time_score = 1.0  # 合理范围
+        else:
+            time_score = 0.0  # 无效时间跨度
+    except (AttributeError, TypeError):
+        time_score = 0.5  # 如果无法计算时间跨度，给中等分数
+    time_score = time_score * 0.1  # 权重 10%
+    
+    # 综合评分
+    total_score = node_score + diversity_score + segment_score + adjustment_score + time_score
+    
+    return total_score
+
+
+def _filter_fsa_graphs(graphs: List[FSAGraph]) -> List[FSAGraph]:
+    """
+    使用综合评分算法过滤 FSA 图。
+    
+    策略：
+    1. 计算每个图的评分
+    2. 过滤掉单节点图（通常是噪声）
+    3. 如果还有多个图，保留评分最高的前 N 个（N = max(1, len(graphs) // 2)）
+    4. 如果最高分和次高分差距很大（> 0.3），只保留最高分的图
+    
+    返回：
+        List[FSAGraph]: 过滤后的图列表
+    """
+    if not graphs:
+        return graphs
+    
+    # 1. 计算所有图的评分
+    scored_graphs = [(g, _score_fsa_graph(g)) for g in graphs]
+    
+    # 2. 过滤掉单节点图
+    filtered = [(g, score) for g, score in scored_graphs if len(g.nodes) > 1]
+    
+    # 如果没有多节点图，返回原始结果（避免全部过滤掉）
+    if not filtered:
+        return graphs
+    
+    # 3. 按评分排序
+    filtered.sort(key=lambda x: x[1], reverse=True)
+    
+    # 4. 如果最高分和次高分差距很大（> 0.3），只保留最高分的图
+    if len(filtered) > 1:
+        best_score = filtered[0][1]
+        second_score = filtered[1][1]
+        if best_score - second_score > 0.3:
+            return [filtered[0][0]]
+    
+    # 5. 保留评分最高的前 N 个（N = max(1, len(filtered) // 2)）
+    # 但至少保留 1 个，最多保留 3 个
+    keep_count = max(1, min(3, len(filtered) // 2))
+    return [g for g, _ in filtered[:keep_count]]
 
 
 def _extend_hypothesis(h: _Hypothesis, node: KillChainEdgeNode) -> None:
