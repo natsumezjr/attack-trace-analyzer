@@ -8,6 +8,8 @@ filebeat.inputs:
     paths:
       - /var/log/host/auth.log
       - /var/log/host/auth.log.*
+    tail_files: true
+    ignore_older: 10m
     exclude_lines: ['^\s*$']  # 排除空行
     fields:
       log_type: auth
@@ -19,6 +21,8 @@ filebeat.inputs:
     paths:
       - /var/log/host/syslog
       - /var/log/host/syslog.*
+    tail_files: true
+    ignore_older: 10m
     exclude_lines: ['^\s*$']
     fields:
       log_type: syslog
@@ -30,6 +34,8 @@ filebeat.inputs:
     paths:
       - /var/log/host/kern.log
       - /var/log/host/kern.log.*
+    tail_files: true
+    ignore_older: 10m
     exclude_lines: ['^\s*$']
     fields:
       log_type: kernel

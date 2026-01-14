@@ -11,7 +11,8 @@ from typing import Any, Iterable
 
 import os
 
-from app.services.opensearch import INDEX_PATTERNS, search
+from app.core.time import format_rfc3339
+from app.services.opensearch.internal import INDEX_PATTERNS, search
 
 
 _TECHNIQUE_ID_RE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
@@ -324,7 +325,11 @@ def fetch_attack_techniques_from_canonical_findings(
             "filter": [
                 {"term": {"event.dataset": "finding.canonical"}},
                 {"term": {"host.id": host_id}},
-                {"range": {"@timestamp": {"gte": start_ts.isoformat(), "lte": end_ts.isoformat()}}},
+                {
+                    "range": {
+                        "@timestamp": {"gte": format_rfc3339(start_ts), "lte": format_rfc3339(end_ts)}
+                    }
+                },
             ]
         }
     }

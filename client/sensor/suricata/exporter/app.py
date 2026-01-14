@@ -390,16 +390,13 @@ def process_event(publish, event: Dict[str, Any], raw_line: str) -> None:
     if etype == "flow":
         insert_event(publish, map_flow(event, raw_line))
     elif etype == "dns":
-        insert_event(publish, map_dns(event, raw_line))
-        alert = build_dns_tunnel_alert(event, raw_line)
-        if alert:
-            insert_event(publish, alert)
+        return
     elif etype == "http":
-        insert_event(publish, map_http(event, raw_line))
+        return
     elif etype == "tls":
-        insert_event(publish, map_tls(event, raw_line))
+        return
     elif etype == "icmp":
-        insert_event(publish, map_icmp(event, raw_line))
+        return
     elif etype == "alert":
         insert_event(publish, map_alert(event, raw_line))
 

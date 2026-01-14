@@ -17,7 +17,7 @@ from typing import Any
 
 
 # 使用绝对导入，避免 pytest 收集路径变化导致的相对导入失败
-from app.services.algorithm.attack_fsa import (
+from app.services.analyze.attack_fsa import (
     AttackState,
     TAG_TO_STATE,
     TransitionPolicy,

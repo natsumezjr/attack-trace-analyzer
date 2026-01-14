@@ -414,7 +414,7 @@ if result['findings_count'] > 0:
 else:
     print("\n⚠ 没有findings，可能需要:")
     print("  1. 确保有测试数据")
-    print("  2. 运行 trigger_scan=True 触发新扫描")
+    print("  2. 运行 force_scan=True 强制触发新扫描")
 EOF
 ```
 
@@ -437,6 +437,13 @@ EOF
 ### 步骤 8：手动触发 Workflow 测试 (80%)
 
 **目标**：验证手动触发 workflow 的功能
+
+**注意（重要）**：
+- 在部分 OpenSearch 版本/配置中（例如 3.x），Security Analytics 的 workflow execute 可能会触发 Alerting 读取系统索引，
+  进而报错：`alerting_exception ... indices:data/read/get[s]`。
+- 这类报错即使使用 `admin` + `all_access` 也可能发生，更像是系统索引/插件内部限制，并不一定代表账号权限配置错误。
+- 推荐优先使用步骤 7/10 的 schedule 触发路径（`run_security_analytics(force_scan=True)`），它不依赖 workflow execute。
+  如确实要验证 execute，可设置环境变量：`OPENSEARCH_SA_PREFER_WORKFLOW_EXECUTE=1`。
 
 **指令**：
 ```bash
@@ -553,7 +560,7 @@ print("完整数据分析流程测试")
 print("=" * 60)
 
 # 运行完整流程（检测 + 融合）
-result = run_data_analysis(trigger_scan=True)
+result = run_data_analysis(force_scan=True)
 
 print("\n检测阶段结果:")
 detection = result['detection']

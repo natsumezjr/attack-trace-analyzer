@@ -91,13 +91,213 @@ Analysis 模块不由中心机定时流水线自动触发；定时流水线只�
 - 处理：对每条边计算风险评分，风险评分由“关系类型权重 + 解释性信号”共同决定。
 - 输出：带 `analysis.risk_score` 的边集合，以及任务级摘要特征（Technique 集合等）
 
-#### Phase D：关键路径选择
+#### Phase C：LLM 路径选择（实际实现）
 
-- 输入：Phase C 的子图
-- 处理：选择总风险最高的路径或边集合，作为对外展示的“溯源关键路径”。
-- 输出：关键路径边集合（用于写回 `analysis.is_path_edge=true`）
+- 输入：Phase B 的语义候选子图（包含多个锚点对的候选路径）
+- 处理：
+  - 构建 LLM payload：包含段摘要（段内异常边摘要）和每对锚点的候选路径集合
+  - Payload 裁剪：对字段进行白名单过滤和长度截断，控制 token 数量
+  - 启发式预筛选（可选）：基于 hop 长度和实体一致性对候选路径排序，保留 top-K
+  - LLM 选择：调用 LLM 在全链一致性视角下，为每个锚点对选择一条最可能的路径
+  - 输出验证：校验 LLM 返回的 path_id 是否有效，失败则回退到最短 hop 策略
+- 输出：选中的路径集合（KillChain），包含全链解释文本
 
-### 4.3 解释性摘要（固定输出）
+#### Phase D/E：特征提取与 TTP 比对（当前留白）
+
+- Phase D：从最终 killchain 提取 TTP 特征向量（待实现）
+- Phase E：与现有 TTP 特征库比对（待实现）
+
+### 4.3 算法详细说明
+
+#### 4.3.1 Phase A：攻击阶段骨架（Attack FSA）
+
+**核心思想**：将异常边序列映射为 MITRE ATT&CK 战术状态序列，通过有限状态自动机（FSA）筛选出符合攻击链逻辑的骨架序列。
+
+**算法流程**：
+
+1. **输入预处理**：
+   - 获取时间窗内所有 `is_alarm=true` 的异常边
+   - 按时间戳升序排序，保证处理顺序符合事件时间线
+
+2. **状态映射**：
+   - 从边的 `threat.tactic.name` 字段（或通过 `get_attack_tag()` 方法）提取攻击标签
+   - 将标签映射到 14 个 ATT&CK 战术状态之一：
+     - Reconnaissance（侦察）
+     - Resource Development（资源开发）
+     - Initial Access（初始访问）
+     - Execution（执行）
+     - Persistence（持久化）
+     - Privilege Escalation（权限提升）
+     - Defense Evasion（防御规避）
+     - Credential Access（凭据访问）
+     - Discovery（发现）
+     - Lateral Movement（横向移动）
+     - Collection（收集）
+     - Command and Control（命令与控制）
+     - Exfiltration（数据渗出）
+     - Impact（影响）
+
+3. **状态转移规则**：
+   - 定义 `TransitionPolicy`，指定每个状态允许的后继状态集合
+   - 允许自环（同一阶段多条告警）
+   - 允许从任意状态开始（`allow_start_anywhere=True`）
+   - 支持显式跳转对（`allow_jump_pairs`）
+
+4. **Beam Search 与分支策略**：
+   - 维护多个假设（Hypothesis），每个假设代表一条可能的状态序列
+   - 对每条异常边，尝试将其加入当前假设：
+     - **DIRECT 分支**：如果状态转移合法，直接扩展假设
+     - **POP 分支**：如果转移不合法，回溯 pop 若干关键边，直到可以接入
+     - **DROP 分支**：丢弃该边，认为可能是噪声
+   - 使用去重机制：相同位置、相同末状态、相同末锚点的假设视为等价，只保留评分最高的
+   - Beam 截断：每轮只保留评分最高的 `beam_width` 个假设（默认 30）
+
+5. **评分机制**：
+   - `score_hint = key_edge_count - 0.25 * drops - 0.5 * pops`
+   - 关键边越多越好，DROP/POP 操作会扣分
+
+6. **接受态与输出**：
+   - 当假设到达接受态（默认：Exfiltration、Impact、Command and Control）时，输出一条 FSAGraph
+   - FSAGraph 包含：关键边节点序列（`is_key=True`）、状态段划分、决策 trace
+   - 输出后清空假设，继续寻找下一条链
+
+**关键参数**：
+- `max_backtrack_edges`：POP 分支最多回溯的边数（默认 10）
+- `beam_width`：同时保留的假设数上限（默认 30）
+- `accept_states`：接受态集合（默认包含 Exfiltration、Impact、Command and Control）
+
+#### 4.3.2 Phase B：子图补全（Graph Completion）
+
+**核心思想**：在 Phase A 产生的关键边序列的相邻段锚点之间，枚举候选连接路径，将骨架补全为弱连通子图。
+
+**算法流程**：
+
+1. **段划分**：
+   - 将 FSAGraph 的关键边按状态聚合成连续段（StateSegment）
+   - 每段提供：状态、时间窗口 `[t_start, t_end]`、进入锚点 `anchor_in_uid`、退出锚点 `anchor_out_uid`
+
+2. **锚点对候选路径枚举**：
+   对每个相邻段对 `(seg_i, seg_{i+1})`：
+   - 确定时间窗口：`[seg_i.t_end - margin, seg_{i+1}.t_start + margin]`（margin 用于抗时钟偏差，默认 1.0 秒）
+   - 确定最大 hop 数：根据段状态动态设置（Reconnaissance/Discovery/Lateral Movement 允许 10 hop，Command and Control 允许 6 hop，其他默认 8 hop）
+   - 查询边池：从 Neo4j 获取时间窗内的边，过滤关系类型白名单（SPAWN、LOGON、RUNS_ON、FILE_ACCESS、NET_CONNECT、DNS_QUERY、RESOLVES_TO、HAS_IP）
+   - 路径枚举：
+     - 优先尝试使用 Neo4j API 的路径查询接口（如果返回路径集合，直接使用）
+     - 否则使用本地 BFS 枚举：
+       - 构建无向邻接表（支持双向遍历，提高鲁棒性）
+       - BFS 搜索从 `anchor_out_uid` 到 `anchor_in_uid` 的路径
+       - 限制 hop 数、路径时间单调性（允许 `TIME_SKEW_TOLERANCE_SEC` 容忍）
+       - 限制路径数量（第一轮 `FIRST_K=10`，第二轮 `SECOND_K=25`）
+
+3. **多级枚举策略**：
+   - Stage 1：使用标准 `max_hops` 和 `FIRST_K` 限制枚举
+   - Stage 2：如果 Stage 1 无结果，放宽到 `max_hops+2` 和 `SECOND_K` 限制
+   - 最终每个锚点对最多保留 `MAX_PATHS_PER_PAIR=20` 条候选路径
+
+4. **缓存机制**：
+   - 使用 `AnchorPairCache` 缓存锚点对的候选路径
+   - 缓存 key：`(src_anchor, dst_anchor, t_min_rounded, t_max_rounded, constraints_sig)`
+   - 使用 FIFO 淘汰策略，最大条目数 `MAX_CACHE_ITEMS=300`
+
+5. **段内摘要构建**：
+   - 对每段内的异常边，选取 top-N（默认 6）条信息量较高的边
+   - 构建边摘要：包含 edge_id、时间戳、src/dst、关系类型、关键 ECS 字段（白名单过滤、长度截断）
+
+6. **输出**：
+   - 如果任意相邻锚点对无候选路径，丢弃该 FSAGraph
+   - 否则输出 `SemanticCandidateSubgraph`，包含：FSAGraph、段摘要列表、锚点对候选路径列表
+
+**关键参数**：
+- `TIME_MARGIN_SEC`：锚点窗口扩展 margin（默认 1.0 秒）
+- `TIME_SKEW_TOLERANCE_SEC`：路径内时间单调约束容忍（默认 0.0 秒）
+- `FIRST_K`：第一轮最多保留的候选路径数（默认 10）
+- `SECOND_K`：第二轮最多保留的候选路径数（默认 25）
+- `MAX_PATHS_PER_PAIR`：每对锚点最终给 LLM 的候选路径数上限（默认 20）
+
+#### 4.3.3 Phase C：LLM 路径选择
+
+**核心思想**：使用 LLM 在全链一致性视角下，为每个锚点对选择一条最可能的连接路径，并生成解释文本。
+
+**算法流程**：
+
+1. **Payload 构建**：
+   - 输入：`SemanticCandidateSubgraph`
+   - 构建结构：
+     - `segments`：段摘要列表（包含段状态、时间窗口、锚点、段内异常边摘要）
+     - `pairs`：锚点对列表，每个 pair 包含候选路径集合
+     - 每个候选路径包含：`path_id`、`steps`（路径步骤摘要）
+
+2. **Payload 裁剪（PayloadReducer）**：
+   - 字段白名单过滤：只保留关键解释字段（edge_id、时间戳、关系类型、威胁信息、实体信息等）
+   - 长度截断：字符串字段超过 `max_str_len`（默认 200）时截断
+   - 步数限制：每条候选路径最多保留 `max_steps_per_path`（默认 10）步
+
+3. **启发式预筛选（HeuristicPreselector，可选）**：
+   - 对每个锚点对的候选路径评分：
+     - 基础分：`10.0 / (1.0 + hop)`（hop 越短越好）
+     - 一致性加分：与全局上下文 token（process.entity_id、host.id、user.name 等）的重叠度
+   - 按评分排序，每个 pair 只保留 top-K（默认 8）条候选给 LLM
+   - 维护全局 token 上下文，鼓励跨 pair 的实体一致性
+
+4. **LLM 调用**：
+   - 构建 prompt：
+     - System：定义角色（高级事件响应专家）和任务（选择最可能的 killchain 连接路径）
+     - User：包含任务描述、输出 schema、输入 payload、选择规则
+   - 调用 LLM API（支持 OpenAI 兼容接口）
+   - 期望输出 JSON：
+     ```json
+     {
+       "chosen_path_ids": ["p-...", "p-...", ...],
+       "explanation": "全局解释文本",
+       "pair_explanations": [
+         {"pair_idx": 0, "path_id": "p-...", "why": "解释文本"}
+       ]
+     }
+     ```
+
+5. **输出验证与回退**：
+   - 验证 `chosen_path_ids` 数量必须等于 pairs 数量
+   - 验证每个 `path_id` 必须存在于对应 pair 的候选集合中
+   - 如果验证失败或 LLM 调用失败，回退到 fallback 策略：
+     - 每个 pair 选择 hop 最短的候选路径
+     - 生成占位解释文本
+
+6. **KillChain 物化**：
+   - 将选中的 `path_id` 列表映射回 `CandidatePath` 对象
+   - 生成 `KillChain` 对象，包含：
+     - `kc_uuid`：唯一标识符
+     - `fsa_graph`：原始 FSAGraph
+     - `segments`：段摘要
+     - `selected_paths`：选中的路径集合
+     - `explanation`：全链解释文本
+
+**关键参数**：
+- `per_pair_keep`：每个 pair 最多保留给 LLM 的候选数（默认 8）
+- `max_steps_per_path`：每条候选路径最多步数（默认 10）
+- `max_str_len`：文本字段截断长度（默认 200）
+- `require_pair_explanations`：是否要求逐 pair 解释（默认 True）
+
+#### 4.3.4 Phase D/E：特征提取与 TTP 比对（当前留白）
+
+- **Phase D**：从最终 killchain 提取 TTP 特征向量（待实现）
+- **Phase E**：与现有 TTP 特征库比对（待实现）
+
+#### 4.3.5 结果持久化
+
+**写回逻辑**：
+
+1. **收集边集合**：
+   - Phase A 的关键边（FSA key edges）
+   - Phase C 选中的连接路径边
+
+2. **写入 killchain uuid**：
+   - 对每条边写入 `custom.killchain.uuid = kc_uuid`（ECS 合规字段）
+   - 对边涉及的节点 uid，生成最小 GraphNode 并写入 `custom.killchain.uuid`
+   - 调用 `graph_api.add_edge` 和 `graph_api.add_node` 写入 Neo4j（假设支持 upsert/merge）
+
+3. **边去重**：使用稳定 edge_id（优先 `event.id`，否则基于 src/dst/rtype/ts 的 hash）去重
+
+### 4.4 解释性摘要（固定输出）
 
 任务完成时必须生成 1 段摘要文本，写入：
 
