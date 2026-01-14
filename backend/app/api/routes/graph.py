@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
+from app.services.neo4j import internal as graph_api
 
 
 router = APIRouter()
@@ -63,15 +64,6 @@ def _node_to_dict(node: Any) -> dict[str, Any]:
 
 @router.post("/api/v1/graph/query")
 def graph_query(req: GraphQueryRequest):
-    # Lazy import: graph module depends on neo4j, which may not be installed in every dev env.
-    try:
-        from app.services.neo4j import internal as graph_api  # type: ignore
-    except Exception as error:
-        return JSONResponse(
-            status_code=501,
-            content=err("NOT_IMPLEMENTED", f"graph backend unavailable: {error}"),
-        )
-
     try:
         if req.action == "alarm_edges":
             edges = graph_api.get_alarm_edges()
