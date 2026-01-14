@@ -40,7 +40,7 @@ if sys.platform == 'win32':
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.services.opensearch import deduplicate_findings
+from app.services.opensearch.analysis import deduplicate_findings
 
 print("=" * 60)
 print("OpenSearch Findings 告警去重测试")

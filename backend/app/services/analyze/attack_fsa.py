@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from ..neo4j.models import GraphEdge
+from ..neo4j.internal import GraphEdge
 from ..neo4j.utils import _parse_ts_to_float
 
 
@@ -633,5 +633,4 @@ def _maybe_emit_and_reset(h: _Hypothesis, accept_states: Set[AttackState], out: 
 
     # 输出后清空（与之前 AttackFSA 的“输出后重置”一致）
     h.clear()
-
 

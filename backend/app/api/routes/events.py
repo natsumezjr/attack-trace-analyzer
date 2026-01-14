@@ -8,8 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
-from app.services.opensearch.client import get_client
-from app.services.opensearch.index import INDEX_PATTERNS
+from app.services.opensearch.internal import INDEX_PATTERNS, get_client
 
 
 router = APIRouter()
@@ -112,4 +111,3 @@ def search_events(req: EventsSearchRequest):
         items=items,
         server_time=utc_now_rfc3339(),
     )
-

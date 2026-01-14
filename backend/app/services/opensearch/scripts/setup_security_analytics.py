@@ -14,9 +14,13 @@ from datetime import datetime
 backend_dir = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(backend_dir))
 
-from app.services.opensearch import get_client
-from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
-from app.services.opensearch import initialize_indices, index_exists
+from app.services.opensearch.internal import (
+    INDEX_PATTERNS,
+    get_client,
+    get_index_name,
+    index_exists,
+    initialize_indices,
+)
 
 
 def check_security_analytics_available() -> bool:

@@ -31,14 +31,9 @@ class TestFullWorkflowWithIncremental:
         2. 模拟增量处理（只处理新的findings）
         3. 验证去重和规范findings生成
         """
-        from app.services.opensearch import (
-            store_events,
-            deduplicate_findings,
-            run_data_analysis,
-            search,
-            get_index_name,
-            INDEX_PATTERNS,
-        )
+        from app.services.opensearch import run_data_analysis, store_events
+        from app.services.opensearch.analysis import deduplicate_findings
+        from app.services.opensearch.internal import INDEX_PATTERNS, get_index_name, search
         from app.services.opensearch.analysis import (
             _get_last_processed_timestamp,
             _filter_new_findings,

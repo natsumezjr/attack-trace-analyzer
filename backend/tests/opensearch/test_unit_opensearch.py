@@ -35,14 +35,14 @@ class TestClientOperations:
     
     def test_get_client(self, opensearch_client):
         """测试获取客户端"""
-        from app.services.opensearch import get_client
+        from app.services.opensearch.internal import get_client
         client = get_client()
         assert client is not None
         assert client == opensearch_client  # 单例模式
     
     def test_index_exists(self, initialized_indices):
         """测试检查索引是否存在"""
-        from app.services.opensearch import INDEX_PATTERNS, get_index_name, index_exists
+        from app.services.opensearch.internal import INDEX_PATTERNS, get_index_name, index_exists
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -54,7 +54,7 @@ class TestClientOperations:
     
     def test_search_empty_index(self, initialized_indices):
         """测试搜索空索引"""
-        from app.services.opensearch import INDEX_PATTERNS, get_index_name, search
+        from app.services.opensearch.internal import INDEX_PATTERNS, get_index_name, search
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -64,7 +64,7 @@ class TestClientOperations:
     
     def test_get_document_not_exists(self, initialized_indices):
         """测试获取不存在的文档"""
-        from app.services.opensearch import INDEX_PATTERNS, get_document, get_index_name
+        from app.services.opensearch.internal import INDEX_PATTERNS, get_document, get_index_name
         today = datetime.now()
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today)
         
@@ -114,7 +114,12 @@ class TestIndexManagement:
     
     def test_initialize_indices(self, clean_test_indices):
         """测试初始化所有索引"""
-        from app.services.opensearch import INDEX_PATTERNS, get_index_name, index_exists, initialize_indices
+        from app.services.opensearch.internal import (
+            INDEX_PATTERNS,
+            get_index_name,
+            index_exists,
+            initialize_indices,
+        )
 
         initialize_indices()
         
@@ -134,7 +139,7 @@ class TestStorageOperations:
     
     def test_route_to_index_event(self):
         """测试事件路由到ecs-events索引"""
-        from app.services.opensearch import route_to_index
+        from app.services.opensearch.internal import route_to_index
 
         event = create_test_event("evt-001", kind="event")
         index_name = route_to_index(event)
@@ -143,7 +148,7 @@ class TestStorageOperations:
     
     def test_route_to_index_raw_finding(self):
         """测试原始告警路由到raw-findings索引"""
-        from app.services.opensearch import route_to_index
+        from app.services.opensearch.internal import route_to_index
 
         finding = create_test_finding("finding-001")
         index_name = route_to_index(finding)
@@ -152,7 +157,7 @@ class TestStorageOperations:
     
     def test_route_to_index_canonical_finding(self):
         """测试规范告警路由到canonical-findings索引"""
-        from app.services.opensearch import route_to_index
+        from app.services.opensearch.internal import route_to_index
 
         finding = create_test_finding("finding-001")
         finding["event"]["dataset"] = "finding.canonical"
@@ -335,7 +340,7 @@ class TestAnalysisOperations:
     
     def test_deduplicate_findings_empty(self, initialized_indices):
         """测试去重空索引"""
-        from app.services.opensearch import deduplicate_findings
+        from app.services.opensearch.analysis import deduplicate_findings
         
         result = deduplicate_findings()
         
@@ -346,7 +351,8 @@ class TestAnalysisOperations:
     
     def test_deduplicate_findings_with_data(self, initialized_indices):
         """测试去重有数据的索引"""
-        from app.services.opensearch import deduplicate_findings, store_events
+        from app.services.opensearch import store_events
+        from app.services.opensearch.analysis import deduplicate_findings
         
         # 创建多个相似的findings（相同technique和host）
         findings = []
@@ -370,7 +376,7 @@ class TestAnalysisOperations:
     
     def test_run_security_analytics(self, initialized_indices):
         """测试运行Security Analytics（当前为MVP版本）"""
-        from app.services.opensearch import run_security_analytics
+        from app.services.opensearch.analysis import run_security_analytics
         
         result = run_security_analytics()
         
@@ -410,7 +416,7 @@ class TestEdgeCases:
     
     def test_search_with_complex_query(self, initialized_indices):
         """测试复杂查询"""
-        from app.services.opensearch import INDEX_PATTERNS, get_index_name, search
+        from app.services.opensearch.internal import INDEX_PATTERNS, get_index_name, search
         
         index_name = get_index_name(INDEX_PATTERNS["ECS_EVENTS"])
         
