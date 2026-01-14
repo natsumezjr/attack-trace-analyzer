@@ -626,6 +626,87 @@ def close() -> None:
     _DRIVER = None
 
 
+def set_analysis_task_id(target: GraphNode | GraphEdge | str, task_id: str) -> int:
+    """Set analysis.task_id on a node or edge."""
+    if not isinstance(task_id, str):
+        raise ValueError("task_id must be a string")
+    ensure_schema()
+    with _get_session() as session:
+        if isinstance(target, GraphEdge):
+            return _execute_write(session, _set_analysis_task_id_edge_tx, target, task_id)
+        if isinstance(target, GraphNode):
+            uid = target.uid
+        elif isinstance(target, str):
+            uid = target
+        else:
+            raise ValueError("target must be a GraphNode, GraphEdge, or node uid string")
+        return _execute_write(session, _set_analysis_task_id_node_tx, uid, task_id)
+
+
+def _set_analysis_task_id_node_tx(tx, uid: str, task_id: str) -> int:
+    """Set analysis.task_id on a single node."""
+    label, key = parse_uid(uid)
+    params: Dict[str, Any] = {"task_id": task_id}
+
+    clause_parts = []
+    for k, v in key.items():
+        param = _param_key(k)
+        clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    clause = ", ".join(clause_parts)
+
+    cypher = (
+        f"MATCH (n:{label.value} {{{clause}}}) "
+        f"SET n.{_cypher_prop('analysis.task_id')} = $task_id "
+        "RETURN count(n) AS cnt"
+    )
+    record = tx.run(cypher, **params).single()
+    if record is None:
+        return 0
+    count = record.get("cnt")
+    return int(count) if isinstance(count, (int, float)) else 0
+
+
+def _set_analysis_task_id_edge_tx(tx, edge: GraphEdge, task_id: str) -> int:
+    """Set analysis.task_id on a single edge."""
+    if not isinstance(edge.props, dict):
+        return 0
+    event_id = edge.props.get("event.id")
+    if not isinstance(event_id, str) or not event_id:
+        return 0
+
+    src_label, src_key = parse_uid(edge.src_uid)
+    dst_label, dst_key = parse_uid(edge.dst_uid)
+
+    params: Dict[str, Any] = {"event_id": event_id, "task_id": task_id}
+
+    src_clause_parts = []
+    for k, v in src_key.items():
+        param = _param_key(f"src_{k}")
+        src_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    src_clause = ", ".join(src_clause_parts)
+
+    dst_clause_parts = []
+    for k, v in dst_key.items():
+        param = _param_key(f"dst_{k}")
+        dst_clause_parts.append(f"{_cypher_prop(k)}: ${param}")
+        params[param] = v
+    dst_clause = ", ".join(dst_clause_parts)
+
+    cypher = (
+        f"MATCH (s:{src_label.value} {{{src_clause}}})-[r:{edge.rtype.value}]->(t:{dst_label.value} {{{dst_clause}}}) "
+        f"WHERE r.{_cypher_prop('event.id')} = $event_id "
+        f"SET r.{_cypher_prop('analysis.task_id')} = $task_id "
+        "RETURN count(r) AS cnt"
+    )
+    record = tx.run(cypher, **params).single()
+    if record is None:
+        return 0
+    count = record.get("cnt")
+    return int(count) if isinstance(count, (int, float)) else 0
+
+
 def write_analysis_results(
     edges: Sequence[GraphEdge],
     *,
