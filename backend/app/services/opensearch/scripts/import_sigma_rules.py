@@ -108,8 +108,8 @@ def test_opensearch_connection() -> bool:
         print(f"\n[错误] 连接测试失败: {type(e).__name__}: {e}")
         return False
 
-# Sigma 规则目录
-SIGMA_RULES_DIR = Path(__file__).parent / "sigma-rules"
+# Sigma 规则目录（在 opensearch 目录下，不在 scripts 目录下）
+SIGMA_RULES_DIR = Path(__file__).parent.parent / "sigma-rules"
 
 # ECS 字段映射（Sigma 字段 -> ECS 字段）
 SIGMA_TO_ECS_MAPPING = {
@@ -339,7 +339,7 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             rule_data = yaml.safe_load(f)
         
         if not rule_data:
-            print(f"✗ 导入失败: {rule_file.name} (无法解析 YAML)")
+            print(f"[X] 导入失败: {rule_file.name} (无法解析 YAML)")
             return False
         
         # 序列化日期字段（date 和 modified）
@@ -411,7 +411,7 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             finally:
                 client.close()  # 确保关闭连接
         except httpx.ConnectError as e:
-            print(f"✗ 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_URL}")
+            print(f"[X] 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_URL}")
             print(f"  错误详情: {e}")
             print(f"  请检查:")
             print(f"    1) OpenSearch服务是否运行 (docker ps)")
@@ -419,35 +419,35 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             print(f"    3) 防火墙/网络是否允许连接")
             return False
         except httpx.TimeoutException as e:
-            print(f"✗ 超时错误: {rule_file.name} - 连接超时")
+            print(f"[X] 超时错误: {rule_file.name} - 连接超时")
             print(f"  错误详情: {e}")
             print(f"  提示: OpenSearch可能响应缓慢，请检查服务状态")
             return False
         except httpx.HTTPStatusError as e:
-            print(f"✗ HTTP状态错误: {rule_file.name} - {e.response.status_code}")
+            print(f"[X] HTTP状态错误: {rule_file.name} - {e.response.status_code}")
             print(f"  响应: {e.response.text[:300]}")
             return False
         except httpx.HTTPError as e:
-            print(f"✗ HTTP错误: {rule_file.name} - {e}")
+            print(f"[X] HTTP错误: {rule_file.name} - {e}")
             return False
         except Exception as e:
-            print(f"✗ 未知错误: {rule_file.name} - {type(e).__name__}: {e}")
+            print(f"[X] 未知错误: {rule_file.name} - {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
             return False
         
         if response.status_code in [200, 201]:
-            print(f"✓ 成功导入: {rule_file.name} (category: {category})")
+            print(f"[OK] 成功导入: {rule_file.name} (category: {category})")
             return True
         else:
-            print(f"✗ 导入失败: {rule_file.name} (状态码: {response.status_code})")
+            print(f"[X] 导入失败: {rule_file.name} (状态码: {response.status_code})")
             print(f"  响应: {response.text[:300]}")
             return False
     except yaml.YAMLError as e:
-        print(f"✗ 导入错误: {rule_file.name} - YAML 解析失败: {e}")
+        print(f"[X] 导入错误: {rule_file.name} - YAML 解析失败: {e}")
         return False
     except Exception as e:
-        print(f"✗ 导入错误: {rule_file.name} - {e}")
+        print(f"[X] 导入错误: {rule_file.name} - {e}")
         import traceback
         traceback.print_exc()
         return False
