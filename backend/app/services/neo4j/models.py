@@ -29,22 +29,21 @@ class RelType(str, Enum):
     RESOLVES_TO = "RESOLVES_TO"
     HAS_IP = "HAS_IP"
 
-# 每种节点类型的唯一键字段
-    # 这里的定义是为例parase时简写时正确解析
-    # uid = "Host:host.id=h-aaa" parse_uid(uid)
-    # uid = "Host:h-aaa" parse_uid(uid)简写# 定义各节点的key字段
+# 每种节点类型的唯一键字段（用于 parse_uid 简写解析）
+# 说明：这里定义的是短写解析时使用的单一字段名，实际实现中某些节点类型使用复合键
+# 例如：File 实际使用 (host.id, file.path) 复合键，但短写 "File:/path" 仍可解析为 {"file.path": "/path"}
 NODE_UNIQUE_KEY: dict[NodeType, str] = {
     NodeType.HOST: "host.id",
     # User 优先使用 user.id；当 user.id 缺失时使用 (host.id, user.name) 复合键。
     NodeType.USER: "user.id",
     NodeType.PROCESS: "process.entity_id",
-    # File 在 v2 中使用 (host.id, file.path) 复合键；短写解析仍使用 file.path。
+    # File 实际使用 (host.id + file.path) 复合键；此处保留 file.path 仅用于短写解析兜底。
     NodeType.FILE: "file.path",
     NodeType.IP: "ip",
     NodeType.DOMAIN: "domain.name",
 }
 
-# 定义边的类型规则(每种边允许的源节点类型和目标节点类型)# 定义连接规则
+# 定义边的类型规则：每种边允许的源节点类型和目标节点类型
 EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.LOGON: ({NodeType.USER}, {NodeType.HOST}),
     RelType.RUNS_ON: ({NodeType.PROCESS}, {NodeType.HOST}),
@@ -56,26 +55,24 @@ EDGE_TYPE_RULES: dict[RelType, tuple[set[NodeType], set[NodeType]]] = {
     RelType.HAS_IP: ({NodeType.HOST}, {NodeType.IP}),
 }
 
-# 去重逻辑：避免因为数据源不同导致同一结点重复定义
+# 去重逻辑：避免因为数据源不同导致同一节点重复定义
 
-# 辅助函数：生成唯一ID(hash前16位)
+# 辅助函数：生成唯一 ID（SHA1 hash 前 16 位）
 def _sha1_hex(raw: str) -> str:
     return sha1(raw.encode("utf-8")).hexdigest()[:16]
 
-# 生成Host ID# host_id生成
+# 生成 Host ID
 def make_host_id(host_name: str) -> str:
     return f"h-{_sha1_hex(host_name)}"
-# process_entity_id生成# 生成进程 ID(主机+PID+启动时间+执行路径 定义)
+# 生成进程 ID（host_id + pid + start_ts + executable 的组合）
 def make_process_entity_id(host_id: str, pid: int, start_ts: str, executable: str) -> str:
     raw = f"{host_id}:{pid}:{start_ts}:{executable}"
     return f"p-{_sha1_hex(raw)}"
 
-# 给类的实例创建唯一标识符uid
-# UID 是一个字符串，格式固定："<Label>:key=value;k=v"
+# 构建 Node UID 字符串
+# UID 格式："<Label>:key=value" 或 "<Label>:k1=v1;k2=v2"（复合键按字段名排序）
 # 前缀是节点类型（Host/User/Process/...）
 # 后面是若干个 k=v（key field = value），用来表达这个节点的唯一键
-
-# 构建 UID 字符串
 def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     items = [(k, v) for k, v in key.items() if v is not None]
     if not items:
@@ -87,7 +84,7 @@ def build_uid(ntype: NodeType, key: Mapping[str, Any]) -> str:
     payload = ";".join(f"{k}={v}" for k, v in items)
     return f"{ntype.value}:{payload}"
 
-# 解析 UID 字符串，返回节点类型和唯一键字典# 基于标识符获得类的实例
+# 解析 UID 字符串，返回节点类型和唯一键字典
 def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     if ":" not in uid:
         raise ValueError(f"Invalid uid format: {uid}")
@@ -112,11 +109,6 @@ def parse_uid(uid: str) -> tuple[NodeType, dict[str, Any]]:
     return label, {key_field: rest}
 
 
-# GraphNode节点数据结构
-    # 节点类型ntype
-    # 唯一键key
-    # 其他属性props
-    # merged_props方法将key和props合并，key中的非None值优先级更高。
 # 图的节点定义
 @dataclass
 class GraphNode:
@@ -137,11 +129,6 @@ class GraphNode:
         return merged
 
 # 图的边定义
-# GraphEdge边数据结构
-    # 源节点UID src_uid
-    # 目标节点UID dst_uid
-    # 关系类型rtype
-    # 其他属性props(其他攻击相关属性)
 @dataclass
 class GraphEdge:
     src_uid: str
@@ -184,6 +171,19 @@ def host_node(
     host_name: str | None = None,
     props: dict[str, Any] | None = None,
 ) -> GraphNode:
+    """创建 Host 节点。
+
+    Args:
+        host_id: 主机 ID（若为 None 则根据 host_name 生成）
+        host_name: 主机名称
+        props: 其他属性
+
+    Returns:
+        GraphNode: Host 节点实例
+
+    Raises:
+        ValueError: 当 host_id 和 host_name 都为 None 时
+    """
     if host_id is None and host_name is None:
         raise ValueError("host_id or host_name is required.")
     if host_id is None:
@@ -205,7 +205,6 @@ def user_node(
 ) -> GraphNode:
     if user_name is None and user_id is None:
         raise ValueError("user_name or user_id is required.")
-    node_props = dict(props or {})
     node_props = dict(props or {})
 
     if user_name is not None:

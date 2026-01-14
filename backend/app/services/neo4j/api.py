@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Iterable, Mapping
 import uuid
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -158,19 +157,24 @@ def add_edge(edge: GraphEdge) -> None:
     """Create an edge in Neo4j.
 
     关键：为 Phase B 的窗口过滤和 GDS 投影，写入数值时间戳 r.ts_float。
+
+    Args:
+        edge: 要写入的边
+
+    Raises:
+        ValueError: 当 edge 的 src_uid 或 dst_uid 格式无效时
+        Neo4jError: 当数据库写入失败时
     """
     ensure_schema()
 
     # Best-effort: store a numeric timestamp for window/GDS queries.
-    try:
-        if isinstance(getattr(edge, "props", None), dict):
-            ts_float = edge.props.get("ts_float")
-            if not isinstance(ts_float, (int, float)):
-                ts = edge.get_ts() if hasattr(edge, "get_ts") else None
-                if ts is not None:
-                    edge.props["ts_float"] = _parse_ts_to_float(str(ts))
-    except Exception:
-        pass
+    # 如果时间戳解析失败，边仍然可以写入，只是没有 ts_float 优化字段。
+    if isinstance(getattr(edge, "props", None), dict):
+        ts_float = edge.props.get("ts_float")
+        if not isinstance(ts_float, (int, float)):
+            ts = edge.get_ts() if hasattr(edge, "get_ts") else None
+            if ts is not None:
+                edge.props["ts_float"] = _parse_ts_to_float(str(ts))
 
     with _get_session() as session:
         _execute_write(session, _create_edge, edge)
@@ -207,6 +211,17 @@ def _create_edge(tx, edge: GraphEdge) -> None:
 
 # 按 UID 查询单个节点
 def get_node(uid: str) -> Optional[GraphNode]:
+    """查询给定 UID 的节点。
+
+    Args:
+        uid: 节点 UID（格式："NodeType:key=value"）
+
+    Returns:
+        GraphNode: 节点实例，如果不存在则返回 None
+
+    Raises:
+        ValueError: 当 uid 格式无效时
+    """
     label, key = parse_uid(uid)
     with _get_session() as session:
         props = _execute_read(session, _fetch_node, label, key)
@@ -235,6 +250,14 @@ def _fetch_node(tx, label: NodeType, key: Dict[str, Any]) -> Optional[Dict[str, 
 
 # 查询节点相关边
 def get_edges(node: GraphNode) -> List[GraphEdge]:
+    """查询与给定节点相关的所有边。
+
+    Args:
+        node: 节点实例
+
+    Returns:
+        List[GraphEdge]: 相关边的列表
+    """
     with _get_session() as session:
         rows = _execute_read(session, _fetch_edges, node)
     edges: List[GraphEdge] = []
@@ -270,7 +293,11 @@ def _fetch_edges(tx, node: GraphNode) -> List[Dict[str, Any]]:
 
 # 查询告警边集合
 def get_alarm_edges() -> List[GraphEdge]:
-    """Return all edges labeled as alarms (r.is_alarm = true)."""
+    """查询所有告警边（is_alarm = true 的边）。
+
+    Returns:
+        List[GraphEdge]: 告警边的列表
+    """
     with _get_session() as session:
         rows = _execute_read(session, _fetch_alarm_edges)
     edges: List[GraphEdge] = []
@@ -306,7 +333,17 @@ def get_edges_in_window(
     allowed_reltypes: Optional[Sequence[str]] = None,
     only_alarm: bool = False,
 ) -> List[GraphEdge]:
-    """查询一个时间窗口内的所有边（可选关系类型/告警过滤）"""
+    """查询时间窗口内的所有边。
+
+    Args:
+        t_min: 时间窗口起始时间（Unix 时间戳，秒）
+        t_max: 时间窗口结束时间（Unix 时间戳，秒）
+        allowed_reltypes: 允许的关系类型列表，None 表示允许所有类型
+        only_alarm: 是否只返回告警边
+
+    Returns:
+        List[GraphEdge]: 时间窗口内的边列表
+    """
     with _get_session() as session:
         rows = _execute_read(
             session,
@@ -378,7 +415,20 @@ def gds_shortest_path_in_window(
     min_risk: float = 0.0,
     allowed_reltypes: Optional[Sequence[str]] = None,
 ) -> Optional[Tuple[float, List[GraphEdge]]]:
-    """Compute weighted shortest path via Neo4j GDS on a time-window projected graph."""
+    """使用 Neo4j GDS 计算时间窗内的加权最短路径。
+
+    Args:
+        src_uid: 源节点 UID
+        dst_uid: 目标节点 UID
+        t_min: 时间窗口起始时间（Unix 时间戳，秒）
+        t_max: 时间窗口结束时间（Unix 时间戳，秒）
+        risk_weights: 关系类型到风险权重的映射
+        min_risk: 最小风险阈值，低于此值的边将被过滤
+        allowed_reltypes: 允许的关系类型列表，None 表示允许所有类型
+
+    Returns:
+        Optional[Tuple[float, List[GraphEdge]]]: (总成本, 边列表)，如果路径不存在则返回 None
+    """
     if src_uid == dst_uid:
         return 0.0, []
 
@@ -820,32 +870,3 @@ def ingest_from_opensearch(
         total_edges += edge_count
 
     return total_events, total_nodes, total_edges
-
-
-
-
-def _fetch_edges_inter_nodes(tx, node_uids: List[str], t_start: float, t_end: float) -> List[Dict[str, Any]]:
-    params: Dict[str, Any] = {"t_min": float(t_start), "t_max": float(t_end)}
-
-    # Match each uid into a bound variable.
-    match_parts: List[str] = []
-    id_parts: List[str] = []
-    for idx, uid in enumerate(node_uids):
-        alias = f"n{idx}"
-        match_parts.append(_match_clause_for_uid(uid, alias, params, f"u{idx}"))
-        id_parts.append(f"id({alias})")
-
-    match_clause = "\n".join(match_parts)
-    ids_expr = ", ".join(id_parts)
-
-    cypher = (
-        f"{match_clause}\n"
-        f"WITH [{ids_expr}] AS node_ids\n"
-        "MATCH (s)-[r]->(t)\n"
-        "WHERE id(s) IN node_ids AND id(t) IN node_ids\n"
-        "AND coalesce(r.ts_float, 0.0) >= $t_min AND coalesce(r.ts_float, 0.0) <= $t_max\n"
-        "RETURN type(r) AS rtype, properties(r) AS rprops, "
-        "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
-        "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
-    )
-    return list(tx.run(cypher, **params))
