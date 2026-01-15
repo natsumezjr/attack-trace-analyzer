@@ -1,9 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"go-client/queue"
 
@@ -15,6 +23,22 @@ func main() {
 	falcoQueue := getEnv("FALCO_QUEUE", "data.falco")
 	filebeatQueue := getEnv("FILEBEAT_QUEUE", "data.filebeat")
 	suricataQueue := getEnv("SURICATA_QUEUE", "data.suricata")
+	serverIP := getEnv("SERVER_IP", "")
+	selfIP := getEnv("SELF_IP", "")
+
+	if serverIP == "" {
+		log.Fatal("SERVER_IP is required")
+	}
+	if selfIP == "" {
+		var err error
+		selfIP, err = getLocalIPv4()
+		if err != nil {
+			log.Fatalf("failed to detect local IP, set SELF_IP: %v", err)
+		}
+	}
+	if err := registerTarget(serverIP, selfIP); err != nil {
+		log.Fatalf("failed to register target: %v", err)
+	}
 
 	client, err := queue.NewClient(amqpURL, log.Default())
 	if err != nil {
@@ -56,4 +80,79 @@ func getEnv(key string, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+func registerTarget(serverIP string, selfIP string) error {
+	registerURL := buildServerURL(serverIP) + "/api/v1/targets/register"
+	payload := map[string]string{"ip": selfIP}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal register payload: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create register request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send register request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		msg := strings.TrimSpace(string(respBody))
+		if msg == "" {
+			msg = "empty response body"
+		}
+		return fmt.Errorf("register request failed with %s: %s", resp.Status, msg)
+	}
+
+	return nil
+}
+
+func buildServerURL(serverIP string) string {
+	serverIP = strings.TrimRight(serverIP, "/")
+	if strings.HasPrefix(serverIP, "http://") || strings.HasPrefix(serverIP, "https://") {
+		return serverIP
+	}
+	return "http://" + serverIP
+}
+
+func getLocalIPv4() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", fmt.Errorf("list interfaces: %w", err)
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", errors.New("no non-loopback IPv4 address found")
 }

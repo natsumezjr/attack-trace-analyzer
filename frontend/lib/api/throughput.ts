@@ -1,5 +1,6 @@
 export type ThroughputResponse = {
-  ok: boolean;
+  ok?: boolean;
+  status?: string;
   throughput_bytes: number;
   last_poll_time: string;
   server_time: string;
@@ -15,11 +16,13 @@ export async function fetchThroughput(): Promise<ThroughputResponse> {
 
 export async function getThroughputKb(): Promise<{
   kb: number;
+  lastPollTime: string;
   serverTime: string;
 }> {
   const data = await fetchThroughput();
   return {
     kb: data.throughput_bytes / 1024,
+    lastPollTime: data.last_poll_time,
     serverTime: data.server_time,
   };
 }

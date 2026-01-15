@@ -203,4 +203,3 @@ async def stop_polling() -> None:
     finally:
         _stop_event = None
         _poll_task = None
-

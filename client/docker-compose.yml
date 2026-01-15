@@ -139,6 +139,10 @@ services:
       FALCO_QUEUE: "data.falco"
       FILEBEAT_QUEUE: "data.filebeat"
       SURICATA_QUEUE: "data.suricata"
+      # Required: registration server host[:port], e.g. "host.docker.internal:8080".
+      SERVER_IP: ${SERVER_IP}
+      # Optional override; otherwise backend auto-detects a non-loopback IPv4.
+      SELF_IP: ${SELF_IP:-}
     depends_on:
       rabbitmq:
         condition: service_healthy
