@@ -20,8 +20,9 @@ from pathlib import Path
 from datetime import datetime
 import os
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 # 设置环境变量（如果需要）
@@ -30,9 +31,9 @@ if "OPENSEARCH_INITIAL_ADMIN_PASSWORD" not in os.environ:
     os.environ["OPENSEARCH_INITIAL_ADMIN_PASSWORD"] = "OpenSearch@2024!Dev"
 
 # 使用internal模块导入内部接口（scripts应该使用internal）
-from opensearch.internal import get_client, INDEX_PATTERNS, get_index_name
-from opensearch import store_events
-from opensearch.analysis import (
+from app.services.opensearch.internal import get_client, INDEX_PATTERNS, get_index_name
+from app.services.opensearch import store_events
+from app.services.opensearch.analysis import (
     run_data_analysis,
     _check_and_setup_rules_detectors,
     _convert_security_analytics_finding_to_ecs,

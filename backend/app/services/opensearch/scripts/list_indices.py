@@ -10,22 +10,50 @@
 
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client, get_index_name, INDEX_PATTERNS
+from app.services.opensearch.internal import get_client, get_index_name, INDEX_PATTERNS, initialize_indices
+from app.services.opensearch.client import index_exists
 
 
 def list_all_indices():
-    """列出所有索引"""
+    """列出所有索引，如果缺少必要索引则自动创建"""
     client = get_client()
     
     print("=" * 80)
     print("OpenSearch 索引列表")
     print("=" * 80)
+    
+    # 检查并创建缺失的必要索引
+    today = datetime.now(timezone.utc)
+    required_indices = {
+        "ECS_EVENTS": get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today),
+        "RAW_FINDINGS": get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today),
+        "CANONICAL_FINDINGS": get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today),
+        "ATTACK_CHAINS": get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
+    }
+    
+    missing_indices = []
+    for index_type, index_name in required_indices.items():
+        if not index_exists(index_name):
+            missing_indices.append((index_type, index_name))
+    
+    if missing_indices:
+        print(f"\n[INFO] 检测到 {len(missing_indices)} 个缺失的必要索引，正在自动创建...")
+        for index_type, index_name in missing_indices:
+            print(f"  - {index_type}: {index_name}")
+        
+        try:
+            initialize_indices()
+            print("[OK] 索引创建完成")
+        except Exception as e:
+            print(f"[WARNING] 自动创建索引失败: {e}")
+            print("[INFO] 将继续列出现有索引")
     
     try:
         # 获取所有索引

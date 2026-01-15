@@ -13,12 +13,13 @@ import sys
 import argparse
 from pathlib import Path
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client
-from opensearch.analysis import (
+from app.services.opensearch.internal import get_client
+from app.services.opensearch.analysis import (
     run_security_analytics,
     run_data_analysis,
     SA_FINDINGS_SEARCH_API,
@@ -27,8 +28,9 @@ from opensearch.analysis import (
     _should_trigger_scan,
     _fetch_and_store_findings,
     _get_latest_findings_count,
+    _get_latest_findings_timestamp,
 )
-from opensearch.trigger_lock import complete_trigger
+from app.services.opensearch.trigger_lock import complete_trigger
 
 
 def run_detector_scan(detector_id: str, detector_name: str, trigger_scan: bool = True, max_wait_seconds: int = 120) -> dict:
@@ -36,8 +38,8 @@ def run_detector_scan(detector_id: str, detector_name: str, trigger_scan: bool =
     client = get_client()
     
     try:
-        # 查询已有findings数量
-        baseline_count = _get_latest_findings_count(client, detector_id)
+        # 查询已有findings的时间戳和数量
+        baseline_timestamp_ms, baseline_count = _get_latest_findings_timestamp(client, detector_id)
         
         # 判断是否需要触发新扫描
         need_trigger = _should_trigger_scan(trigger_scan, baseline_count)
@@ -55,7 +57,7 @@ def run_detector_scan(detector_id: str, detector_name: str, trigger_scan: bool =
             if detector:
                 try:
                     scan_info = _trigger_scan_with_lock(
-                        client, detector_id, detector, baseline_count, max_wait_seconds
+                        client, detector_id, detector, baseline_timestamp_ms, baseline_count, max_wait_seconds
                     )
                 except Exception as trigger_error:
                     print(f"[WARNING] 触发检测时出错: {trigger_error}")

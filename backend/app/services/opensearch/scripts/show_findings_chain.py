@@ -15,11 +15,12 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client, get_index_name, INDEX_PATTERNS
+from app.services.opensearch.internal import get_client, get_index_name, INDEX_PATTERNS
 
 
 def get_raw_findings():

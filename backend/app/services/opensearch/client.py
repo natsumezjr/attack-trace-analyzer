@@ -180,12 +180,22 @@ def search(
     client = get_client()
 
     try:
+        # 先检查索引是否存在
+        if not index_exists(index_name):
+            print(f"[INFO] 索引不存在: {index_name}，返回空结果")
+            return []
+        
         response = client.search(
             index=index_name,
             body={"query": query, "size": size},
         )
         return [hit["_source"] for hit in response["hits"]["hits"]]
     except Exception as error:
+        error_str = str(error)
+        # 如果是索引不存在的错误，返回空列表而不是抛出异常
+        if 'index_not_found' in error_str.lower() or '404' in error_str:
+            print(f"[INFO] 索引不存在: {index_name}，返回空结果")
+            return []
         print(f"查询 {index_name} 失败: {error}")
         raise
 
