@@ -12,6 +12,8 @@ from app.core.time import format_rfc3339, parse_datetime
 from app.services.analyze.pipeline import new_task_id
 from app.services.analyze.runner import enqueue_analysis_task
 from app.services.opensearch.internal import get_client
+from app.services.analyze import analyze_killchain
+import uuid
 
 
 router = APIRouter()
@@ -183,4 +185,89 @@ def get_analysis_task(task_id: str):
                 doc[k] = format_rfc3339(dt)
 
     return ok(task=doc, server_time=utc_now_rfc3339())
+
+
+# ============================================
+# 测试接口：直接测试 killchain 分析
+# 注意：这是一个临时测试接口，方便删除
+# ============================================
+@router.post("/api/v1/analysis/killchain/test")
+def test_killchain_analysis():
+    """
+    测试接口：直接运行 killchain 分析
+    
+    此接口会：
+    1. 自动加载测试数据到数据库（如果数据库为空）
+    2. 运行完整的 killchain 分析流水线
+    3. 返回分析结果
+    
+    注意：这是一个临时测试接口，测试完成后可以删除
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("[TEST] test_killchain_analysis endpoint called")
+    print("[TEST] test_killchain_analysis endpoint called")
+    
+    try:
+        # 检查 LLM 配置
+        import os
+        llm_provider = os.getenv("LLM_PROVIDER", "not_set")
+        has_api_key = bool(os.getenv("DEEPSEEK_API_KEY"))
+        logger.info(f"[TEST] LLM配置检查: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+        print(f"[TEST] LLM配置检查: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+        
+        if llm_provider.lower() == "mock" or not has_api_key:
+            error_detail = (
+                "killchain 测试必须使用真实大模型。\n"
+                f"当前配置: LLM_PROVIDER={llm_provider}, DEEPSEEK_API_KEY={'已设置' if has_api_key else '未设置'}\n"
+                "请设置环境变量 LLM_PROVIDER=deepseek 和 DEEPSEEK_API_KEY=your_key"
+            )
+            logger.error(f"[TEST] {error_detail}")
+            return JSONResponse(
+                status_code=400,
+                content=err("BAD_REQUEST", error_detail),
+            )
+        
+        # 生成一个 killchain UUID
+        kc_uuid = str(uuid.uuid4())
+        logger.info(f"[TEST] Generated kc_uuid: {kc_uuid}")
+        print(f"[TEST] Generated kc_uuid: {kc_uuid}")
+        
+        # 运行 killchain 分析
+        # analyze_killchain 内部会调用 load_test_fsa_to_database() 加载测试数据
+        logger.info("[TEST] Calling analyze_killchain...")
+        print("[TEST] Calling analyze_killchain...")
+        killchains = analyze_killchain(kc_uuid)
+        logger.info(f"[TEST] analyze_killchain returned {len(killchains)} killchains")
+        print(f"[TEST] analyze_killchain returned {len(killchains)} killchains")
+        
+        # 格式化返回结果
+        result = {
+            "kc_uuid": kc_uuid,
+            "killchain_count": len(killchains),
+            "killchains": []
+        }
+        
+        for kc in killchains:
+            kc_info = {
+                "kc_uuid": kc.kc_uuid,
+                "confidence": kc.confidence,
+                "explanation": kc.explanation,
+                "segment_count": len(kc.segments) if kc.segments else 0,
+                "selected_path_count": len(kc.selected_paths) if kc.selected_paths else 0,
+            }
+            result["killchains"].append(kc_info)
+        
+        return ok(
+            message="Killchain 分析完成",
+            result=result,
+            server_time=utc_now_rfc3339(),
+        )
+    except Exception as error:
+        import traceback
+        error_trace = traceback.format_exc()
+        return JSONResponse(
+            status_code=500,
+            content=err("INTERNAL_ERROR", f"killchain 分析失败: {str(error)}\n{error_trace}"),
+        )
 
