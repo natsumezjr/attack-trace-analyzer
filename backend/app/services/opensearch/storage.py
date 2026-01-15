@@ -137,7 +137,7 @@ def _dotted_to_nested(doc: dict[str, Any]) -> None:
     """
     Normalize flattened ECS keys (e.g. "event.id") into nested objects.
 
-    Rules (docs/80-规范/81-ECS字段规范.md):
+    Rules (docs/51-ECS字段规范.md):
     - Nested object semantics win when both exist.
     - After a successful merge, the dotted key is removed.
     """
@@ -176,7 +176,7 @@ def _dotted_to_nested(doc: dict[str, Any]) -> None:
 
 def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
     """
-    Enforce the "公共字段" subset from docs/80-规范/81-ECS字段规范.md.
+    Enforce the "公共字段" subset from docs/51-ECS字段规范.md.
 
     We intentionally do best-effort filling for missing fields when safe:
     - Default/normalize event.kind
@@ -498,7 +498,7 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
 
 def _normalize_three_timestamps(doc: dict[str, Any], *, ingested_now: str) -> dict[str, Any] | None:
     """
-    Enforce docs/80-规范/81-ECS字段规范.md 三时间字段：
+    Enforce docs/51-ECS字段规范.md 三时间字段：
     - @timestamp: 主时间轴（必须可推导；否则丢弃）
     - event.created: 观察时间（缺失则回填为 @timestamp）
     - event.ingested: 中心侧入库时间（总是覆盖为 now）
@@ -617,13 +617,13 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             total_dropped += 1
             continue
 
-        # Enforce docs/80-规范/81-ECS字段规范.md: event.id is the idempotency key.
+        # Enforce docs/51-ECS字段规范.md: event.id is the idempotency key.
         event_id = _get_event_id(event)
         if not event_id:
             total_dropped += 1
             continue
 
-        # Enforce docs/80-规范/81-ECS字段规范.md: only "event" (Telemetry) and "alert" (Findings) are valid.
+        # Enforce docs/51-ECS字段规范.md: only "event" (Telemetry) and "alert" (Findings) are valid.
         event_obj = event.get("event", {})
         kind = (
             (event_obj.get("kind") if isinstance(event_obj, dict) else None)

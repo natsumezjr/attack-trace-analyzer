@@ -92,7 +92,7 @@ func (c *Client) FetchAll(queueName string) ([]json.RawMessage, error) {
 		return nil, fmt.Errorf("rabbitmq declare queue %s: %w", queueName, err)
 	}
 
-	out := make([]json.RawMessage, 0)
+	var out []json.RawMessage
 	for {
 		msg, ok, err := ch.Get(queueName, false)
 		if err != nil {

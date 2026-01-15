@@ -143,10 +143,10 @@ services:
       FALCO_QUEUE: "data.falco"
       FILEBEAT_QUEUE: "data.filebeat"
       SURICATA_QUEUE: "data.suricata"
-      # Optional: client can self-register to the center (best-effort) when provided.
-      # Recommended: register clients via the center backend `/api/v1/clients/register`.
-      # SERVER_IP: http://10.92.35.13:8001
-      # SELF_IP: 10.92.35.13
+      # Required: registration server host[:port], e.g. "host.docker.internal:8080".
+      SERVER_IP: http://10.21.251.127:8000
+      # Optional override; otherwise backend auto-detects a non-loopback IPv4.
+      SELF_IP: 10.122.243.144
     depends_on:
       rabbitmq:
         condition: service_healthy

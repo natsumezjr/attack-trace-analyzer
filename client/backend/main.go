@@ -23,29 +23,21 @@ func main() {
 	falcoQueue := getEnv("FALCO_QUEUE", "data.falco")
 	filebeatQueue := getEnv("FILEBEAT_QUEUE", "data.filebeat")
 	suricataQueue := getEnv("SURICATA_QUEUE", "data.suricata")
-	serverIP := strings.TrimSpace(getEnv("SERVER_IP", ""))
-	selfIP := strings.TrimSpace(getEnv("SELF_IP", ""))
+	serverIP := getEnv("SERVER_IP", "")
+	selfIP := getEnv("SELF_IP", "")
 
-	// NOTE: Client self-registration is best-effort and optional.
-	// The recommended deployment flow registers clients via the center backend
-	// `/api/v1/clients/register` (see docs/90-运维与靶场/92-一键编排.md).
-	//
-	// Keeping this optional avoids hard failures when the center is not up yet,
-	// or when SERVER_IP/SELF_IP are not configured in multi-instance setups.
-	if serverIP != "" {
-		if selfIP == "" {
-			detected, err := getLocalIPv4()
-			if err != nil {
-				log.Printf("WARN: failed to detect local IP, skip registration (set SELF_IP): %v", err)
-			} else {
-				selfIP = detected
-			}
+	if serverIP == "" {
+		log.Fatal("SERVER_IP is required")
+	}
+	if selfIP == "" {
+		var err error
+		selfIP, err = getLocalIPv4()
+		if err != nil {
+			log.Fatalf("failed to detect local IP, set SELF_IP: %v", err)
 		}
-		if selfIP != "" {
-			if err := registerTarget(serverIP, selfIP); err != nil {
-				log.Printf("WARN: failed to register target (non-fatal): %v", err)
-			}
-		}
+	}
+	if err := registerTarget(serverIP, selfIP); err != nil {
+		log.Fatalf("failed to register target: %v", err)
 	}
 
 	client, err := queue.NewClient(amqpURL, log.Default())
