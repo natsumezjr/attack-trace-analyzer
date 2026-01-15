@@ -7,6 +7,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from hashlib import sha1
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -104,6 +105,19 @@ def extract_attack_from_tags(tags, attack_map: Dict):
     return tactic_id, tactic_name, technique_id, technique_name
 
 
+def _sha1_hex(raw: str) -> str:
+    return sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def make_host_id(host_name: str) -> str:
+    return f"h-{_sha1_hex(host_name)}"
+
+
+def make_process_entity_id(host_id: str, pid: int, start_ts: str, executable: str) -> str:
+    raw = f"{host_id}:{pid}:{start_ts}:{executable}"
+    return f"p-{_sha1_hex(raw)}"
+
+
 def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     out_fields = evt.get("output_fields") or {}
     ecs: Dict = {}
@@ -113,7 +127,10 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
         or datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     )
     ecs["ecs"] = {"version": "8.11.0"}
-    ecs.setdefault("event", {})["dataset"] = "falco"
+    event_obj = ecs.setdefault("event", {})
+    # Default dataset kept for abnormal findings (raw Falco alerts). Telemetry dataset
+    # is selected later based on extracted fields.
+    event_obj["dataset"] = "falco"
 
     rule = evt.get("rule")
     if rule:
@@ -135,9 +152,28 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     if output:
         ecs["message"] = output
 
-    host = out_fields.get("host.name") or out_fields.get("hostname") or evt.get("hostname")
-    if host:
-        ecs.setdefault("host", {})["name"] = host
+    host_override = os.getenv("HOST_NAME")
+    host = (
+        (host_override.strip() if isinstance(host_override, str) and host_override.strip() else None)
+        or out_fields.get("host.name")
+        or out_fields.get("hostname")
+        or evt.get("hostname")
+    )
+    if isinstance(host, str) and host.strip():
+        host = host.strip()
+        host_obj = ecs.setdefault("host", {})
+        host_obj["name"] = host
+        # Prefer HOST_ID when provided (docs/89 环境变量规范). Otherwise derive a stable fallback id.
+        host_id_override = os.getenv("HOST_ID")
+        if isinstance(host_id_override, str) and host_id_override.strip():
+            host_obj["id"] = host_id_override.strip()
+        else:
+            host_id_from_evt = out_fields.get("host.id") or evt.get("host_id") or evt.get("host.id")
+            if isinstance(host_id_from_evt, str) and host_id_from_evt.strip():
+                host_obj["id"] = host_id_from_evt.strip()
+            else:
+                # Keep host.id stable across sensors (fallback rule matches backend/storage + docs/81).
+                host_obj["id"] = make_host_id(host)
 
     user = out_fields.get("user.name") or out_fields.get("user") or out_fields.get("user.name_raw")
     if user:
@@ -147,6 +183,14 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     if proc_name:
         ecs.setdefault("process", {})["name"] = proc_name
 
+    proc_exe = out_fields.get("proc.exepath") or out_fields.get("proc.exe") or out_fields.get("process.executable")
+    if proc_exe:
+        ecs.setdefault("process", {})["executable"] = proc_exe
+
+    proc_cmd = out_fields.get("proc.cmdline") or out_fields.get("process.command_line")
+    if proc_cmd:
+        ecs.setdefault("process", {})["command_line"] = proc_cmd
+
     pid = out_fields.get("proc.pid") or out_fields.get("process.pid")
     ppid = out_fields.get("proc.ppid") or out_fields.get("process.ppid")
     if pid is not None:
@@ -154,18 +198,31 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     if ppid is not None:
         ecs.setdefault("process", {})["parent"] = {"pid": to_int(ppid)}
 
+    parent_name = out_fields.get("proc.pname")
+    parent_exe = out_fields.get("proc.pexepath") or out_fields.get("proc.pexe")
+    parent_cmd = out_fields.get("proc.pcmdline")
+    if parent_name or parent_exe or parent_cmd:
+        parent_obj = ecs.setdefault("process", {}).setdefault("parent", {})
+        if parent_name:
+            parent_obj.setdefault("name", parent_name)
+        if parent_exe:
+            parent_obj.setdefault("executable", parent_exe)
+        if parent_cmd:
+            parent_obj.setdefault("command_line", parent_cmd)
+
     fd_name = out_fields.get("fd.name") or out_fields.get("file") or out_fields.get("file.path")
     if fd_name:
         ecs.setdefault("file", {})["path"] = fd_name
 
     evt_type = out_fields.get("evt.type") or out_fields.get("event.action")
     if evt_type:
-        ecs.setdefault("event", {})["action"] = evt_type
+        event_obj["action"] = evt_type
 
     src_ip = out_fields.get("fd.sip") or out_fields.get("source.ip")
     src_port = out_fields.get("fd.sport") or out_fields.get("source.port")
     dst_ip = out_fields.get("fd.dip") or out_fields.get("destination.ip")
     dst_port = out_fields.get("fd.dport") or out_fields.get("destination.port")
+    l4proto = out_fields.get("fd.l4proto") or out_fields.get("network.transport")
     if src_ip:
         ecs.setdefault("source", {})["ip"] = src_ip
     if src_port:
@@ -174,6 +231,8 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
         ecs.setdefault("destination", {})["ip"] = dst_ip
     if dst_port:
         ecs.setdefault("destination", {})["port"] = to_int(dst_port)
+    if isinstance(l4proto, str) and l4proto.strip() and l4proto.strip().upper() not in ("<NA>", "N/A"):
+        ecs.setdefault("network", {})["transport"] = l4proto.strip().lower()
 
     container_id = out_fields.get("container.id") or out_fields.get("container.id_raw")
     container_name = out_fields.get("container.name")
@@ -195,15 +254,95 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
 
     pri = (evt.get("priority") or "").upper()
     if pri:
-        ecs.setdefault("event", {})["severity"] = PRIORITY_SEVERITY.get(pri, 3)
-        ecs.setdefault("event", {})["risk_score"] = PRIORITY_SEVERITY.get(pri, 3) * 10
+        event_obj["severity"] = PRIORITY_SEVERITY.get(pri, 3)
+        event_obj["risk_score"] = PRIORITY_SEVERITY.get(pri, 3) * 10
 
     if abnormal:
-        ecs.setdefault("event", {})["kind"] = "alert"
-        ecs.setdefault("event", {})["category"] = ["intrusion_detection"]
+        # Raw Finding: keep dataset as "falco" (center will normalize to finding.raw.falco).
+        event_obj["kind"] = "alert"
+        event_obj["category"] = ["intrusion_detection"]
     else:
-        ecs.setdefault("event", {})["kind"] = "event"
-        ecs.setdefault("event", {})["category"] = ["host"]
+        # Telemetry: choose dataset/category to match docs/81 + docs/84 extraction rules.
+        evt_type0 = str(evt_type or "").strip().lower()
+        has_file = isinstance(fd_name, str) and fd_name.strip() != ""
+        is_exec = evt_type0 in ("execve", "execveat")
+
+        host_id = ecs.get("host", {}).get("id")
+        ts = ecs.get("@timestamp")
+        process_obj = ecs.get("process")
+
+        # Best-effort Process identity enrichment (docs/81 process.entity_id generation rule).
+        # Important: do not fabricate entity_id without (host.id, pid, executable).
+        host_id = ecs.get("host", {}).get("id")
+        if isinstance(host_id, str) and isinstance(ts, str) and isinstance(process_obj, dict):
+            # Child process entity_id
+            if not (isinstance(process_obj.get("entity_id"), str) and process_obj.get("entity_id").strip()):
+                proc_pid = process_obj.get("pid")
+                proc_executable = process_obj.get("executable")
+                if isinstance(proc_pid, int) and isinstance(proc_executable, str) and proc_executable.strip():
+                    start_ts = process_obj.get("start") if isinstance(process_obj.get("start"), str) else None
+                    if not start_ts:
+                        start_ts = ts
+                        process_obj.setdefault("start", start_ts)
+                    process_obj["entity_id"] = make_process_entity_id(
+                        host_id=str(host_id),
+                        pid=int(proc_pid),
+                        start_ts=start_ts,
+                        executable=proc_executable.strip(),
+                    )
+
+            # Parent process entity_id (only when we have pid + executable)
+            parent_obj = process_obj.get("parent")
+            if isinstance(parent_obj, dict):
+                if not (isinstance(parent_obj.get("entity_id"), str) and parent_obj.get("entity_id").strip()):
+                    ppid0 = parent_obj.get("pid")
+                    pexe0 = parent_obj.get("executable")
+                    if isinstance(ppid0, int) and isinstance(pexe0, str) and pexe0.strip():
+                        pstart_ts = parent_obj.get("start") if isinstance(parent_obj.get("start"), str) else None
+                        if not pstart_ts:
+                            pstart_ts = ts
+                            parent_obj.setdefault("start", pstart_ts)
+                        parent_obj["entity_id"] = make_process_entity_id(
+                            host_id=str(host_id),
+                            pid=int(ppid0),
+                            start_ts=pstart_ts,
+                            executable=pexe0.strip(),
+                        )
+
+        # Dataset selection (after best-effort entity_id generation)
+        telemetry_dataset = "hostbehavior.syscall"
+        telemetry_category = ["host"]
+
+        if is_exec:
+            proc_pid = process_obj.get("pid") if isinstance(process_obj, dict) else None
+            proc_executable = process_obj.get("executable") if isinstance(process_obj, dict) else None
+            if isinstance(proc_pid, int) and isinstance(proc_executable, str) and proc_executable.strip():
+                telemetry_dataset = "hostlog.process"
+                telemetry_category = ["process"]
+                event_obj["type"] = ["start"]
+                event_obj["action"] = "process_start"
+        elif has_file:
+            telemetry_category = ["file"]
+            # Map common syscall names to the v1.0 ECS subset actions when possible.
+            if evt_type0 in ("open", "openat", "openat2"):
+                event_obj["action"] = "file_read"
+            elif "write" in evt_type0 or evt_type0 in ("creat", "pwrite", "pwrite64"):
+                event_obj["action"] = "file_write"
+            elif "unlink" in evt_type0 or "delete" in evt_type0:
+                event_obj["action"] = "file_delete"
+            elif "exec" in evt_type0:
+                event_obj["action"] = "file_execute"
+
+            has_entity_id = (
+                isinstance(process_obj, dict)
+                and isinstance(process_obj.get("entity_id"), str)
+                and process_obj.get("entity_id").strip()
+            )
+            telemetry_dataset = "hostbehavior.file" if has_entity_id else "hostlog.file_registry"
+
+        event_obj["kind"] = "event"
+        event_obj["dataset"] = telemetry_dataset
+        event_obj["category"] = telemetry_category
 
     # Minimal ATT&CK enrichment: 填充 `threat.*` 字段。
     # 优先从 Falco 的 output_fields 中获取已有的 ATT&CK 信息，否则使用默认值。
@@ -411,13 +550,20 @@ def main():
                 continue
 
             abnormal = is_abnormal(evt.get("priority", ""), threshold)
-            ecs = falco_to_ecs(evt, abnormal)
-            publish(ecs)
 
-            out_f = abnormal_f if abnormal else normal_f
-            if out_f:
-                out_f.write(json.dumps(ecs, ensure_ascii=False) + "\n")
-                out_f.flush()
+            # Always emit Telemetry (graph input), and additionally emit Raw Finding when abnormal.
+            telemetry = falco_to_ecs(evt, False)
+            publish(telemetry)
+            if not abnormal and normal_f:
+                normal_f.write(json.dumps(telemetry, ensure_ascii=False) + "\n")
+                normal_f.flush()
+
+            if abnormal:
+                finding = falco_to_ecs(evt, True)
+                publish(finding)
+                if abnormal_f:
+                    abnormal_f.write(json.dumps(finding, ensure_ascii=False) + "\n")
+                    abnormal_f.flush()
     finally:
         if normal_f:
             normal_f.close()
@@ -427,4 +573,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

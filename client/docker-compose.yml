@@ -31,6 +31,8 @@ services:
       - /etc:/host/etc:ro
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/tracing:/sys/kernel/tracing
+      # Custom telemetry rules (loaded via the default rules_file list).
+      - ./sensor/falco/rules.d:/etc/falco/rules.d:ro
       - ./data:/data
     command:
       - falco
@@ -52,6 +54,9 @@ services:
     environment:
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_QUEUE: "data.falco"
+      # Ensure all sensors share the same host identity in OpenSearch/Neo4j.
+      HOST_NAME: ${HOST_NAME:-client-01}
+      HOST_ID: ${HOST_ID:-sensor-01}
     volumes:
       - ./data:/data
     command:
@@ -77,6 +82,9 @@ services:
       - TZ=${TZ:-Asia/Shanghai}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - RABBITMQ_QUEUE=data.filebeat
+      # Ensure all sensors share the same host identity in OpenSearch/Neo4j.
+      - HOST_NAME=${HOST_NAME:-client-01}
+      - HOST_ID=${HOST_ID:-sensor-01}
     logging:
       driver: "json-file"
       options:
@@ -119,7 +127,7 @@ services:
         condition: service_healthy
     environment:
       HOST_ID: ${HOST_ID:-sensor-01}
-      HOST_NAME: ${HOST_NAME:-suricata-sensor}
+      HOST_NAME: ${HOST_NAME:-client-01}
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_QUEUE: "data.suricata"
     volumes:

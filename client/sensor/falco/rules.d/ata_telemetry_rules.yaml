@@ -1,0 +1,45 @@
+# ATA telemetry rules (lab-friendly)
+#
+# Goal: generate deterministic ECS-compatible telemetry for the graph model:
+# - process exec (hostlog.process)
+# - file access (hostbehavior.file / hostlog.file_registry)
+# - outbound connect (hostbehavior.syscall with connect)
+#
+# Notes:
+# - Keep priorities below WARNING so the converter treats them as Telemetry.
+# - Include proc.pid / proc.exepath / proc.ppid / proc.pexepath in outputs so
+#   we can build doc-compliant process.entity_id values.
+
+- rule: ATA Telemetry Process Exec
+  desc: Emit process exec telemetry (execve/execveat) with full process identity fields.
+  condition: evt.type in (execve, execveat)
+  output: >
+    ATA telemetry exec | evt_type=%evt.type user=%user.name proc_pid=%proc.pid proc_ppid=%proc.ppid
+    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
+    container_id=%container.id container_name=%container.name
+  priority: Informational
+  tags: [ata, telemetry, process]
+
+- rule: ATA Telemetry File Access
+  desc: Emit file access telemetry for a limited set of paths to keep noise manageable in the lab.
+  condition: >
+    evt.type in (open, openat, openat2, creat, unlink, unlinkat, rename, renameat, renameat2) and
+    fd.typechar='f' and
+    (fd.name startswith /etc/ or fd.name startswith /tmp/ or fd.name startswith /var/log/)
+  output: >
+    ATA telemetry file | evt_type=%evt.type user=%user.name fd_name=%fd.name proc_pid=%proc.pid proc_ppid=%proc.ppid
+    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
+    container_id=%container.id container_name=%container.name
+  priority: Informational
+  tags: [ata, telemetry, file]
+
+- rule: ATA Telemetry Connect
+  desc: Emit connect() syscall telemetry with network 5-tuple info when available.
+  condition: evt.type=connect
+  output: >
+    ATA telemetry connect | evt_type=%evt.type user=%user.name fd_sip=%fd.sip fd_sport=%fd.sport fd_dip=%fd.dip fd_dport=%fd.dport
+    fd_l4proto=%fd.l4proto proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath container_id=%container.id container_name=%container.name
+  priority: Informational
+  tags: [ata, telemetry, network]
+

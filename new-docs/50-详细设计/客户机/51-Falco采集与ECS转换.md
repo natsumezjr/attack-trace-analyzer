@@ -62,6 +62,24 @@ command:
   - file_output.filename=/data/falco.jsonl
 ```
 
+### 2.3 Telemetry 规则（用于“能入图”）
+
+Falco 默认规则集主要用于“检测/告警”，但图谱重建需要一定比例的“事实 Telemetry”。
+
+本项目通过在 Falco 容器中加载额外的 Telemetry 规则文件来补齐以下能力：
+
+- `execve/execveat`：产生 `hostlog.process`（用于进程树 / 父子进程）
+- `open/openat/...`：产生 `hostbehavior.file` / `hostlog.file_registry`（用于文件访问链路）
+- `connect`：产生 `hostbehavior.syscall`（用于 `Process → IP` 的网络连接边）
+
+规则文件位置：
+
+- `client/sensor/falco/rules.d/ata_telemetry_rules.yaml`
+
+部署时通过容器挂载到 Falco 默认加载目录：
+
+- `/etc/falco/rules.d`
+
 ## 3. ECS 转换规则
 
 ### 3.1 转换器运行方式
@@ -84,9 +102,9 @@ Falco 转换器输出为**嵌套对象形态**（非点号扁平键）。
 {
   "@timestamp": "2026-01-14T12:00:00.000Z",
   "ecs": {"version": "8.11.0"},
-  "event": {"kind": "event", "dataset": "falco"},
-  "host": {"name": "client-01"},
-  "process": {"pid": 1234},
+  "event": {"kind": "event", "dataset": "hostlog.process"},
+  "host": {"name": "client-01", "id": "h-1111111111111111"},
+  "process": {"pid": 1234, "executable": "/usr/bin/bash"},
   "message": "...",
   "falco": { "...": "raw event payload" }
 }
@@ -94,8 +112,12 @@ Falco 转换器输出为**嵌套对象形态**（非点号扁平键）。
 
 说明：
 
-1. Falco 转换器产生的 `ecs.version` 与 `event.dataset` 会在中心机入库时被规范化，规范化后的权威口径见 `../../80-规范/81-ECS字段规范.md`。
+1. Falco 转换器产生的 `ecs.version` 会在中心机入库时被规范化为 `9.2.0`，权威口径见 `../../80-规范/81-ECS字段规范.md`。
 2. Falco 原始事件完整保存在 `falco` 字段中，用于审计与回放。
+3. Telemetry 的 `event.dataset` 会根据事件类型选择为 `hostlog.process` / `hostbehavior.file` / `hostlog.file_registry` / `hostbehavior.syscall`，以满足 `../../80-规范/84-Neo4j实体图谱规范.md` 的抽取条件。
+4. 为保证三传感器数据在同一主机上可关联，转换器支持：
+   - 通过环境变量 `HOST_NAME` 覆盖 `host.name`（权威值见 `89-环境变量与配置规范.md`）
+   - 优先使用环境变量 `HOST_ID` 覆盖 `host.id`；当 `HOST_ID` 缺失时，按 `81-ECS字段规范.md` 回退生成 `host.id`（`h-` + sha1(host.name)[:16]）。
 
 ### 3.3 eventkind 规则
 

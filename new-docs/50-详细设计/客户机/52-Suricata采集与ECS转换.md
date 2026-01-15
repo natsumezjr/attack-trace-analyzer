@@ -51,6 +51,13 @@ Suricata EVE 导出器位于：
 
 Suricata 导出器输出为**点号扁平键形态**（例如 `event.dataset`、`source.ip`），中心机会在入库前把点号键合并为嵌套对象形态。
 
+### 2.2.1 主机身份（跨传感器关联）
+
+为保证 Suricata 的网络 Telemetry 能与 Falco/Filebeat 的主机行为/日志在中心机侧汇聚到同一 `Host` 节点，导出器遵循以下规则：
+
+- `host.name`：默认来自环境变量 `HOST_NAME`（见 `../../80-规范/89-环境变量与配置规范.md`）
+- `host.id`：优先使用环境变量 `HOST_ID`；当 `HOST_ID` 缺失时回退为 `h-` + sha1(host.name)[:16]（见 `../../80-规范/81-ECS字段规范.md`）
+
 ### 2.3 dataset 取值范围
 
 Suricata 导出器根据 `event_type` 映射 dataset，取值固定在以下集合中：
@@ -58,6 +65,12 @@ Suricata 导出器根据 `event_type` 映射 dataset，取值固定在以下集�
 - `netflow.flow`
 - `netflow.dns`
 - `netflow.http`
+- `netflow.tls`
+- `netflow.icmp`
+
+此外，Suricata 的 IDS 告警会以 `event.kind="alert"` 输出（导出器侧使用 `event.dataset="netflow.alert"` 表示来源），中心机入库时会规范化为 Raw Finding：
+
+- `finding.raw.suricata`
 
 ## 3. 网络字段与证据引用
 
@@ -67,6 +80,9 @@ Suricata 导出器按以下规则写入网络相关字段：
 - `destination.ip`、`destination.port`
 - `network.transport`、`network.protocol`
 - `flow.id`、`network.community_id`
+- DNS 查询与解析（当 `event_type=dns`）：
+  - `dns.question.name`
+  - `dns.answers[]`（用于 `Domain → IP` 的 `RESOLVES_TO` 边）
 
 字段口径见 `../../80-规范/81-ECS字段规范.md`。
 
