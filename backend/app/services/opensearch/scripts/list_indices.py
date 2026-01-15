@@ -35,7 +35,6 @@ def list_all_indices():
         "ECS_EVENTS": get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today),
         "RAW_FINDINGS": get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today),
         "CANONICAL_FINDINGS": get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today),
-        "ATTACK_CHAINS": get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
     }
     
     missing_indices = []

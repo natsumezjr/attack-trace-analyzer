@@ -27,6 +27,22 @@ from .utils import (
 
 
 # =============================================================================
+# 节点类型到唯一键字段的映射（用于批量 MERGE）
+# =============================================================================
+
+# 每种节点类型的唯一键字段定义
+# 用于批量写入时生成 MERGE 语句的键条件
+_NODE_TYPE_TO_KEY_FIELDS: dict[NodeType, list[str]] = {
+    NodeType.HOST: ["host.id"],
+    NodeType.USER: ["user.id"],  # 备选: ["host.id", "user.name"]
+    NodeType.PROCESS: ["process.entity_id"],
+    NodeType.FILE: ["host.id", "file.path"],
+    NodeType.DOMAIN: ["domain.name"],
+    NodeType.IP: ["ip"],
+}
+
+
+# =============================================================================
 # 全局驱动与 Schema 初始化
 # =============================================================================
 
@@ -110,6 +126,119 @@ def _create_schema(tx) -> None:
 # CRUD 操作
 # =============================================================================
 
+# =============================================================================
+# 批量操作辅助函数
+# =============================================================================
+
+def _group_nodes_by_type(
+    nodes: Sequence[GraphNode],
+) -> dict[NodeType, list[GraphNode]]:
+    """按节点类型分组
+
+    Args:
+        nodes: 节点列表
+
+    Returns:
+        dict[NodeType, list[GraphNode]]: 按类型分组的节点字典
+
+    Examples:
+        >>> nodes = [host_node(host_id="h-001"), user_node(user_id="u-001")]
+        >>> grouped = _group_nodes_by_type(nodes)
+        >>> len(grouped[NodeType.HOST])
+        1
+        >>> len(grouped[NodeType.USER])
+        1
+    """
+    grouped: dict[NodeType, list[GraphNode]] = {}
+    for node in nodes:
+        grouped.setdefault(node.ntype, []).append(node)
+    return grouped
+
+
+def _build_unwind_params(
+    nodes: list[GraphNode],
+    key_fields: list[str],
+) -> list[dict[str, Any]]:
+    """构建 UNWIND 批量参数
+
+    每个节点转换为扁平结构:
+    单键: {"key_val": "h-001", "props": {...}}
+    复合键: {"key_0": "h-001", "key_1": "/etc/passwd", "props": {...}}
+
+    Args:
+        nodes: 同类型的节点列表
+        key_fields: 唯一键字段列表
+
+    Returns:
+        list[dict]: UNWIND 参数列表
+
+    Examples:
+        >>> nodes = [host_node(host_id="h-001", host_name="victim-01")]
+        >>> params = _build_unwind_params(nodes, ["host.id"])
+        >>> params[0]["key_val"]
+        'h-001'
+        >>> params[0]["props"]["host.name"]
+        'victim-01'
+    """
+    items = []
+    for node in nodes:
+        param = {"props": node.merged_props()}
+        # 提取键值到扁平结构
+        for i, key_field in enumerate(key_fields):
+            if len(key_fields) == 1:
+                param["key_val"] = node.key[key_field]
+            else:
+                param[f"key_{i}"] = node.key[key_field]
+        items.append(param)
+    return items
+
+
+def _build_batch_merge_cypher(label: NodeType, key_fields: list[str]) -> str:
+    """生成批量 MERGE Cypher 语句
+
+    单键:   UNWIND $nodes AS node
+            MERGE (n:Label {key_field: node.key_val})
+            SET n += node.props
+
+    复合键: UNWIND $nodes AS node
+            MERGE (n:Label {key1: node.key_0, key2: node.key_1})
+            SET n += node.props
+
+    Args:
+        label: 节点类型
+        key_fields: 唯一键字段列表
+
+    Returns:
+        str: Cypher 查询语句
+
+    Examples:
+        >>> cypher = _build_batch_merge_cypher(NodeType.HOST, ["host.id"])
+        >>> "UNWIND $nodes AS node" in cypher
+        True
+        >>> "MERGE (n:Host" in cypher
+        True
+        >>> "node.key_val" in cypher
+        True
+    """
+    if len(key_fields) == 1:
+        # 单键: host.id, process.entity_id, etc.
+        key_clause = f"{_cypher_prop(key_fields[0])}: node.key_val"
+    else:
+        # 复合键: (host.id, file.path), (host.id, user.name), etc.
+        key_clause = ", ".join(
+            f"{_cypher_prop(key_fields[i])}: node.key_{i}"
+            for i in range(len(key_fields))
+        )
+
+    return f"UNWIND $nodes AS node " \
+           f"MERGE (n:{label.value} {{{key_clause}}}) " \
+           f"SET n += node.props"
+
+
+# =============================================================================
+# 单条操作 API（向后兼容）
+# =============================================================================
+
 def add_node(node: GraphNode) -> None:
     """写入节点（基于唯一键 MERGE）"""
     ensure_schema()
@@ -135,7 +264,7 @@ def _merge_node(tx, node: GraphNode) -> None:
 
 
 def add_edge(edge: GraphEdge) -> None:
-    """写入关系边（按证据追加）
+    """写入关系边（按 event.id 幂等 MERGE）
 
     关键：为 Phase B 的窗口过滤和 GDS 投影，写入数值时间戳 r.ts_float。
 
@@ -164,11 +293,17 @@ def add_edge(edge: GraphEdge) -> None:
 
 
 def _create_edge(tx, edge: GraphEdge) -> None:
-    """CREATE 边事务函数"""
+    """MERGE 边事务函数（按 (src,dst,rtype,event.id) 幂等）"""
     src_label, src_key = parse_uid(edge.src_uid)
     dst_label, dst_key = parse_uid(edge.dst_uid)
 
-    params: Dict[str, Any] = {"props": edge.props}
+    event_id = None
+    if isinstance(getattr(edge, "props", None), dict):
+        event_id = edge.props.get("event.id")
+    if not isinstance(event_id, str) or not event_id:
+        raise ValueError("edge.props['event.id'] is required for idempotent edge writes")
+
+    params: Dict[str, Any] = {"props": edge.props, "event_id": event_id}
 
     src_clause_parts = []
     for k, v in src_key.items():
@@ -187,10 +322,154 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     cypher = (
         f"MERGE (s:{src_label.value} {{{src_clause}}}) "
         f"MERGE (d:{dst_label.value} {{{dst_clause}}}) "
-        f"CREATE (s)-[r:{edge.rtype.value}]->(d) "
+        f"MERGE (s)-[r:{edge.rtype.value} {{{_cypher_prop('event.id')}: $event_id}}]->(d) "
         "SET r += $props"
     )
     tx.run(cypher, **params)
+
+
+# =============================================================================
+# 批量操作 API（性能优化）
+# =============================================================================
+
+def _merge_nodes_in_batch(tx, nodes: Sequence[GraphNode]) -> int:
+    """批量 MERGE 节点事务函数（使用 UNWIND）
+
+    性能优化：
+    - 按节点类型分组
+    - 每种类型使用 UNWIND 批量 MERGE
+    - 减少 Cypher 执行次数和网络往返
+
+    Args:
+        tx: Neo4j 事务对象
+        nodes: 节点序列
+
+    Returns:
+        int: 写入的节点数
+
+    Examples:
+        >>> nodes = [host_node(host_id="h-001"), user_node(user_id="u-001")]
+        >>> count = _merge_nodes_in_batch(tx, nodes)
+        >>> count
+        2
+    """
+    if not nodes:
+        return 0
+
+    # 按类型分组
+    grouped = _group_nodes_by_type(nodes)
+    total_count = 0
+
+    for ntype, node_list in grouped.items():
+        # 获取唯一键字段
+        key_fields = _NODE_TYPE_TO_KEY_FIELDS[ntype]
+
+        # 构建 UNWIND 参数
+        params_list = _build_unwind_params(node_list, key_fields)
+
+        # 生成 Cypher
+        cypher = _build_batch_merge_cypher(ntype, key_fields)
+
+        # 执行批量 MERGE
+        tx.run(cypher, nodes=params_list)
+        total_count += len(node_list)
+
+    return total_count
+
+
+def _merge_edges_in_batch(tx, edges: Sequence[GraphEdge]) -> int:
+    """批量 MERGE 边事务函数（在单个事务中逐个 MERGE）
+
+    边需要匹配起终点（复合键），复杂度高，保持逐个 MERGE。
+    但在单个事务中执行，避免多次 session 创建和网络往返。
+
+    Args:
+        tx: Neo4j 事务对象
+        edges: 边序列
+
+    Returns:
+        int: 写入的边数
+
+    Raises:
+        ValueError: 当边缺少 event.id 时
+
+    Examples:
+        >>> nodes = [user_node(user_id="u-001"), host_node(host_id="h-001")]
+        >>> edge = make_edge(nodes[0], nodes[1], RelType.LOGON, {"event.id": "evt-001"})
+        >>> count = _merge_edges_in_batch(tx, [edge])
+        >>> count
+        1
+    """
+    if not edges:
+        return 0
+
+    from .utils import _parse_ts_to_float
+
+    count = 0
+    for edge in edges:
+        # 确保有 ts_float 字段（与 add_edge 保持一致）
+        if isinstance(edge.props, dict):
+            ts_float = edge.props.get("ts_float")
+            if not isinstance(ts_float, (int, float)):
+                ts = edge.get_ts() if hasattr(edge, "get_ts") else None
+                if ts is not None:
+                    edge.props["ts_float"] = _parse_ts_to_float(str(ts))
+
+        # 使用现有的 _create_edge 逻辑
+        _create_edge(tx, edge)
+        count += 1
+
+    return count
+
+
+def add_nodes_and_edges(
+    nodes: Sequence[GraphNode],
+    edges: Sequence[GraphEdge],
+) -> tuple[int, int]:
+    """批量写入节点和边（在单个事务中）
+
+    性能优化：
+    - 节点使用 UNWIND 批量 MERGE，减少 Cypher 执行次数
+    - 边在单个事务中逐个 MERGE，减少网络往返
+    - 预期 1000 事件从 ~16000 次往返降至 ~160 次（100x 提升）
+
+    Args:
+        nodes: 节点列表（去重由 MERGE 保证）
+        edges: 边列表（按 event.id 幂等）
+
+    Returns:
+        tuple[int, int]: (节点数, 边数)
+
+    Raises:
+        Neo4jError: 当数据库写入失败时
+
+    Examples:
+        >>> nodes = [host_node(host_id="h-001"), user_node(user_id="u-001")]
+        >>> edges = [logon_edge(user, host)]
+        >>> add_nodes_and_edges(nodes, edges)
+        (2, 1)
+
+    Notes:
+        - 节点按唯一键自动去重（MERGE 语义）
+        - 边按 (src, dst, rtype, event.id) 四元组去重
+        - 保持与 add_node() / add_edge() 相同的幂等性
+
+    See Also:
+        add_node: 单节点写入 API（向后兼容）
+        add_edge: 单边写入 API（向后兼容）
+    """
+    ensure_schema()
+
+    try:
+        with _get_session() as session:
+            node_count = _execute_write(session, _merge_nodes_in_batch, nodes)
+            edge_count = _execute_write(session, _merge_edges_in_batch, edges)
+        return node_count, edge_count
+    except Neo4jError as exc:
+        # 提供详细的错误上下文
+        raise Neo4jError(
+            f"Failed to batch write {len(nodes)} nodes and {len(edges)} edges: {exc}"
+        ) from exc
 
 
 # =============================================================================

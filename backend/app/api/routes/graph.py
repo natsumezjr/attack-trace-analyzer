@@ -37,8 +37,6 @@ class GraphQueryRequest(BaseModel):
     task_id: str | None = None
     only_path: bool = False
 
-    include_nodes: bool = False
-
 
 def _edge_to_dict(edge: Any) -> dict[str, Any]:
     rtype = getattr(edge, "rtype", None)
@@ -67,13 +65,12 @@ def graph_query(req: GraphQueryRequest):
     try:
         if req.action == "alarm_edges":
             edges = graph_api.get_alarm_edges()
+            uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
             nodes: list[dict[str, Any]] = []
-            if req.include_nodes:
-                uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
-                for uid in sorted(uids):
-                    node = graph_api.get_node(uid)
-                    if node is not None:
-                        nodes.append(_node_to_dict(node))
+            for uid in sorted(uids):
+                node = graph_api.get_node(uid)
+                if node is not None:
+                    nodes.append(_node_to_dict(node))
             return ok(
                 edges=[_edge_to_dict(e) for e in edges],
                 nodes=nodes,
@@ -94,13 +91,12 @@ def graph_query(req: GraphQueryRequest):
                 allowed_reltypes=req.allowed_reltypes,
                 only_alarm=req.only_alarm,
             )
-            nodes = []
-            if req.include_nodes:
-                uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
-                for uid in sorted(uids):
-                    node = graph_api.get_node(uid)
-                    if node is not None:
-                        nodes.append(_node_to_dict(node))
+            uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
+            nodes: list[dict[str, Any]] = []
+            for uid in sorted(uids):
+                node = graph_api.get_node(uid)
+                if node is not None:
+                    nodes.append(_node_to_dict(node))
             return ok(
                 edges=[_edge_to_dict(e) for e in edges],
                 nodes=nodes,
@@ -141,14 +137,22 @@ def graph_query(req: GraphQueryRequest):
                     found=False,
                     cost=None,
                     edges=[],
+                    nodes=[],
                     server_time=utc_now_rfc3339(),
                 )
 
             cost, edges = result
+            uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
+            nodes: list[dict[str, Any]] = []
+            for uid in sorted(uids):
+                node = graph_api.get_node(uid)
+                if node is not None:
+                    nodes.append(_node_to_dict(node))
             return ok(
                 found=True,
                 cost=cost,
                 edges=[_edge_to_dict(e) for e in edges],
+                nodes=nodes,
                 server_time=utc_now_rfc3339(),
             )
 
@@ -159,13 +163,12 @@ def graph_query(req: GraphQueryRequest):
                     content=err("BAD_REQUEST", "task_id is required"),
                 )
             edges = graph_api.get_edges_by_task_id(task_id=req.task_id, only_path=req.only_path)
+            uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
             nodes: list[dict[str, Any]] = []
-            if req.include_nodes:
-                uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
-                for uid in sorted(uids):
-                    node = graph_api.get_node(uid)
-                    if node is not None:
-                        nodes.append(_node_to_dict(node))
+            for uid in sorted(uids):
+                node = graph_api.get_node(uid)
+                if node is not None:
+                    nodes.append(_node_to_dict(node))
             return ok(
                 edges=[_edge_to_dict(e) for e in edges],
                 nodes=nodes,

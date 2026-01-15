@@ -1,10 +1,6 @@
 services:
   rabbitmq:
     image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -16,7 +12,6 @@ services:
 
   falco:
     image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/falcosecurity/falco:0.42.1
-    container_name: falco
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -45,7 +40,6 @@ services:
   falco-ecs:
     build:
       context: ./sensor/falco/ecs-converter
-    container_name: falco-ecs
     depends_on:
       falco:
         condition: service_started
@@ -67,7 +61,6 @@ services:
     build:
       context: ./sensor/filebeat
       dockerfile: Dockerfile
-    container_name: filebeat
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -131,9 +124,8 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: backend
     ports:
-      - "8888:8888"
+      - "${CLIENT_API_PORT:-8888}:8888"
     environment:
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       FALCO_QUEUE: "data.falco"

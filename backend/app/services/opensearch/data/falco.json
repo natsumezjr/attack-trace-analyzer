@@ -1,0 +1,438 @@
+faclco:
+{
+  "data": [
+    {
+      "@timestamp": "2026-01-15T05:17:36.269440018Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.269440018+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.269440018+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256269440018,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.269440018Z"
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:17:36.276048784Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.276048784+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.276048784+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256276048784,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.276048784Z"
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:17:36.306342554Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.306342554+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.306342554+0000: Notice Packet socket was created in a container | socket_info=fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=4(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256306342554,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.306342554Z"
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:17:36.318156278Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.318156278+0000: Notice Packet socket was created in a container | socket_info=fd=5(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.318156278+0000: Notice Packet socket was created in a container | socket_info=fd=5(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=5(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256318156278,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.318156278Z"
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:17:36.336337571Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.336337571+0000: Notice Packet socket was created in a container | socket_info=fd=6(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.336337571+0000: Notice Packet socket was created in a container | socket_info=fd=6(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=6(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256336337571,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.336337571Z"
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:17:36.356187089Z",
+      "ecs": {
+        "version": "8.11.0"
+      },
+      "event": {
+        "dataset": "falco",
+        "action": "socket",
+        "severity": 3,
+        "risk_score": 30,
+        "kind": "event",
+        "category": [
+          "host"
+        ]
+      },
+      "rule": {
+        "name": "Packet socket created in container"
+      },
+      "message": "2026-01-15T05:17:36.356187089+0000: Notice Packet socket was created in a container | socket_info=fd=7(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "host": {
+        "name": "0bdcc2330aac"
+      },
+      "user": {
+        "name": "root"
+      },
+      "process": {
+        "name": "Suricata-Main"
+      },
+      "container": {
+        "id": "1d6b2f73272d",
+        "name": "client-suricata-1"
+      },
+      "falco": {
+        "hostname": "0bdcc2330aac",
+        "output": "2026-01-15T05:17:36.356187089+0000: Notice Packet socket was created in a container | socket_info=fd=7(<o>) domain=17(AF_PACKET) type=3 proto=768 connection= lport=<NA> rport=<NA> fd_type=<NA> fd_proto=<NA> evt_type=socket user=root user_uid=0 user_loginuid=-1 process=Suricata-Main proc_exepath=/usr/bin/suricata parent=containerd-shim command=Suricata-Main -c /etc/suricata/suricata.yaml -i ens33 terminal=0 container_id=1d6b2f73272d container_name=client-suricata-1 container_image_repository=client-suricata container_image_tag=latest k8s_pod_name=<NA> k8s_ns_name=<NA>",
+        "output_fields": {
+          "container.id": "1d6b2f73272d",
+          "container.image.repository": "client-suricata",
+          "container.image.tag": "latest",
+          "container.name": "client-suricata-1",
+          "evt.args": "fd=7(<o>) domain=17(AF_PACKET) type=3 proto=768",
+          "evt.time.iso8601": 1768454256356187089,
+          "evt.type": "socket",
+          "fd.l4proto": "<NA>",
+          "fd.lport": null,
+          "fd.name": "",
+          "fd.rport": null,
+          "fd.type": "<NA>",
+          "k8s.ns.name": null,
+          "k8s.pod.name": null,
+          "proc.cmdline": "Suricata-Main -c /etc/suricata/suricata.yaml -i ens33",
+          "proc.exepath": "/usr/bin/suricata",
+          "proc.name": "Suricata-Main",
+          "proc.pname": "containerd-shim",
+          "proc.tty": 0,
+          "user.loginuid": -1,
+          "user.name": "root",
+          "user.uid": 0
+        },
+        "priority": "Notice",
+        "rule": "Packet socket created in container",
+        "source": "syscall",
+        "tags": [
+          "T1557.002",
+          "container",
+          "maturity_stable",
+          "mitre_credential_access",
+          "network"
+        ],
+        "time": "2026-01-15T05:17:36.356187089Z"
+      }
+    }
+  ],
+  "total": 6
+}

@@ -107,12 +107,12 @@ def get_custom_rules(detector_type: str = "dns", max_rules: int = 200) -> dict:
     # OpenSearch Security Analytics 使用 category 而不是 logType
     category_map = {
         "network": ["dns", "network", "others_web"],
-        "windows": ["windows"],
+        # "windows": ["windows"],  # 不需要windows规则
         "linux": ["linux"],
         "macos": ["macos"],
         "dns": ["dns", "network"],  # dns类型也可以使用network规则
     }
-    target_categories = category_map.get(detector_type.lower(), ["dns", "network", "windows", "linux"])  # 默认尝试多个category
+    target_categories = category_map.get(detector_type.lower(), ["dns", "network", "linux"])  # 默认尝试多个category（不包含windows）
     
     try:
         prepackaged_rules = []
@@ -307,7 +307,8 @@ def create_default_detector() -> dict:
     # 支持的log type：dns, network, windows, linux, macos, ad_ldap, apache_access, cloudtrail, s3等
     
     # 优先尝试dns（因为我们有DNS规则）
-    detector_types_to_try = ["dns", "network", "windows", "linux"]
+    # 注意：不包含windows，因为不需要windows规则
+    detector_types_to_try = ["dns", "network", "linux"]
     detector_type = None
     prepackaged_rules = []
     custom_rules = []
@@ -607,7 +608,8 @@ def create_multiple_detectors() -> dict:
     print("创建多个 Detector（覆盖所有规则类型）")
     print("=" * 80)
     
-    detector_types = ["dns", "network", "windows", "linux"]
+    # 注意：不包含windows，因为不需要windows规则
+    detector_types = ["dns", "network", "linux"]
     created_detectors = []
     failed_detectors = []
     
@@ -834,8 +836,8 @@ def create_detector_for_type(detector_type: str) -> dict:
             key = f"{category} ({'预打包' if is_prepackaged else '自定义' if is_custom else '未知'})"
             category_stats[key] = category_stats.get(key, 0) + 1
             
-            # 单独统计自定义规则
-            if is_custom or (not is_prepackaged and category in ['windows', 'network', 'linux', 'dns']):
+            # 单独统计自定义规则（不包含windows）
+            if is_custom or (not is_prepackaged and category in ['network', 'linux', 'dns']):
                 custom_category_stats[category] = custom_category_stats.get(category, 0) + 1
         
         print(f"[DEBUG] 所有规则category统计（前10个）:")

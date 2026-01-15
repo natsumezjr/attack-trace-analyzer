@@ -1,0 +1,311 @@
+{
+  "data": [
+    {
+      "ecs.version": "9.2.0",
+      "@timestamp": "2026-01-15T13:20:00.378217+0800",
+      "event.created": "2026-01-15T05:20:00.417Z",
+      "event.ingested": "2026-01-15T05:20:00.417Z",
+      "event.kind": "event",
+      "event.dataset": "netflow.flow",
+      "host.id": "sensor-01",
+      "host.name": "suricata-sensor",
+      "agent.name": "netflow-exporter",
+      "agent.version": "0.1.0",
+      "event.original": {
+        "timestamp": "2026-01-15T13:20:00.378217+0800",
+        "flow_id": 2082623079892624,
+        "in_iface": "ens33",
+        "event_type": "flow",
+        "src_ip": "10.122.243.144",
+        "src_port": 44624,
+        "dest_ip": "34.36.137.203",
+        "dest_port": 443,
+        "proto": "TCP",
+        "flow": {
+          "pkts_toserver": 1,
+          "pkts_toclient": 0,
+          "bytes_toserver": 74,
+          "bytes_toclient": 0,
+          "start": "2026-01-15T13:19:28.444048+0800",
+          "end": "2026-01-15T13:19:28.444048+0800",
+          "age": 0,
+          "state": "new",
+          "reason": "timeout",
+          "alerted": false
+        },
+        "community_id": "1:7mCt1wbe7bmBGktnvFBuwVrwnkg=",
+        "tcp": {
+          "tcp_flags": "02",
+          "tcp_flags_ts": "02",
+          "tcp_flags_tc": "00",
+          "syn": true,
+          "state": "syn_sent"
+        }
+      },
+      "source.ip": "10.122.243.144",
+      "destination.ip": "34.36.137.203",
+      "source.port": 44624,
+      "destination.port": 443,
+      "related.ip": [
+        "10.122.243.144",
+        "34.36.137.203"
+      ],
+      "flow.id": "2082623079892624",
+      "network.community_id": "1:7mCt1wbe7bmBGktnvFBuwVrwnkg=",
+      "network.transport": "TCP",
+      "event.category": [
+        "network"
+      ],
+      "event.type": [
+        "end"
+      ],
+      "event.action": "flow_end",
+      "network.bytes": 74,
+      "network.packets": 1
+    },
+    {
+      "ecs.version": "9.2.0",
+      "@timestamp": "2026-01-15T13:20:05.047475+0800",
+      "event.created": "2026-01-15T05:20:05.243Z",
+      "event.ingested": "2026-01-15T05:20:05.243Z",
+      "event.kind": "event",
+      "event.dataset": "netflow.flow",
+      "host.id": "sensor-01",
+      "host.name": "suricata-sensor",
+      "agent.name": "netflow-exporter",
+      "agent.version": "0.1.0",
+      "event.original": {
+        "timestamp": "2026-01-15T13:20:05.047475+0800",
+        "flow_id": 2091517952900912,
+        "in_iface": "ens33",
+        "event_type": "flow",
+        "src_ip": "34.107.243.93",
+        "src_port": 443,
+        "dest_ip": "10.122.243.144",
+        "dest_port": 56466,
+        "proto": "TCP",
+        "flow": {
+          "pkts_toserver": 2,
+          "pkts_toclient": 2,
+          "bytes_toserver": 156,
+          "bytes_toclient": 160,
+          "start": "2026-01-15T13:18:23.704304+0800",
+          "end": "2026-01-15T13:18:23.740872+0800",
+          "age": 0,
+          "state": "new",
+          "reason": "timeout",
+          "alerted": false
+        },
+        "community_id": "1:e3TI5Zync6ZMoVnmGwFNWTwehO0=",
+        "tcp": {
+          "tcp_flags": "00",
+          "tcp_flags_ts": "00",
+          "tcp_flags_tc": "00"
+        }
+      },
+      "source.ip": "34.107.243.93",
+      "destination.ip": "10.122.243.144",
+      "source.port": 443,
+      "destination.port": 56466,
+      "related.ip": [
+        "34.107.243.93",
+        "10.122.243.144"
+      ],
+      "flow.id": "2091517952900912",
+      "network.community_id": "1:e3TI5Zync6ZMoVnmGwFNWTwehO0=",
+      "network.transport": "TCP",
+      "event.category": [
+        "network"
+      ],
+      "event.type": [
+        "end"
+      ],
+      "event.action": "flow_end",
+      "network.bytes": 316,
+      "network.packets": 4
+    },
+    {
+      "ecs.version": "9.2.0",
+      "@timestamp": "2026-01-15T13:20:05.047605+0800",
+      "event.created": "2026-01-15T05:20:05.244Z",
+      "event.ingested": "2026-01-15T05:20:05.244Z",
+      "event.kind": "event",
+      "event.dataset": "netflow.flow",
+      "host.id": "sensor-01",
+      "host.name": "suricata-sensor",
+      "agent.name": "netflow-exporter",
+      "agent.version": "0.1.0",
+      "event.original": {
+        "timestamp": "2026-01-15T13:20:05.047605+0800",
+        "flow_id": 262035835265067,
+        "in_iface": "ens33",
+        "event_type": "flow",
+        "src_ip": "2001:0da8:0215:8f01:ab6b:20f6:fbca:05e3",
+        "src_port": 55316,
+        "dest_ip": "2600:1901:0000:38d7:0000:0000:0000:0000",
+        "dest_port": 80,
+        "proto": "TCP",
+        "flow": {
+          "pkts_toserver": 1,
+          "pkts_toclient": 0,
+          "bytes_toserver": 94,
+          "bytes_toclient": 0,
+          "start": "2026-01-15T13:19:29.466987+0800",
+          "end": "2026-01-15T13:19:29.466987+0800",
+          "age": 0,
+          "state": "new",
+          "reason": "timeout",
+          "alerted": false
+        },
+        "community_id": "1:de0AhaT/tygGuEDhfgC8qFYLwwI=",
+        "tcp": {
+          "tcp_flags": "02",
+          "tcp_flags_ts": "02",
+          "tcp_flags_tc": "00",
+          "syn": true,
+          "state": "syn_sent"
+        }
+      },
+      "source.ip": "2001:0da8:0215:8f01:ab6b:20f6:fbca:05e3",
+      "destination.ip": "2600:1901:0000:38d7:0000:0000:0000:0000",
+      "source.port": 55316,
+      "destination.port": 80,
+      "related.ip": [
+        "2001:0da8:0215:8f01:ab6b:20f6:fbca:05e3",
+        "2600:1901:0000:38d7:0000:0000:0000:0000"
+      ],
+      "flow.id": "262035835265067",
+      "network.community_id": "1:de0AhaT/tygGuEDhfgC8qFYLwwI=",
+      "network.transport": "TCP",
+      "event.category": [
+        "network"
+      ],
+      "event.type": [
+        "end"
+      ],
+      "event.action": "flow_end",
+      "network.bytes": 94,
+      "network.packets": 1
+    },
+    {
+      "ecs.version": "9.2.0",
+      "@timestamp": "2026-01-15T13:20:11.050266+0800",
+      "event.created": "2026-01-15T05:20:11.073Z",
+      "event.ingested": "2026-01-15T05:20:11.073Z",
+      "event.kind": "event",
+      "event.dataset": "netflow.flow",
+      "host.id": "sensor-01",
+      "host.name": "suricata-sensor",
+      "agent.name": "netflow-exporter",
+      "agent.version": "0.1.0",
+      "event.original": {
+        "timestamp": "2026-01-15T13:20:11.050266+0800",
+        "flow_id": 1116403607630652,
+        "in_iface": "ens33",
+        "event_type": "flow",
+        "src_ip": "10.122.243.144",
+        "src_port": 50432,
+        "dest_ip": "34.107.221.82",
+        "dest_port": 80,
+        "proto": "TCP",
+        "flow": {
+          "pkts_toserver": 9,
+          "pkts_toclient": 8,
+          "bytes_toserver": 594,
+          "bytes_toclient": 528,
+          "start": "2026-01-15T13:17:41.947004+0800",
+          "end": "2026-01-15T13:18:46.132376+0800",
+          "age": 65,
+          "state": "new",
+          "reason": "timeout",
+          "alerted": false
+        },
+        "community_id": "1:V3AoiHWk1YW5+RZtsj/rPHGcHjE=",
+        "tcp": {
+          "tcp_flags": "00",
+          "tcp_flags_ts": "00",
+          "tcp_flags_tc": "00"
+        }
+      },
+      "source.ip": "10.122.243.144",
+      "destination.ip": "34.107.221.82",
+      "source.port": 50432,
+      "destination.port": 80,
+      "related.ip": [
+        "10.122.243.144",
+        "34.107.221.82"
+      ],
+      "flow.id": "1116403607630652",
+      "network.community_id": "1:V3AoiHWk1YW5+RZtsj/rPHGcHjE=",
+      "network.transport": "TCP",
+      "event.category": [
+        "network"
+      ],
+      "event.type": [
+        "end"
+      ],
+      "event.action": "flow_end",
+      "network.bytes": 1122,
+      "network.packets": 17
+    },
+    {
+      "ecs.version": "9.2.0",
+      "@timestamp": "2026-01-15T13:20:13.051615+0800",
+      "event.created": "2026-01-15T05:20:13.083Z",
+      "event.ingested": "2026-01-15T05:20:13.083Z",
+      "event.kind": "event",
+      "event.dataset": "netflow.flow",
+      "host.id": "sensor-01",
+      "host.name": "suricata-sensor",
+      "agent.name": "netflow-exporter",
+      "agent.version": "0.1.0",
+      "event.original": {
+        "timestamp": "2026-01-15T13:20:13.051615+0800",
+        "flow_id": 2245243425634233,
+        "in_iface": "ens33",
+        "event_type": "flow",
+        "src_ip": "fe80:0000:0000:0000:4657:01c0:2dc7:323d",
+        "src_port": 5353,
+        "dest_ip": "ff02:0000:0000:0000:0000:0000:0000:00fb",
+        "dest_port": 5353,
+        "proto": "UDP",
+        "app_proto": "failed",
+        "flow": {
+          "pkts_toserver": 6,
+          "pkts_toclient": 0,
+          "bytes_toserver": 1579,
+          "bytes_toclient": 0,
+          "start": "2026-01-15T13:19:13.899001+0800",
+          "end": "2026-01-15T13:19:14.686825+0800",
+          "age": 1,
+          "state": "new",
+          "reason": "timeout",
+          "alerted": false
+        },
+        "community_id": "1:ocL6f9TJe+Z0wqjzqY6Ssansuvc="
+      },
+      "source.ip": "fe80:0000:0000:0000:4657:01c0:2dc7:323d",
+      "destination.ip": "ff02:0000:0000:0000:0000:0000:0000:00fb",
+      "source.port": 5353,
+      "destination.port": 5353,
+      "related.ip": [
+        "fe80:0000:0000:0000:4657:01c0:2dc7:323d",
+        "ff02:0000:0000:0000:0000:0000:0000:00fb"
+      ],
+      "flow.id": "2245243425634233",
+      "network.community_id": "1:ocL6f9TJe+Z0wqjzqY6Ssansuvc=",
+      "network.transport": "UDP",
+      "event.category": [
+        "network"
+      ],
+      "event.type": [
+        "end"
+      ],
+      "event.action": "flow_end",
+      "network.protocol": "failed",
+      "network.bytes": 1579,
+      "network.packets": 6
+    }
+  ],
+  "total": 5
+}
