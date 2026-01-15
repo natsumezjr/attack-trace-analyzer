@@ -20,6 +20,8 @@ services:
       rabbitmq:
         condition: service_healthy
     privileged: true
+    environment:
+      - FALCO_DRIVER_ENGINE=modern_ebpf
     pid: host
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
