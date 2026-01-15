@@ -109,9 +109,11 @@ def _update_poll_status(client_id: str, *, status: str, last_error: str | None) 
             id=client_id,
             body={
                 "doc": {
-                    "poll.last_seen": now,
-                    "poll.status": status,
-                    "poll.last_error": last_error,
+                    "poll": {
+                        "last_seen": now,
+                        "status": status,
+                        "last_error": last_error,
+                    },
                 }
             },
         )
