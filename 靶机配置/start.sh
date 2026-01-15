@@ -12,6 +12,7 @@ NC='\033[0m'
 # 固定变量
 export BASE=/home/ubuntu/attack-trace-analyzer
 export REPO="$BASE"/repo/attack-trace-analyzer
+export DEBUG_LOG="$REPO/.cursor/debug.log"
 
 # 自动加载 nvm（如果已安装）
 export NVM_DIR="$HOME/.nvm"
@@ -288,32 +289,106 @@ if should_start "frontend"; then
         [ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || log_info "nvm 不可用，使用系统默认 Node.js"
     fi
 
+    # 确保日志目录存在
+    mkdir -p "$REPO/.cursor" 2>/dev/null || true
+    
+    # #region agent log
+    echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A,C,D\",\"location\":\"start.sh:291\",\"message\":\"检查前端运行状态开始\",\"data\":{\"pidFile\":\"$BASE/run/frontend.pid\",\"lockFile\":\"$REPO/frontend/.next/dev/lock\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+    # #endregion
+    
+    # 检查并清理 Next.js 锁文件
+    LOCK_FILE="$REPO/frontend/.next/dev/lock"
+    if [ -f "$LOCK_FILE" ]; then
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\",\"location\":\"start.sh:296\",\"message\":\"发现锁文件，尝试清理\",\"data\":{\"lockFile\":\"$LOCK_FILE\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
+        rm -f "$LOCK_FILE"
+        log_info "已清理 Next.js 锁文件"
+    fi
+    
     # 检查前端是否在运行：检查 PID 文件和端口状态
     FRONTEND_RUNNING=false
     if [ -f "$BASE"/run/frontend.pid ]; then
         FRONTEND_PID=$(cat "$BASE"/run/frontend.pid)
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:303\",\"message\":\"检查PID文件\",\"data\":{\"pid\":\"$FRONTEND_PID\",\"pidFileExists\":true},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
         if ps -p "$FRONTEND_PID" > /dev/null 2>&1; then
             FRONTEND_RUNNING=true
+            # #region agent log
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:307\",\"message\":\"PID进程存在\",\"data\":{\"pid\":\"$FRONTEND_PID\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+            # #endregion
         else
             # PID 文件存在但进程不存在，清理 PID 文件
             rm -f "$BASE"/run/frontend.pid
+            # #region agent log
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:312\",\"message\":\"PID进程不存在，清理PID文件\",\"data\":{\"pid\":\"$FRONTEND_PID\"},\"timestamp\":$(date +%s%3N)}" >> ".cursor/debug.log" 2>/dev/null || true
+            # #endregion
         fi
+    else
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:316\",\"message\":\"PID文件不存在\",\"data\":{},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
     fi
     
-    # 检查端口 3000 是否被占用（更可靠的检查方式）
-    if ! $FRONTEND_RUNNING && ss -lntup 2>/dev/null | grep -q ":3000 " || netstat -lntup 2>/dev/null | grep -q ":3000 "; then
-        FRONTEND_RUNNING=true
+    # 检查端口 3000 是否被占用（修复逻辑错误）
+    PORT_CHECK_CMD=""
+    if command -v ss >/dev/null 2>&1; then
+        PORT_CHECK_CMD="ss -lntup"
+    elif command -v netstat >/dev/null 2>&1; then
+        PORT_CHECK_CMD="netstat -lntup"
+    fi
+    
+    if [ -n "$PORT_CHECK_CMD" ] && ! $FRONTEND_RUNNING; then
+        if $PORT_CHECK_CMD 2>/dev/null | grep -q ":3000 "; then
+            FRONTEND_RUNNING=true
+            # #region agent log
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"start.sh:329\",\"message\":\"端口3000被占用\",\"data\":{},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+            # #endregion
+        else
+            # #region agent log
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"start.sh:333\",\"message\":\"端口3000未被占用\",\"data\":{},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+            # #endregion
+        fi
     fi
 
     if ! $FRONTEND_RUNNING; then
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\",\"location\":\"start.sh:338\",\"message\":\"启动前端进程\",\"data\":{},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
         nohup npm run dev -- -H 0.0.0.0 -p 3000 > "$BASE"/run/frontend.log 2>&1 &
-        echo $! > "$BASE"/run/frontend.pid
-        log_info "前端已启动，PID: $(cat "$BASE"/run/frontend.pid)"
+        START_PID=$!
+        echo $START_PID > "$BASE"/run/frontend.pid
+        log_info "前端已启动，PID: $START_PID"
         log_info "Node.js 版本: $(node --version 2>/dev/null || echo '未知')"
+        
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A,D\",\"location\":\"start.sh:346\",\"message\":\"进程启动后立即检查\",\"data\":{\"pid\":\"$START_PID\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
+        
+        # 等待一下让进程启动
+        sleep 2
+        
+        # 验证进程是否真的在运行
+        if ps -p "$START_PID" > /dev/null 2>&1; then
+            # #region agent log
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A,D\",\"location\":\"start.sh:353\",\"message\":\"进程仍在运行\",\"data\":{\"pid\":\"$START_PID\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+            # #endregion
+        else
+            # #region agent log
+            LOG_ERROR=$(tail -n 5 "$BASE"/run/frontend.log 2>/dev/null | head -n 1 || echo "无法读取日志")
+            echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:357\",\"message\":\"进程启动后立即失败\",\"data\":{\"pid\":\"$START_PID\",\"error\":\"$LOG_ERROR\"},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+            # #endregion
+            log_warn "前端进程启动失败，请查看日志: $BASE/run/frontend.log"
+            rm -f "$BASE"/run/frontend.pid
+        fi
     else
+        # #region agent log
+        echo "{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"start.sh:363\",\"message\":\"前端已在运行，跳过启动\",\"data\":{\"running\":true},\"timestamp\":$(date +%s%3N)}" >> "$DEBUG_LOG" 2>/dev/null || true
+        # #endregion
         log_warn "前端已在运行"
     fi
-    sleep 3
+    sleep 1
 else
     log_warn "跳过: 前端"
 fi

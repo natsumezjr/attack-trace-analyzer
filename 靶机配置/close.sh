@@ -196,6 +196,13 @@ if should_stop "frontend"; then
         log_info "前端进程已停止（通过 pkill）"
     fi
     
+    # 清理 Next.js 锁文件
+    LOCK_FILE="$REPO/frontend/.next/dev/lock"
+    if [ -f "$LOCK_FILE" ]; then
+        rm -f "$LOCK_FILE"
+        log_info "已清理 Next.js 锁文件"
+    fi
+    
     # 等待端口释放
     if $FRONTEND_STOPPED; then
         sleep 2
