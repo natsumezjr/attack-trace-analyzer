@@ -19,22 +19,48 @@ def register_online_target(req: RegisterTargetRequest):
     # 简化版注册：只提供 IP，由中心机推导 listen_url 与 capabilities，并写入 OpenSearch client-registry。
     ip_str = str(req.ip)
 
+    # 自动分配端口：查找已注册的 clients，分配下一个可用端口
+    client = get_client()
+    try:
+        existing = client.search(index="client-registry", body={
+            "query": {"bool": {"must": [{"prefix": {"client.id": f"{ip_str}_"}}]}},
+            "size": 100
+        })
+        used_ports = set()
+        for hit in existing["hits"]["hits"]:
+            listen_url = hit["_source"]["client"]["listen_url"]
+            port = int(listen_url.split(":")[-1])
+            used_ports.add(port)
+    except:
+        used_ports = set()
+
+    # 分配端口 8888-8891
+    for port in [8888, 8889, 8890, 8891]:
+        if port not in used_ports:
+            assigned_port = port
+            break
+    else:
+        assigned_port = 8888  # 默认
+
+    # 使用 IP_端口作为唯一 ID
+    client_id = f"{ip_str}_{assigned_port}"
+
     now = utc_now_rfc3339()
     doc = {
         "@timestamp": now,
         "client": {
-            "id": ip_str,
+            "id": client_id,
             "version": "manual",
-            "listen_url": f"http://{ip_str}:8888",
+            "listen_url": f"http://{ip_str}:{assigned_port}",
             "capabilities": {"falco": True, "suricata": True, "filebeat": True},
         },
-        "host": {"id": ip_str, "name": ip_str},
+        "host": {"id": client_id, "name": client_id},
         "poll": {"last_seen": now, "status": "registered", "last_error": None},
     }
 
     try:
         ensure_index(INDEX_PATTERNS["CLIENT_REGISTRY"], client_registry_mapping)
-        index_document(INDEX_PATTERNS["CLIENT_REGISTRY"], doc, doc_id=ip_str)
+        index_document(INDEX_PATTERNS["CLIENT_REGISTRY"], doc, doc_id=client_id)
     except Exception as error:
         return JSONResponse(
             status_code=503,

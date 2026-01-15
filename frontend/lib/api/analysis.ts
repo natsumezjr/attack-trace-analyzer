@@ -12,6 +12,42 @@ export type CreateAnalysisTaskResponse = {
   server_time?: string;
 };
 
+// TTP Similarity APT 条目类型
+export type SimilarAptItem = {
+  intrusion_set?: {
+    id?: string;
+    name?: string;
+  };
+  similarity_score?: number;
+  confidence?: number;
+  explanation?: string;
+  top_tactics?: string[];
+  top_techniques?: string[];
+};
+
+// KillChain 数据类型
+export type KillChainData = {
+  kc_uuid: string;
+  confidence: number;
+  segments: Array<{
+    seg_idx: number;
+    state: string;
+    t_start: number;
+    t_end: number;
+    anchor_in_uid: string;
+    anchor_out_uid: string;
+    abnormal_edge_count: number;
+  }>;
+  selected_paths: Array<{
+    path_id: string;
+    src_anchor: string;
+    dst_anchor: string;
+    hop_count: number;
+    edge_ids: string[];
+  }>;
+  explanation: string;
+};
+
 export type AnalysisTaskItem = {
   "@timestamp": string;
   "task.id": string;
@@ -26,9 +62,11 @@ export type AnalysisTaskItem = {
   "task.result.summary"?: string | null;
   "task.result.ttp_similarity.attack_tactics"?: string[] | null;
   "task.result.ttp_similarity.attack_techniques"?: string[] | null;
-  "task.result.ttp_similarity.similar_apts"?: unknown[] | null;
+  "task.result.ttp_similarity.similar_apts"?: SimilarAptItem[] | null;
   "task.result.trace.updated_edges"?: number | null;
   "task.result.trace.path_edges"?: number | null;
+  "task.result.killchain_uuid"?: string;
+  "task.result.killchain"?: KillChainData | null;
 };
 
 export type AnalysisTasksResponse =

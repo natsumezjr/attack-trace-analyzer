@@ -202,6 +202,23 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
         "netflow.http",
         "netflow.tls",
         "netflow.icmp",
+        "falco.syscall",
+        "falco.exec",
+        "falco.privilege_escalation",
+        "falco.file_access",
+        "falco.file_deletion",
+        "falco.file_creation",
+        "falco.service_install",
+        "suricata.http",
+        "suricata.flow",
+        "suricata.dns",
+        "suricata.tls",
+        "suricata.icmp",
+        "filebeat.system",
+        "filebeat.auth",
+        "system.auth",
+        "vsftpd.auth",
+        "finding.canonical",
     }
     finding_providers = {"falco", "suricata", "filebeat_sigma", "security_analytics"}
 

@@ -11,6 +11,23 @@ const MAX_CANONICAL_FINDINGS = 2000;
 const APPENDIX_EDGE_LIMIT = 50;
 const APPENDIX_FINDING_LIMIT = 50;
 
+const ATTACK_STATE_ZH_MAP: Record<string, string> = {
+  "INITIAL_ACCESS": "初始入侵",
+  "EXECUTION": "执行",
+  "PRIVILEGE_ESCALATION": "权限提升",
+  "LATERAL_MOVEMENT": "横向移动",
+  "COMMAND_AND_CONTROL": "命令与控制",
+  "DISCOVERY": "发现",
+  "IMPACT": "影响",
+  "RESOURCE_DEVELOPMENT": "资源开发",
+  "PERSISTENCE": "持久化",
+  "DEFENSE_EVASION": "防御规避",
+  "CREDENTIAL_ACCESS": "凭证访问",
+  "COLLECTION": "收集",
+  "EXFILTRATION": "数据渗出",
+  "RECONNAISSANCE": "侦察",
+};
+
 type IntrusionSetRef = { id?: string; name?: string };
 
 export type SimilarAptItem = {
@@ -27,6 +44,28 @@ export type TtpSimilarityBlock = {
   similar_apts: SimilarAptItem[];
 };
 
+export type KillChainBlock = {
+  uuid: string;
+  confidence: number;
+  segments: Array<{
+    seg_idx: number;
+    state: string;
+    t_start: number;
+    t_end: number;
+    anchor_in_uid: string;
+    anchor_out_uid: string;
+    abnormal_edge_count: number;
+  }>;
+  selected_paths: Array<{
+    path_id: string;
+    src_anchor: string;
+    dst_anchor: string;
+    hop_count: number;
+    edge_ids: string[];
+  }>;
+  explanation: string;
+};
+
 export type ReportData = {
   task: AnalysisTaskItem;
   taskId: string;
@@ -41,6 +80,7 @@ export type ReportData = {
   graphNodes: GraphApiNode[];
   pathEdges: GraphApiEdge[];
   ttpSimilarity: TtpSimilarityBlock;
+  killChain?: KillChainBlock;
   notes: string[];
 };
 
@@ -362,6 +402,42 @@ export async function generateReportData(taskId: string): Promise<ReportData> {
   const pathEdges = sortGraphEdges(sortedEdges.filter(isPathEdge));
   const sortedFindings = sortFindings(canonicalFindings);
 
+  // Extract killchain data
+  const kcUuid = task["task.result.killchain_uuid"];
+  const kcRaw = task["task.result.killchain"];
+  let killChain: KillChainBlock | undefined;
+  if (kcUuid && kcRaw && typeof kcRaw === "object") {
+    killChain = {
+      uuid: kcUuid,
+      confidence: typeof kcRaw.confidence === "number" ? kcRaw.confidence : 0,
+      segments: Array.isArray(kcRaw.segments)
+        ? kcRaw.segments
+          .filter((s) => s && typeof s === "object")
+          .map((s: any) => ({
+            seg_idx: typeof s.seg_idx === "number" ? s.seg_idx : 0,
+            state: typeof s.state === "string" ? s.state : "",
+            t_start: typeof s.t_start === "number" ? s.t_start : 0,
+            t_end: typeof s.t_end === "number" ? s.t_end : 0,
+            anchor_in_uid: typeof s.anchor_in_uid === "string" ? s.anchor_in_uid : "",
+            anchor_out_uid: typeof s.anchor_out_uid === "string" ? s.anchor_out_uid : "",
+            abnormal_edge_count: typeof s.abnormal_edge_count === "number" ? s.abnormal_edge_count : 0,
+          }))
+        : [],
+      selected_paths: Array.isArray(kcRaw.selected_paths)
+        ? kcRaw.selected_paths
+          .filter((p) => p && typeof p === "object")
+          .map((p: any) => ({
+            path_id: typeof p.path_id === "string" ? p.path_id : "",
+            src_anchor: typeof p.src_anchor === "string" ? p.src_anchor : "",
+            dst_anchor: typeof p.dst_anchor === "string" ? p.dst_anchor : "",
+            hop_count: typeof p.hop_count === "number" ? p.hop_count : 0,
+            edge_ids: Array.isArray(p.edge_ids) ? p.edge_ids : [],
+          }))
+        : [],
+      explanation: typeof kcRaw.explanation === "string" ? kcRaw.explanation : "",
+    };
+  }
+
   return {
     task,
     taskId,
@@ -376,6 +452,7 @@ export async function generateReportData(taskId: string): Promise<ReportData> {
     graphNodes: sortedNodes,
     pathEdges,
     ttpSimilarity,
+    killChain,
     notes,
   };
 }
@@ -610,16 +687,81 @@ export function generateMarkdownReport(data: ReportData): string {
     lines.push("");
   }
 
-  lines.push(`## 6. 附录：原始数据（JSON）`);
+  // KillChain section
+  if (data.killChain) {
+    lines.push(`## 6. KillChain 攻击链分析`);
+    lines.push("");
+
+    // 6.1 概览
+    lines.push(`### 6.1 概览`);
+    lines.push("");
+    lines.push(`- kc_uuid: \`${data.killChain.uuid}\``);
+    lines.push(`- confidence: \`${data.killChain.confidence.toFixed(2)}\``);
+    lines.push(`- segment_count: \`${data.killChain.segments.length}\``);
+    lines.push(`- selected_path_count: \`${data.killChain.selected_paths.length}\``);
+    lines.push("");
+
+    // 6.2 战术时间线
+    lines.push(`### 6.2 MITRE ATT&CK 战术分段`);
+    lines.push("");
+    const timeline = data.killChain.segments
+      .map((seg) => ATTACK_STATE_ZH_MAP[seg.state] || seg.state)
+      .join(" → ");
+    lines.push(`${timeline}`);
+    lines.push("");
+
+    // 6.3 分段详情
+    lines.push(`#### 分段详情`);
+    lines.push("");
+    data.killChain.segments.forEach((seg) => {
+      const stateZh = ATTACK_STATE_ZH_MAP[seg.state] || seg.state;
+      lines.push(`**${seg.seg_idx + 1}. ${stateZh} (${seg.state})**`);
+      lines.push(`- 时间范围：${new Date(seg.t_start * 1000).toISOString()} → ${new Date(seg.t_end * 1000).toISOString()}`);
+      lines.push(`- 入口锚点：\`${seg.anchor_in_uid}\``);
+      lines.push(`- 出口锚点：\`${seg.anchor_out_uid}\``);
+      lines.push(`- 异常边数：${seg.abnormal_edge_count}`);
+      lines.push("");
+    });
+
+    // 6.4 LLM 解释
+    lines.push(`### 6.3 LLM 全链解释`);
+    lines.push("");
+    lines.push(data.killChain.explanation);
+    lines.push("");
+
+    // 6.5 路径列表
+    if (data.killChain.selected_paths.length > 0) {
+      lines.push(`### 6.4 段间连接路径`);
+      lines.push("");
+      data.killChain.selected_paths.forEach((path, idx) => {
+        lines.push(`**路径 ${idx + 1}**: \`${path.path_id}\``);
+        lines.push(`- 源锚点：\`${path.src_anchor}\``);
+        lines.push(`- 目标锚点：\`${path.dst_anchor}\``);
+        lines.push(`- hop 数量：${path.hop_count}`);
+        lines.push(`- 边 ID 列表：${path.edge_ids.map((id) => `\`${id}\``).join(", ")}`);
+        lines.push("");
+      });
+    }
+  } else {
+    // If killchain_uuid exists but no data
+    if (data.task["task.result.killchain_uuid"]) {
+      lines.push(`## 6. KillChain 攻击链分析`);
+      lines.push("");
+      lines.push(`> 说明：该任务关联了 KillChain UUID (\`${data.task["task.result.killchain_uuid"]}\`)，但完整数据未嵌入任务文档。`);
+      lines.push("");
+    }
+  }
+
+  lines.push(`## 7. 附录：原始数据（JSON）`);
   lines.push("");
-  lines.push(`### 6.1 任务文档（task）`);
+  lines.push(`### 7.1 任务文档（task）`);
   lines.push("");
   lines.push("```json");
   lines.push(stableStringify(data.task));
   lines.push("```");
   lines.push("");
 
-  lines.push(`### 6.2 关键路径边（Top ${APPENDIX_EDGE_LIMIT}）`);
+  lines.push(`### 7.2 关键路径边（Top ${APPENDIX_EDGE_LIMIT}）`);
   lines.push("");
   lines.push("```json");
   lines.push(
