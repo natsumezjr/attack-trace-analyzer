@@ -1575,9 +1575,27 @@ def run_killchain_pipeline(
         kc_uuid = str(uuid.uuid4())
 
     abnormal = graph_api.get_alarm_edges()
+    print(f"[DEBUG] run_killchain_pipeline: 查询到 {len(abnormal)} 条告警边")
+    if abnormal:
+        print(f"[DEBUG] 第一条告警边示例:")
+        first_edge = abnormal[0]
+        print(f"  - src_uid: {first_edge.src_uid}")
+        print(f"  - dst_uid: {first_edge.dst_uid}")
+        print(f"  - rtype: {first_edge.rtype}")
+        print(f"  - is_alarm: {first_edge.props.get('is_alarm')}")
+        print(f"  - threat.tactic.name: {first_edge.props.get('threat.tactic.name')}")
+        if hasattr(first_edge, 'get_attack_tag'):
+            print(f"  - attack_tag: {first_edge.get_attack_tag()}")
+    else:
+        print("[WARN] run_killchain_pipeline: 没有查询到任何告警边！")
+        print("[WARN] 可能原因:")
+        print("  1. 数据库中没有 is_alarm=true 的边")
+        print("  2. 测试数据加载失败")
+        print("  3. 测试数据中的事件没有 event.kind='alert'")
 
     # Phase A
     fsa_graphs = behavior_state_machine(abnormal)
+    print(f"[DEBUG] run_killchain_pipeline: Phase A 生成了 {len(fsa_graphs)} 个 FSA 图")
 
     # Phase B
     cache = AnchorPairCache(max_items=MAX_CACHE_ITEMS)
