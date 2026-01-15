@@ -80,6 +80,42 @@ def test_batch_ingest_idempotent():
 
 
 @pytest.mark.requires_neo4j
+def test_batch_ingest_user_without_user_id_uses_composite_key():
+    """user.id 缺失时应回退到 (host.id, user.name) 复合键，且批量写入不应崩溃"""
+    events = [
+        {
+            "@timestamp": "2026-01-15T10:00:00Z",
+            "event": {
+                "id": "evt-uid-missing-001",
+                "kind": "event",
+                "category": ["authentication"],
+                "dataset": "hostlog.auth",
+                "action": "logged_in",
+            },
+            "host": {"id": "h-001", "name": "victim-01"},
+            "user": {"name": "alice"},
+        },
+    ]
+
+    total_nodes, total_edges = graph_ingest.ingest_ecs_events(events)
+    assert total_nodes > 0
+    assert total_edges > 0
+
+    # 验证用户节点以 host.id + user.name 存在（而不是必须有 user.id）
+    with graph_db._get_session() as session:
+        records = list(
+            session.run(
+                "MATCH (n:User) "
+                "WHERE n.`host.id` = $host_id AND n.`user.name` = $user_name "
+                "RETURN n LIMIT 1",
+                host_id="h-001",
+                user_name="alice",
+            )
+        )
+    assert len(records) == 1
+
+
+@pytest.mark.requires_neo4j
 def test_batch_ingest_canonical_finding():
     """测试批量入图 Canonical Finding"""
     events = [
