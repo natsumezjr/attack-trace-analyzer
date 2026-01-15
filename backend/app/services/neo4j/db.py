@@ -721,29 +721,78 @@ def get_edges_by_task_id(
     only_path: bool = False,
 ) -> List[GraphEdge]:
     """按 analysis.task_id 查询边集合（可选仅关键路径边）"""
+    # #region agent log
+    print(f"[DEBUG] get_edges_by_task_id entry: task_id={task_id}, only_path={only_path}")
+    # #endregion
     if not isinstance(task_id, str) or not task_id:
         raise ValueError("task_id is required")
 
+    # #region agent log
+    print(f"[DEBUG] ensuring schema...")
+    # #endregion
     ensure_schema()
-    with _get_session() as session:
-        rows = _execute_read(session, _fetch_edges_by_task_id, task_id, bool(only_path))
+    # #region agent log
+    print(f"[DEBUG] getting session...")
+    # #endregion
+    try:
+        with _get_session() as session:
+            # #region agent log
+            print(f"[DEBUG] executing read transaction...")
+            # #endregion
+            rows = _execute_read(session, _fetch_edges_by_task_id, task_id, bool(only_path))
+            # #region agent log
+            print(f"[DEBUG] query returned {len(rows)} rows")
+            # #endregion
+    except Exception as e:
+        # #region agent log
+        print(f"[DEBUG] EXCEPTION in get_edges_by_task_id session/query: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        # #endregion
+        raise
 
     edges: List[GraphEdge] = []
-    for row in rows:
-        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
-        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
-        if src_uid is None or dst_uid is None:
-            continue
+    for i, row in enumerate(rows):
+        # #region agent log
+        print(f"[DEBUG] processing row {i+1}/{len(rows)}")
+        # #endregion
         try:
-            rtype = RelType(row["rtype"])
-        except ValueError:
+            src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+            dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+            # #region agent log
+            print(f"[DEBUG] row {i+1}: src_uid={src_uid}, dst_uid={dst_uid}")
+            # #endregion
+            if src_uid is None or dst_uid is None:
+                # #region agent log
+                print(f"[DEBUG] row {i+1}: skipping due to None uid")
+                # #endregion
+                continue
+            try:
+                rtype = RelType(row["rtype"])
+            except ValueError as e:
+                # #region agent log
+                print(f"[DEBUG] row {i+1}: RelType ValueError: {e}, rtype={row.get('rtype')}")
+                # #endregion
+                continue
+            edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+        except Exception as e:
+            # #region agent log
+            print(f"[DEBUG] EXCEPTION processing row {i+1}: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            # #endregion
             continue
-        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+    # #region agent log
+    print(f"[DEBUG] get_edges_by_task_id returning {len(edges)} edges")
+    # #endregion
     return edges
 
 
 def _fetch_edges_by_task_id(tx, task_id: str, only_path: bool) -> List[Dict[str, Any]]:
     """按 analysis.task_id 查询边的事务函数"""
+    # #region agent log
+    print(f"[DEBUG] _fetch_edges_by_task_id: task_id={task_id}, only_path={only_path}")
+    # #endregion
     params: Dict[str, Any] = {"task_id": task_id, "only_path": bool(only_path)}
 
     cypher = (
@@ -754,7 +803,23 @@ def _fetch_edges_by_task_id(tx, task_id: str, only_path: bool) -> List[Dict[str,
         "labels(startNode(r)) AS src_labels, properties(startNode(r)) AS src_props, "
         "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
     )
-    return list(tx.run(cypher, **params))
+    # #region agent log
+    print(f"[DEBUG] executing cypher query: {cypher[:100]}...")
+    print(f"[DEBUG] with params: {params}")
+    # #endregion
+    try:
+        result = list(tx.run(cypher, **params))
+        # #region agent log
+        print(f"[DEBUG] cypher query returned {len(result)} results")
+        # #endregion
+        return result
+    except Exception as e:
+        # #region agent log
+        print(f"[DEBUG] EXCEPTION in _fetch_edges_by_task_id cypher: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        # #endregion
+        raise
 
 
 def _fetch_edges_in_window(

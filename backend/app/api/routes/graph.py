@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal
+import traceback
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -62,7 +63,13 @@ def _node_to_dict(node: Any) -> dict[str, Any]:
 
 @router.post("/api/v1/graph/query")
 def graph_query(req: GraphQueryRequest):
+    # #region agent log
+    print(f"[DEBUG] graph_query entry: action={req.action}, task_id={req.task_id}, only_path={req.only_path}")
+    # #endregion
     try:
+        # #region agent log
+        print(f"[DEBUG] before action branch: action={req.action}")
+        # #endregion
         if req.action == "alarm_edges":
             edges = graph_api.get_alarm_edges()
             uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
@@ -157,18 +164,39 @@ def graph_query(req: GraphQueryRequest):
             )
 
         if req.action == "analysis_edges_by_task":
+            # #region agent log
+            print(f"[DEBUG] before task_id check: task_id={req.task_id}")
+            # #endregion
             if not req.task_id:
                 return JSONResponse(
                     status_code=400,
                     content=err("BAD_REQUEST", "task_id is required"),
                 )
+            # #region agent log
+            print(f"[DEBUG] before get_edges_by_task_id: task_id={req.task_id}, only_path={req.only_path}")
+            # #endregion
             edges = graph_api.get_edges_by_task_id(task_id=req.task_id, only_path=req.only_path)
+            # #region agent log
+            print(f"[DEBUG] after get_edges_by_task_id: edges_count={len(edges)}")
+            # #endregion
+            # #region agent log
+            print(f"[DEBUG] before collecting uids from edges")
+            # #endregion
             uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
+            # #region agent log
+            print(f"[DEBUG] collected {len(uids)} unique uids")
+            # #endregion
             nodes: list[dict[str, Any]] = []
             for uid in sorted(uids):
+                # #region agent log
+                print(f"[DEBUG] fetching node for uid: {uid}")
+                # #endregion
                 node = graph_api.get_node(uid)
                 if node is not None:
                     nodes.append(_node_to_dict(node))
+            # #region agent log
+            print(f"[DEBUG] collected {len(nodes)} nodes, preparing response")
+            # #endregion
             return ok(
                 edges=[_edge_to_dict(e) for e in edges],
                 nodes=nodes,
@@ -180,6 +208,11 @@ def graph_query(req: GraphQueryRequest):
             content=err("BAD_REQUEST", f"unknown action: {req.action}"),
         )
     except Exception as error:
+        # #region agent log
+        print(f"[DEBUG] EXCEPTION in graph_query: {type(error).__name__}: {error}")
+        print(f"[DEBUG] Exception traceback:")
+        traceback.print_exc()
+        # #endregion
         return JSONResponse(
             status_code=500,
             content=err("INTERNAL_ERROR", str(error)),
