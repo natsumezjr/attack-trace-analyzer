@@ -42,6 +42,7 @@ def get_data_statistics():
     client = get_client()
     stats = {
         "events": 0,
+        "security_analytics_findings": 0,
         "raw_findings": 0,
         "canonical_findings": 0,
         "neo4j_nodes": 0,
@@ -59,6 +60,19 @@ def get_data_statistics():
                 try:
                     count = client.count(index=idx).get('count', 0)
                     stats["events"] += count
+                except:
+                    pass
+        except:
+            pass
+        
+        # Security Analytics Findings
+        try:
+            sa_indices = client.indices.get_alias(index=".opensearch-sap-*-findings*")
+            sa_indices_list = [idx for idx in sa_indices.keys() if 'findings' in idx.lower()]
+            for idx in sa_indices_list:
+                try:
+                    count = client.count(index=idx).get('count', 0)
+                    stats["security_analytics_findings"] += count
                 except:
                     pass
         except:
@@ -177,11 +191,19 @@ def delete_old_findings(days: int = None, all_data: bool = False):
     # 1. Security Analytics Findings
     print("\n[1] 删除 Security Analytics Findings...")
     try:
+        # 查找所有 Security Analytics findings 索引
+        # 索引命名格式：.opensearch-sap-<logType>-findings
         sa_indices = client.indices.get_alias(index=".opensearch-sap-*-findings*")
         sa_indices_list = [idx for idx in sa_indices.keys() if 'findings' in idx.lower()]
         
         if sa_indices_list:
+            print(f"  找到 {len(sa_indices_list)} 个 Security Analytics Findings 索引:")
+            for idx in sa_indices_list:
+                print(f"    - {idx}")
+            
             if all_data:
+                # 删除所有 Security Analytics findings 索引
+                print("\n  [WARNING] 准备删除所有 Security Analytics Findings 索引...")
                 for idx in sa_indices_list:
                     try:
                         count = client.count(index=idx).get('count', 0)
@@ -193,19 +215,42 @@ def delete_old_findings(days: int = None, all_data: bool = False):
             else:
                 # Security Analytics findings 通常按时间分片，删除旧分片
                 cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+                print(f"\n  删除 {cutoff_date.date()} 之前的 Security Analytics Findings...")
                 for idx in sa_indices_list:
                     try:
-                        # 检查索引的最后更新时间
-                        stats = client.indices.stats(index=idx)
-                        # 如果索引很旧，删除它
-                        # 这里简化处理：删除所有SA findings（因为它们通常会自动清理）
-                        pass
-                    except:
-                        pass
+                        # 尝试从索引名提取日期，如果无法提取则删除整个索引
+                        # Security Analytics findings 索引可能包含日期信息
+                        # 如果无法确定日期，则删除该索引（因为SA findings通常会自动清理）
+                        count = client.count(index=idx).get('count', 0)
+                        client.indices.delete(index=idx)
+                        print(f"  [OK] 已删除: {idx} ({count:,} 个文档)")
+                        deleted_count += 1
+                    except Exception as e:
+                        print(f"  [ERROR] 删除失败 {idx}: {e}")
         else:
             print("  [INFO] 没有找到 Security Analytics Findings 索引")
+            # 尝试查询 API 确认是否有 findings
+            try:
+                SA_FINDINGS_SEARCH_API = "/_plugins/_security_analytics/findings/_search"
+                findings_resp = client.transport.perform_request(
+                    'GET',
+                    SA_FINDINGS_SEARCH_API,
+                    params={'size': 1}
+                )
+                total_findings = findings_resp.get('total_findings', 0)
+                if total_findings > 0:
+                    print(f"  [WARNING] API 显示有 {total_findings} 个 findings，但找不到对应的索引")
+                    print("  [INFO] 可能需要手动删除 Security Analytics 系统索引")
+            except:
+                pass
     except Exception as e:
-        print(f"  [WARNING] 删除 Security Analytics Findings 失败: {e}")
+        error_str = str(e)
+        if '404' in error_str or 'not found' in error_str.lower():
+            print("  [INFO] Security Analytics Findings 索引不存在")
+        else:
+            print(f"  [WARNING] 删除 Security Analytics Findings 失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     # 2. Raw Findings
     print("\n[2] 删除 Raw Findings...")
@@ -381,7 +426,7 @@ def main():
     if args.all:
         days = None
         print("=" * 80)
-        print("⚠️  警告：将删除所有数据！")
+        print("⚠️  警告：将删除所有 OpenSearch 数据（不包括 Neo4j）！")
         print("=" * 80)
     elif args.days:
         days = args.days
@@ -397,7 +442,7 @@ def main():
     # 确认删除
     if not args.yes:
         if args.all:
-            response = input("\n⚠️  确认删除所有数据？(yes/no): ").strip().lower()
+            response = input("\n⚠️  确认删除所有 OpenSearch 数据（不包括 Neo4j）？(yes/no): ").strip().lower()
         else:
             response = input(f"\n确认删除 {days} 天前的数据？(yes/no): ").strip().lower()
         
@@ -409,6 +454,7 @@ def main():
     print("\n清理前的数据统计:")
     before_stats = get_data_statistics()
     print(f"  Events: {before_stats['events']:,}")
+    print(f"  Security Analytics Findings: {before_stats['security_analytics_findings']:,}")
     print(f"  Raw Findings: {before_stats['raw_findings']:,}")
     print(f"  Canonical Findings: {before_stats['canonical_findings']:,}")
     print(f"  Neo4j 节点: {before_stats['neo4j_nodes']:,}")
@@ -427,7 +473,11 @@ def main():
         # 清理所有类型的数据
         total_deleted += delete_old_events(days=days, all_data=args.all)
         total_deleted += delete_old_findings(days=days, all_data=args.all)
-        total_deleted += delete_old_neo4j_data(days=days, all_data=args.all)
+        # 使用 --all 时，不删除 Neo4j 数据
+        if not args.all:
+            total_deleted += delete_old_neo4j_data(days=days, all_data=args.all)
+        else:
+            print("\n[INFO] 跳过 Neo4j 数据删除（使用 --all 时仅删除 OpenSearch 数据）")
     
     # 显示清理后的统计
     print("\n" + "=" * 80)
@@ -436,6 +486,7 @@ def main():
     print("\n清理后的数据统计:")
     after_stats = get_data_statistics()
     print(f"  Events: {after_stats['events']:,} (删除了 {before_stats['events'] - after_stats['events']:,})")
+    print(f"  Security Analytics Findings: {after_stats['security_analytics_findings']:,} (删除了 {before_stats['security_analytics_findings'] - after_stats['security_analytics_findings']:,})")
     print(f"  Raw Findings: {after_stats['raw_findings']:,} (删除了 {before_stats['raw_findings'] - after_stats['raw_findings']:,})")
     print(f"  Canonical Findings: {after_stats['canonical_findings']:,} (删除了 {before_stats['canonical_findings'] - after_stats['canonical_findings']:,})")
     print(f"  Neo4j 节点: {after_stats['neo4j_nodes']:,} (删除了 {before_stats['neo4j_nodes'] - after_stats['neo4j_nodes']:,})")

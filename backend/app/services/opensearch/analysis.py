@@ -10,6 +10,7 @@ OpenSearch 数据分析模块
 """
 
 import hashlib
+import re
 from typing import Any, Optional, List, Dict
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -555,16 +556,14 @@ def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[
 
 def _get_all_monitor_ids(client, enabled_only: bool = False) -> list[str]:
     """
-    从 .opensearch-sap-detectors-config 索引获取所有 monitor IDs
+    获取所有 monitor IDs
     
-    按照推荐方法：
-    1. 查询 .opensearch-sap-detectors-config 索引
-    2. 解析 monitor_id 数组（保序去重）
-    3. 按需过滤 enabled
+    优先方法：从Alerting API查询真正的monitor IDs
+    备用方法：从 .opensearch-sap-detectors-config 索引或detector详情获取
     
     参数：
     - client: OpenSearch客户端
-    - enabled_only: 是否只返回启用的detector的monitor IDs（默认False，返回所有）
+    - enabled_only: 是否只返回启用的monitor IDs（默认False，返回所有）
     
     返回：
     - monitor_ids: monitor ID列表（已去重，保序）
@@ -572,7 +571,52 @@ def _get_all_monitor_ids(client, enabled_only: bool = False) -> list[str]:
     monitor_ids = []
     seen = set()
     
-    # 方法1: 从 .opensearch-sap-detectors-config 索引查询（推荐方法）
+    # 方法1: 从Alerting API查询真正的monitor IDs（推荐方法）
+    try:
+        # Security Analytics使用的monitor workflow_type是"composite"，不是"doc_level_monitor"
+        monitor_resp = client.transport.perform_request(
+            'POST',
+            '/_plugins/_alerting/monitors/_search',
+            body={
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"term": {"workflow_type": "composite"}},  # Security Analytics使用composite
+                            {"term": {"workflow_type": "doc_level_monitor"}}  # 兼容旧版本
+                        ],
+                        "minimum_should_match": 1
+                    }
+                },
+                "size": 100
+            }
+        )
+        
+        monitor_hits = monitor_resp.get('hits', {}).get('hits', [])
+        
+        for hit in monitor_hits:
+            monitor_id = hit.get('_id')
+            monitor_source = hit.get('_source', {})
+            
+            # 检查是否启用
+            if enabled_only and not monitor_source.get('enabled', False):
+                continue
+            
+            # 取composite或doc_level_monitor类型的monitor（Security Analytics使用的）
+            workflow_type = monitor_source.get('workflow_type')
+            if workflow_type in ('composite', 'doc_level_monitor'):
+                if monitor_id and monitor_id not in seen:
+                    seen.add(monitor_id)
+                    monitor_ids.append(monitor_id)
+        
+        if monitor_ids:
+            print(f"[INFO] 从Alerting API获取到 {len(monitor_ids)} 个真正的 monitor IDs (workflow_type: composite/doc_level_monitor)")
+            return monitor_ids
+    
+    except Exception as e:
+        print(f"[INFO] 从Alerting API查询monitor IDs失败: {e}")
+        print(f"[INFO] 尝试备用方法：从配置索引查询")
+    
+    # 方法2: 从 .opensearch-sap-detectors-config 索引查询（备用方法）
     try:
         # 先检查索引是否存在
         if not index_exists(DETECTORS_CONFIG_INDEX):
@@ -1175,11 +1219,13 @@ def _fetch_and_store_findings(
                 last_timestamp = start_time
             print(f"[INFO] 查询时间范围: {last_timestamp.isoformat()} 至 {end_time.isoformat()}（最近{time_window_seconds}秒）")
         else:
-            last_timestamp = start_time
-            print(f"[INFO] 未找到上次处理时间，将查询最近{time_window_seconds}秒的数据")
+            # 如果没有上次处理时间，使用更大的时间窗口（最近1小时）以确保能查询到findings
+            last_timestamp = end_time - timedelta(hours=1)
+            print(f"[INFO] 未找到上次处理时间，将查询最近1小时的数据（从 {last_timestamp.isoformat()} 开始）")
     else:
-        last_timestamp = start_time
-        print(f"[INFO] 查询最近{time_window_seconds}秒的数据")
+        # 如果不限制新数据，使用更大的时间窗口
+        last_timestamp = end_time - timedelta(hours=1)
+        print(f"[INFO] 查询最近1小时的数据")
     
     try:
         params = {'size': 1000}
@@ -2389,6 +2435,236 @@ def create_all_correlation_rules(
     }
 
 
+def _query_string_to_dsl(query_string: str) -> Dict[str, Any]:
+    """
+    将 query_string 转换为 DSL 查询（修复数组字段匹配问题）
+    
+    关键问题：event.category 是数组字段 ['process']，query_string 无法正确匹配
+    解决方案：解析 query_string，将关键条件转换为 DSL term/wildcard 查询
+    
+    策略：使用更简单的方法 - 直接使用 DSL 查询，但保留 query_string 作为后备
+    """
+    must_clauses = []
+    must_not_clauses = []
+    should_clauses = []
+    top_level_should = []  # 处理最外层的 OR 条件
+    
+    # 移除多余的空白
+    query_string = ' '.join(query_string.split())
+    
+    # 检查是否有最外层的 OR（如 Query3 和 Query4）
+    # 格式: (condition1) OR (condition2)
+    outer_or_pattern = r'^\(([^)]+)\)\s+OR\s+\(([^)]+)\)'
+    outer_or_match = re.match(outer_or_pattern, query_string)
+    if outer_or_match:
+        # 处理最外层的 OR，分别解析两个部分
+        part1, part2 = outer_or_match.groups()
+        dsl1 = _query_string_to_dsl(part1)
+        dsl2 = _query_string_to_dsl(part2)
+        return {
+            "bool": {
+                "should": [dsl1, dsl2],
+                "minimum_should_match": 1
+            }
+        }
+    
+    # 1. 解析 event.category 条件（数组字段，使用 term 查询匹配数组中的值）
+    # 只匹配不在括号内的 event.category（避免重复）
+    category_matches = re.findall(r'(?<!\()event\.category(?:\.keyword)?:(\w+)', query_string)
+    if category_matches:
+        # 对于数组字段，term 查询可以匹配数组中的值
+        # 如果有多个 category（在 OR 条件中），使用 should
+        if len(category_matches) > 1:
+            for cat in category_matches:
+                should_clauses.append({"term": {"event.category": cat}})
+        else:
+            # 使用 term 查询匹配数组字段中的值
+            must_clauses.append({"term": {"event.category": category_matches[0]}})
+    
+    # 2. 解析 event.type 条件（数组字段，使用 term 查询匹配数组中的值）
+    type_matches = re.findall(r'(?<!\()event\.type(?:\.keyword)?:(\w+)', query_string)
+    if type_matches:
+        if len(type_matches) > 1:
+            for t in type_matches:
+                should_clauses.append({"term": {"event.type": t}})
+        else:
+            # 使用 term 查询匹配数组字段中的值
+            must_clauses.append({"term": {"event.type": type_matches[0]}})
+    
+    # 3. 解析 event.action 条件（支持 OR）
+    action_or_pattern = r'\(event\.action:(\w+)(?:\s+OR\s+event\.action:(\w+))+\)'
+    action_or_match = re.search(action_or_pattern, query_string)
+    if action_or_match:
+        actions = [a for a in action_or_match.groups() if a]
+        for action in actions:
+            should_clauses.append({"term": {"event.action": action}})
+    else:
+        action_matches = re.findall(r'(?<!\()event\.action:(\w+)', query_string)
+        if action_matches:
+            if len(action_matches) > 1:
+                for action in action_matches:
+                    should_clauses.append({"term": {"event.action": action}})
+            else:
+                must_clauses.append({"term": {"event.action": action_matches[0]}})
+    
+    # 4. 解析括号内的 OR 条件（提权检测条件）
+    # 匹配: (process.name:*xxx* OR process.command_line:*xxx* OR ...)
+    or_condition_pattern = r'\(([^)]+(?:\s+OR\s+[^)]+)+)\)'
+    or_conditions = re.findall(or_condition_pattern, query_string)
+    for or_condition in or_conditions:
+        or_parts = [p.strip() for p in or_condition.split(' OR ')]
+        or_clauses = []
+        for part in or_parts:
+            # process.name 通配符
+            if 'process.name:*' in part:
+                pattern = re.search(r'process\.name:\*([^*]+)\*', part)
+                if pattern:
+                    or_clauses.append({"wildcard": {"process.name": f"*{pattern.group(1)}*"}})
+            # process.command_line 通配符
+            elif 'process.command_line:*' in part:
+                pattern = re.search(r'process\.command_line:\*([^*]+)\*', part)
+                if pattern:
+                    or_clauses.append({"wildcard": {"process.command_line": f"*{pattern.group(1)}*"}})
+            # process.parent.name
+            elif 'process.parent.name:' in part:
+                parent_match = re.search(r'process\.parent\.name:(\w+)', part)
+                if parent_match:
+                    or_clauses.append({"term": {"process.parent.name": parent_match.group(1)}})
+            # tags
+            elif 'tags:' in part:
+                tag_match = re.search(r'tags:(\S+)', part)
+                if tag_match:
+                    or_clauses.append({"term": {"tags": tag_match.group(1)}})
+        if or_clauses:
+            should_clauses.extend(or_clauses)
+    
+    # 5. 解析 network.direction 条件
+    direction_match = re.search(r'network\.direction:(\w+)', query_string)
+    if direction_match:
+        direction_value = direction_match.group(1)
+        must_clauses.append({"term": {"network.direction": direction_value}})
+    
+    # 6. 解析 destination.port 条件（支持 OR 和范围）
+    # 先处理包含OR的端口条件（可能在括号中）
+    # 匹配格式：(... OR destination.port:X OR destination.port:Y) 或 (destination.port:>X OR destination.port:Y)
+    port_or_with_range_pattern = r'\(destination\.port:(>?\d+)(?:\s+OR\s+destination\.port:(\d+))+\)'
+    port_or_with_range_match = re.search(port_or_with_range_pattern, query_string)
+    if port_or_with_range_match:
+        # 提取所有端口条件（包括范围查询）
+        port_conditions = re.findall(r'destination\.port:(>?\d+)', port_or_with_range_match.group(0))
+        for port_cond in port_conditions:
+            if port_cond.startswith('>'):
+                # 范围查询
+                port_value = int(port_cond[1:])
+                should_clauses.append({"range": {"destination.port": {"gt": port_value}}})
+            else:
+                # 精确匹配
+                port_value = int(port_cond)
+                should_clauses.append({"term": {"destination.port": port_value}})
+    else:
+        # 处理单独的端口条件（不在 OR 中）
+        # 先处理范围查询
+        port_range_match = re.search(r'(?<!\()destination\.port:>(\d+)(?!\s+OR)', query_string)
+        if port_range_match:
+            port_value = int(port_range_match.group(1))
+            must_clauses.append({"range": {"destination.port": {"gt": port_value}}})
+        # 处理单独的端口条件（不在 OR 中）
+        standalone_ports = re.findall(r'(?<!\()destination\.port:(\d+)(?!\s+OR)', query_string)
+        for port in standalone_ports:
+            must_clauses.append({"term": {"destination.port": int(port)}})
+    
+    # 7. 解析 NOT destination.port 条件
+    not_port_pattern = r'NOT\s+\(destination\.port:(\d+)(?:\s+OR\s+destination\.port:(\d+))*\)'
+    not_port_match = re.search(not_port_pattern, query_string)
+    if not_port_match:
+        ports_to_exclude = [int(p) for p in not_port_match.groups() if p]
+        for port in ports_to_exclude:
+            must_not_clauses.append({"term": {"destination.port": port}})
+    
+    # 8. 解析 NOT destination.ip 条件（CIDR范围）
+    # IP字段是ip类型，不能使用prefix查询，需要使用range查询
+    not_ip_patterns = re.findall(r'NOT\s+destination\.ip:([\d.]+\.\*)', query_string)
+    for ip_pattern in not_ip_patterns:
+        ip_prefix = ip_pattern.replace('*', '')
+        # 对于10.*，排除10.0.0.0到10.255.255.255
+        if ip_prefix == "10.":
+            must_not_clauses.append({
+                "range": {
+                    "destination.ip": {
+                        "gte": "10.0.0.0",
+                        "lte": "10.255.255.255"
+                    }
+                }
+            })
+        # 对于172.16.*，排除172.16.0.0到172.16.255.255
+        elif ip_prefix == "172.16.":
+            must_not_clauses.append({
+                "range": {
+                    "destination.ip": {
+                        "gte": "172.16.0.0",
+                        "lte": "172.16.255.255"
+                    }
+                }
+            })
+        # 对于192.168.*，排除192.168.0.0到192.168.255.255
+        elif ip_prefix == "192.168.":
+            must_not_clauses.append({
+                "range": {
+                    "destination.ip": {
+                        "gte": "192.168.0.0",
+                        "lte": "192.168.255.255"
+                    }
+                }
+            })
+        else:
+            # 其他情况，尝试使用term查询（完整IP）
+            # 如果无法确定范围，跳过这个条件
+            pass
+    
+    # 9. 解析 file.size 范围查询
+    file_size_match = re.search(r'file\.size:>(\d+)', query_string)
+    if file_size_match:
+        size_value = int(file_size_match.group(1))
+        must_clauses.append({"range": {"file.size": {"gt": size_value}}})
+    
+    # 10. 解析 network.bytes 范围查询
+    network_bytes_match = re.search(r'network\.bytes:>(\d+)', query_string)
+    if network_bytes_match:
+        bytes_value = int(network_bytes_match.group(1))
+        must_clauses.append({"range": {"network.bytes": {"gt": bytes_value}}})
+    
+    # 11. 解析 _exists_ 条件
+    exists_fields = re.findall(r'_exists_:(\S+)', query_string)
+    for field in exists_fields:
+        must_clauses.append({"exists": {"field": field}})
+    
+    # 12. 解析 file.path 条件（可能包含通配符）
+    file_path_patterns = re.findall(r'file\.path:(\S+)', query_string)
+    for path_pattern in file_path_patterns:
+        if '*' in path_pattern:
+            must_clauses.append({"wildcard": {"file.path": path_pattern}})
+        else:
+            must_clauses.append({"term": {"file.path": path_pattern}})
+    
+    # 构建最终的 DSL 查询
+    bool_query = {}
+    if must_clauses:
+        bool_query["must"] = must_clauses
+    if must_not_clauses:
+        bool_query["must_not"] = must_not_clauses
+    if should_clauses:
+        bool_query["should"] = should_clauses
+        bool_query["minimum_should_match"] = 1
+    
+    if bool_query:
+        return {"bool": bool_query}
+    else:
+        # 如果没有解析到任何条件，回退到 query_string（但移除 .keyword 后缀）
+        fallback_query = query_string.replace('event.category.keyword:', 'event.category:')
+        fallback_query = fallback_query.replace('event.type.keyword:', 'event.type:')
+        return {"query_string": {"query": fallback_query, "lenient": True, "default_field": "*"}}
+
+
 def apply_correlation_rule_manually(
     rule: Dict[str, Any],
     start_time: datetime,
@@ -2431,43 +2707,50 @@ def apply_correlation_rule_manually(
         print(f"[DEBUG] Query {i+1} 索引模式: {index}")
         print(f"[DEBUG] Query {i+1} 时间范围: {to_rfc3339(start_time)} 到 {to_rfc3339(end_time)}")
         
-        # 将 query string 转换为 DSL query（添加时间范围）
-        # 重要：event.category 是数组字段 ['process']，query_string 无法正确匹配数组字段
-        # 解决方案：将 query_string 转换为 DSL 查询，使用 term 查询匹配数组字段
+        # 将 query_string 转换为 DSL 查询（修复数组字段匹配问题）
+        base_dsl_query = _query_string_to_dsl(query_string)
         
-        # 转义查询字符串中的特殊字符（避免解析错误）
-        escaped_query = query_string.replace('\\', '/')  # 将反斜杠替换为正斜杠（统一路径格式）
-        
-        # 修复数组字段匹配问题：
-        # 将 event.category:xxx 替换为 event.category.keyword:xxx（用于匹配数组字段）
-        fixed_query = escaped_query.replace('event.category:', 'event.category.keyword:')
-        fixed_query = fixed_query.replace('event.type:', 'event.type.keyword:')
-        
-        # 使用 query_string 查询，但添加 lenient=True 和 default_field 设置
-        # 如果 query_string 仍然无法匹配，可以考虑完全改用 DSL 查询
-        dsl_query = {
-            "bool": {
-                "must": [
-                    {
-                        "query_string": {
-                            "query": fixed_query,
-                            "default_operator": "AND",
-                            "analyze_wildcard": True,
-                            "lenient": True,  # 允许部分字段不存在，避免查询失败
-                            "default_field": "*"  # 默认在所有字段中搜索
-                        }
-                    },
-                    {
-                        "range": {
-                            "@timestamp": {
-                                "gte": to_rfc3339(start_time),
-                                "lte": to_rfc3339(end_time)
-                            }
+        # 添加时间范围
+        # 如果 base_dsl_query 已经是 bool 查询，合并它的子句而不是嵌套
+        if isinstance(base_dsl_query, dict) and "bool" in base_dsl_query:
+            bool_clauses = base_dsl_query["bool"]
+            # 合并 must 子句
+            if "must" in bool_clauses:
+                bool_clauses["must"].append({
+                    "range": {
+                        "@timestamp": {
+                            "gte": to_rfc3339(start_time),
+                            "lte": to_rfc3339(end_time)
                         }
                     }
-                ]
+                })
+            else:
+                bool_clauses["must"] = [{
+                    "range": {
+                        "@timestamp": {
+                            "gte": to_rfc3339(start_time),
+                            "lte": to_rfc3339(end_time)
+                        }
+                    }
+                }]
+            dsl_query = base_dsl_query
+        else:
+            # 如果不是 bool 查询，包装它
+            dsl_query = {
+                "bool": {
+                    "must": [
+                        base_dsl_query,
+                        {
+                            "range": {
+                                "@timestamp": {
+                                    "gte": to_rfc3339(start_time),
+                                    "lte": to_rfc3339(end_time)
+                                }
+                            }
+                        }
+                    ]
+                }
             }
-        }
         
         try:
             response = client.search(
@@ -2685,12 +2968,13 @@ def apply_correlation_rule_manually(
             for e3 in events_3:
                 event_3 = e3.get('event', {})
                 host_3 = event_3.get('host', {}).get('name')
-                host_3_ips = event_3.get('host', {}).get('ip', [])
-                # host.ip 可能是字符串或列表
-                if isinstance(host_3_ips, str):
-                    host_3_ips = [host_3_ips]
-                elif not isinstance(host_3_ips, list):
-                    host_3_ips = []
+                host_3_ip = event_3.get('host', {}).get('ip')
+                # host.ip 现在是字符串（为了简化，不再使用列表）
+                # 兼容旧数据：如果是列表，取第一个元素
+                if isinstance(host_3_ip, list) and len(host_3_ip) > 0:
+                    host_3_ip = host_3_ip[0]
+                elif not isinstance(host_3_ip, str):
+                    host_3_ip = None
                 
                 user_3 = event_3.get('user', {}).get('name')
                 timestamp_3 = event_3.get('@timestamp')
@@ -3444,8 +3728,8 @@ def run_correlation_analysis(
         # 优先使用 OpenSearch Security Analytics API，如果不支持则回退到手动应用
         end_time = datetime.now(timezone.utc)
         # 增加时间窗口，确保能匹配到最近生成的events（默认30分钟可能不够）
-        # 如果events是最近1小时内生成的，使用60分钟窗口
-        effective_time_window = max(time_window_minutes, 60)  # 至少60分钟
+        # 使用24小时窗口，确保能匹配到所有事件
+        effective_time_window = max(time_window_minutes, 24 * 60)  # 至少24小时
         start_time = end_time - timedelta(minutes=effective_time_window)
         
         # 收集所有成功创建的规则ID

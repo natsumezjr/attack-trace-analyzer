@@ -116,7 +116,7 @@ def create_base_event(
         "host": {
             "id": host["id"],
             "name": host["name"],
-            "ip": [host["ip"]]
+            "ip": host["ip"]  # 使用字符串而不是列表
         }
     }
     

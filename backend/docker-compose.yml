@@ -16,11 +16,10 @@ services:
     env_file:
       - .env
     environment:
-      - discovery.type=single-node
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}
-      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms2g -Xmx2g}
-      # Increase HTTP line length limit to handle long correlation query URLs (16KB)
-      - HTTP_MAX_INITIAL_LINE_LENGTH=16kb
+        - discovery.type=single-node
+        - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}
+        - http.max_initial_line_length=64kb
+        - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
     ports:
       - "9200:9200"
       - "9600:9600"
@@ -56,13 +55,13 @@ services:
       - 'OPENSEARCH_HOSTS=["https://opensearch:9200"]'
       - 'OPENSEARCH_USERNAME=admin'
       - 'OPENSEARCH_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}'
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
       - OPENSEARCH_SSL_VERIFICATION_MODE=none
     depends_on:
       opensearch:
         condition: service_healthy
     networks:
       - backend-net
+
 
 
   neo4j:

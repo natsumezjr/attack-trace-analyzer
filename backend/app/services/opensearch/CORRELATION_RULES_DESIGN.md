@@ -347,7 +347,7 @@ event.category: network  ← 不是 process
 - **条件3**：Query2 的源主机与 Query3 的主机不同（`host_2 != host_3`）
   - 要求：Query2 和 Query3 都必须有 `host.name` 字段，且值不同
 - **条件4**：IP地址匹配验证（**新增**）：
-  - 如果 Query3 的事件包含 `host.ip` 字段，则验证 Query2 的 `destination.ip` 是否在 `host.ip` 列表中
+  - 如果 Query3 的事件包含 `host.ip` 字段（字符串），则验证 Query2 的 `destination.ip` 是否等于 `host.ip`
   - 如果 Query3 的事件没有 `host.ip` 字段，则放宽条件（基于主机名称匹配）
   - **目的**：确保 Query2 连接的目标IP确实对应 Query3 所在的主机
 - **条件5**：用户相同（增强关联性）
