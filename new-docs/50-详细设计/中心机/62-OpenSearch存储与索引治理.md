@@ -93,12 +93,11 @@ OpenSearch 的检测触发、Raw Finding 生成与 Canonical Finding 融合去�
 
 OpenSearch 侧的初始化动作固定为：
 
-1) 创建/确保索引存在（包含 mapping）。  
-2) 配置 ISM policy 并绑定到对应索引模式。  
+1) 启动 OpenSearch 容器；  
+2) 启动中心机后端，后端在启动阶段调用 `initialize_indices()` 创建/确保索引存在（包含 mapping）；  
 3) 配置 Security Analytics detector，并导入 Sigma 规则。  
 
 脚本入口固定为以下文件：
 
-- ISM policy 配置：`backend/app/services/opensearch/scripts/setup_index_management.py`
 - Sigma 规则导入：`backend/app/services/opensearch/scripts/import_sigma_rules.py`
 - Security Analytics detector 配置：`backend/app/services/opensearch/scripts/setup_security_analytics.py`
