@@ -10,6 +10,8 @@ import pytest
 from app.services.neo4j import db as graph_db
 from app.services.neo4j.models import RelType
 
+pytestmark = pytest.mark.integration
+
 
 def _fixtures_dir() -> Path:
     # backend/tests/integration/test_api/* -> backend/tests/fixtures
@@ -165,3 +167,254 @@ def test_get_graph_for_frontend_returns_nodes_and_edges(monkeypatch: pytest.Monk
     assert edge["type"] == "RUNS_ON"
     assert edge["source"] == process_node["id"]
     assert edge["target"] == host_node["id"]
+
+
+# ========== API Routes Tests ==========
+
+
+class TestGraphQueryAPI:
+    """测试 /api/v1/graph/query API endpoint"""
+
+    @pytest.mark.asyncio
+    async def test_alarm_edges_action(self, async_client, monkeypatch: pytest.MonkeyPatch):
+        """测试 alarm_edges action 返回告警边"""
+        # Mock graph API responses
+        mock_edges = [
+            type("MockEdge", (), {
+                "src_uid": "Process:process.entity_id=p-001",
+                "dst_uid": "IP:ip=93.184.216.1",
+                "rtype": type("MockRelType", (), {"value": "NET_CONNECT"})(),
+                "props": {"event.id": "evt-001"},
+            })(),
+        ]
+        mock_node = type("MockNode", (), {
+            "uid": "Process:process.entity_id=p-001",
+            "ntype": type("MockNodeType", (), {"value": "Process"})(),
+            "key": {"process.entity_id": "p-001"},
+            "props": {"process.name": "test"},
+        })()
+
+        def mock_get_alarm_edges():
+            return mock_edges
+
+        def mock_get_node(uid):
+            return mock_node if uid == "Process:process.entity_id=p-001" else None
+
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_alarm_edges", mock_get_alarm_edges)
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_node", mock_get_node)
+
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={"action": "alarm_edges"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "edges" in data
+        assert "nodes" in data
+        assert "server_time" in data
+        assert len(data["edges"]) == 1
+        assert data["edges"][0]["rtype"] == "NET_CONNECT"
+
+    @pytest.mark.asyncio
+    async def test_edges_in_window_action_success(self, async_client, monkeypatch: pytest.MonkeyPatch):
+        """测试 edges_in_window action 成功场景
+        此测试会验证 get_edges_in_window 使用正确的关键字参数
+        """
+        mock_edges = [
+            type("MockEdge", (), {
+                "src_uid": "Process:process.entity_id=p-001",
+                "dst_uid": "IP:ip=93.184.216.1",
+                "rtype": type("MockRelType", (), {"value": "NET_CONNECT"})(),
+                "props": {"event.id": "evt-001"},
+            })(),
+        ]
+
+        call_captured = {}
+
+        def mock_get_edges_in_window(*, t_min, t_max, allowed_reltypes=None, only_alarm=False):
+            # 捕获调用参数，验证使用了关键字参数
+            call_captured["t_min"] = t_min
+            call_captured["t_max"] = t_max
+            call_captured["allowed_reltypes"] = allowed_reltypes
+            call_captured["only_alarm"] = only_alarm
+            return mock_edges
+
+        def mock_get_node(uid):
+            return None
+
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_edges_in_window", mock_get_edges_in_window)
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_node", mock_get_node)
+
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "edges_in_window",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-02T00:00:00Z",
+            },
+        )
+
+        # 验证 API 调用成功
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "edges" in data
+
+        # 验证底层函数被正确调用（使用关键字参数）
+        assert "t_min" in call_captured
+        assert "t_max" in call_captured
+        assert call_captured["t_min"] > 0
+        assert call_captured["t_max"] > call_captured["t_min"]
+
+    @pytest.mark.asyncio
+    async def test_edges_in_window_missing_timestamps(self, async_client):
+        """测试 edges_in_window action 缺少时间参数"""
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={"action": "edges_in_window"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "BAD_REQUEST"
+        assert "start_ts and end_ts are required" in data["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_edges_in_window_with_filters(self, async_client, monkeypatch: pytest.MonkeyPatch):
+        """测试 edges_in_window action 带过滤参数"""
+        def mock_get_edges_in_window(*, t_min, t_max, allowed_reltypes=None, only_alarm=False):
+            # 验证过滤参数正确传递
+            assert allowed_reltypes == ["NET_CONNECT", "DNS_QUERY"]
+            assert only_alarm is True
+            return []
+
+        def mock_get_node(uid):
+            return None
+
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_edges_in_window", mock_get_edges_in_window)
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_node", mock_get_node)
+
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "edges_in_window",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-02T00:00:00Z",
+                "allowed_reltypes": ["NET_CONNECT", "DNS_QUERY"],
+                "only_alarm": True,
+            },
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_analysis_edges_by_task_action(self, async_client, monkeypatch: pytest.MonkeyPatch):
+        """测试 analysis_edges_by_task action"""
+        def mock_get_edges_by_task_id(*, task_id, only_path=False):
+            assert task_id == "task-123"
+            assert only_path is True
+            return []
+
+        def mock_get_node(uid):
+            return None
+
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_edges_by_task_id", mock_get_edges_by_task_id)
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_node", mock_get_node)
+
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "analysis_edges_by_task",
+                "task_id": "task-123",
+                "only_path": True,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_analysis_edges_by_task_missing_task_id(self, async_client):
+        """测试 analysis_edges_by_task action 缺少 task_id"""
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={"action": "analysis_edges_by_task"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "BAD_REQUEST"
+        assert "task_id is required" in data["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_shortest_path_in_window_action_success(self, async_client, monkeypatch: pytest.MonkeyPatch):
+        """测试 shortest_path_in_window action 成功场景"""
+        def mock_gds_shortest_path(src_uid, dst_uid, t_min, t_max, *, risk_weights, min_risk=0.0, allowed_reltypes=None):
+            return (1.5, [])  # (cost, edges)
+
+        def mock_get_node(uid):
+            return None
+
+        monkeypatch.setattr("app.api.routes.graph.graph_api.gds_shortest_path_in_window", mock_gds_shortest_path)
+        monkeypatch.setattr("app.api.routes.graph.graph_api.get_node", mock_get_node)
+
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "shortest_path_in_window",
+                "src_uid": "Process:process.entity_id=p-001",
+                "dst_uid": "IP:ip=93.184.216.1",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-02T00:00:00Z",
+                "risk_weights": {"NET_CONNECT": 1.0},
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["found"] is True
+        assert data["cost"] == 1.5
+
+    @pytest.mark.asyncio
+    async def test_shortest_path_missing_src_dst(self, async_client):
+        """测试 shortest_path_in_window action 缺少 src_uid/dst_uid"""
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "shortest_path_in_window",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-02T00:00:00Z",
+            },
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "BAD_REQUEST"
+        assert "src_uid and dst_uid are required" in data["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_shortest_path_missing_risk_weights(self, async_client):
+        """测试 shortest_path_in_window action 缺少 risk_weights"""
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={
+                "action": "shortest_path_in_window",
+                "src_uid": "Process:process.entity_id=p-001",
+                "dst_uid": "IP:ip=93.184.216.1",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-02T00:00:00Z",
+            },
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "BAD_REQUEST"
+        assert "risk_weights is required" in data["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self, async_client):
+        """测试未知的 action (Pydantic 验证失败返回 422)"""
+        response = await async_client.post(
+            "/api/v1/graph/query",
+            json={"action": "unknown_action"},
+        )
+        assert response.status_code == 422
+        data = response.json()
+        # Pydantic validation error format
+        assert "detail" in data
