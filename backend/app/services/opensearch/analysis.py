@@ -316,15 +316,26 @@ def create_lateral_movement_correlation_rule(
         "event.category:process AND "
         "event.action:process_start AND "
         f"({privilege_detection_query}) AND "
-        "_exists_:host.id"
+        "_exists_:host.name"
     )
     
     # Query2: 从A到B的远程连接事件（Remote Connect）
+    # 注意：排除 HTTP/HTTPS 连接（80, 443），因为横向移动通常不使用 HTTP
+    # 横向移动常用的协议和端口：
+    # - RDP: 3389
+    # - SSH: 22
+    # - SMB: 445
+    # - WinRM: 5985, 5986
+    # - Telnet: 23
+    # - VNC: 5900-5909
+    # - 其他管理端口
     query2 = (
         "event.category:network AND "
         "_exists_:source.ip AND "
         "_exists_:destination.ip AND "
-        "network.direction:outbound"
+        "_exists_:host.name AND "
+        "network.direction:outbound AND "
+        "NOT (destination.port:80 OR destination.port:443 OR destination.port:8080 OR destination.port:8443)"
     )
     
     # Query3: 主机B上的提权或远程执行行为（Privilege Escalation / Remote Execution）
@@ -341,7 +352,7 @@ def create_lateral_movement_correlation_rule(
     query3 = (
         f"(({process_privilege_query}) OR "
         f"({authentication_query})) AND "
-        "_exists_:host.id"
+        "_exists_:host.name"
     )
     
     # ========== 构建 Correlation Rule ==========
@@ -512,8 +523,12 @@ def apply_correlation_rule_manually(
         query_string = correlate_query.get('query', '')  # query string 格式
         index = correlate_query.get('index', events_index_pattern)
         
+        print(f"[DEBUG] Query {i+1} 查询条件: {query_string}")
+        print(f"[DEBUG] Query {i+1} 索引模式: {index}")
+        print(f"[DEBUG] Query {i+1} 时间范围: {to_rfc3339(start_time)} 到 {to_rfc3339(end_time)}")
+        
         # 将 query string 转换为 DSL query（添加时间范围）
-        # query string 格式：如 "event.category:process AND _exists_:host.id"
+        # query string 格式：如 "event.category:process AND _exists_:host.name"
         # 需要转换为 DSL 并添加时间范围
         dsl_query = {
             "bool": {
@@ -544,10 +559,22 @@ def apply_correlation_rule_manually(
                 }
             )
             
+            total_hits = response.get('hits', {}).get('total', {})
+            if isinstance(total_hits, dict):
+                total_count = total_hits.get('value', 0)
+            else:
+                total_count = total_hits
+            
             hits = response.get('hits', {}).get('hits', [])
             events = []
+            missing_host_name_count = 0
             for hit in hits:
                 event_source = hit.get('_source', {})
+                
+                # 检查是否有 host.name 字段
+                host_name = event_source.get('host', {}).get('name')
+                if not host_name:
+                    missing_host_name_count += 1
                 
                 # 对每个 event 进行分级判断（如果是提权相关事件）
                 level, confidence = classify_privilege_escalation_level(event_source)
@@ -571,7 +598,9 @@ def apply_correlation_rule_manually(
                 level = e.get('privilege_level', 0)
                 level_counts[level] = level_counts.get(level, 0) + 1
             
-            print(f"[DEBUG] Query {i+1} 在 events 索引中找到 {len(events)} 个事件")
+            print(f"[DEBUG] Query {i+1} 总命中数: {total_count}, 返回事件数: {len(events)}")
+            if missing_host_name_count > 0:
+                print(f"[DEBUG] Query {i+1} 警告: {missing_host_name_count} 个事件缺少 host.name 字段")
             if level_counts:
                 level_str = ", ".join([f"Level {k}: {v}" for k, v in sorted(level_counts.items()) if k > 0])
                 if level_str:
@@ -590,7 +619,7 @@ def apply_correlation_rule_manually(
     # 简化实现：查找满足以下条件的 events 组合：
     # - 来自不同的查询（query_index）
     # - 在时间窗口内
-    # - 有可关联的字段（host.id, source.ip, destination.ip, user.name）
+    # - 有可关联的字段（host.name, source.ip, destination.ip, user.name）
     
     correlations = []
     
@@ -664,114 +693,202 @@ def apply_correlation_rule_manually(
     
     # 如果有3个或更多查询，需要更复杂的关联逻辑
     elif len(query_results) >= 3:
-        # 简化实现：先关联前两个，再关联第三个
+        # 优化实现：使用"最近匹配"策略，避免笛卡尔积
+        # 每个Query2事件只匹配时间最近的Query1和Query3事件
         events_1 = query_results[0].get('events', [])
         events_2 = query_results[1].get('events', [])
         events_3 = query_results[2].get('events', [])
         
-        # 先找前两个的关联
         # Query1: 主机A上的提权事件（没有网络IP）
         # Query2: 从A到B的网络连接事件（有source.ip和destination.ip）
         # Query3: 主机B上的提权事件（没有网络IP）
         # 
-        # 关联逻辑：
-        # 1. e1 和 e2：e1在主机A上，e2的source.ip对应主机A，且用户相同
-        # 2. e2 和 e3：e2的destination.ip对应主机B，e3在主机B上，且用户相同
+        # 关联策略：对于每个Query2事件，找到时间最近的Query1和Query3事件
+        # 1. e1 和 e2：e1在主机A上，e2的源主机也是主机A，且用户相同，时间e1 <= e2
+        # 2. e2 和 e3：e2的destination.ip对应主机B，e3在主机B上，且用户相同，时间e2 <= e3
         
-        for e1 in events_1:
-            event_1 = e1.get('event', {})
-            host_1 = event_1.get('host', {}).get('id')
-            user_1 = event_1.get('user', {}).get('name')
+        for e2 in events_2:
+            event_2 = e2.get('event', {})
+            host_2 = event_2.get('host', {}).get('name')
+            src_ip_2 = event_2.get('source', {}).get('ip')
+            dst_ip_2 = event_2.get('destination', {}).get('ip')
+            user_2 = event_2.get('user', {}).get('name')
+            timestamp_2 = event_2.get('@timestamp')
             
-            for e2 in events_2:
-                event_2 = e2.get('event', {})
-                host_2 = event_2.get('host', {}).get('id')
-                src_ip_2 = event_2.get('source', {}).get('ip')
-                dst_ip_2 = event_2.get('destination', {}).get('ip')
-                user_2 = event_2.get('user', {}).get('name')
+            if not timestamp_2:
+                continue
+            
+            try:
+                ts2 = parse_datetime(timestamp_2)
+            except:
+                continue
+            
+            # 为这个Query2事件找到时间最近的Query1事件（在同一主机上，时间 <= e2）
+            best_e1 = None
+            min_time_diff = None
+            
+            for e1 in events_1:
+                event_1 = e1.get('event', {})
+                host_1 = event_1.get('host', {}).get('name')
+                user_1 = event_1.get('user', {}).get('name')
+                timestamp_1 = event_1.get('@timestamp')
                 
                 # 检查 e1 和 e2 是否关联：
                 # - e1 在主机A上，e2 的源主机也是主机A（host_1 == host_2）
                 # - 用户相同（可选，但增强关联性）
-                e1_e2_correlated = False
+                # - 时间顺序：e1 <= e2
                 if host_1 and host_2 and host_1 == host_2:
-                    # 同一主机上的事件，用户相同则关联
+                    # 检查用户匹配
+                    user_match = False
                     if user_1 and user_2 and user_1 == user_2:
-                        e1_e2_correlated = True
+                        user_match = True
                     elif not user_1 or not user_2:
-                        # 如果用户信息缺失，也允许关联（基于主机）
-                        e1_e2_correlated = True
+                        user_match = True  # 用户信息缺失，允许关联
+                    
+                    if user_match and timestamp_1:
+                        try:
+                            ts1 = parse_datetime(timestamp_1)
+                            if ts1 <= ts2:  # 时间顺序正确
+                                time_diff = (ts2 - ts1).total_seconds()
+                                if min_time_diff is None or time_diff < min_time_diff:
+                                    min_time_diff = time_diff
+                                    best_e1 = e1
+                        except:
+                            pass
+            
+            if not best_e1:
+                continue  # 没有找到匹配的Query1事件
+            
+            # 为这个Query2事件找到时间最近的Query3事件（在不同主机上，时间 >= e2）
+            best_e3 = None
+            min_time_diff_3 = None
+            
+            for e3 in events_3:
+                event_3 = e3.get('event', {})
+                host_3 = event_3.get('host', {}).get('name')
+                host_3_ips = event_3.get('host', {}).get('ip', [])
+                # host.ip 可能是字符串或列表
+                if isinstance(host_3_ips, str):
+                    host_3_ips = [host_3_ips]
+                elif not isinstance(host_3_ips, list):
+                    host_3_ips = []
                 
-                if e1_e2_correlated:
-                    # 再找第三个
-                    for e3 in events_3:
-                        event_3 = e3.get('event', {})
-                        host_3 = event_3.get('host', {}).get('id')
-                        user_3 = event_3.get('user', {}).get('name')
+                user_3 = event_3.get('user', {}).get('name')
+                timestamp_3 = event_3.get('@timestamp')
+                
+                # 检查 e2 和 e3 是否关联：
+                # - e2 的 destination.ip 对应主机B（通过 host.ip 验证，如果存在）
+                # - e3 在主机B上（host_3）
+                # - 用户相同（可选）
+                # - 时间顺序：e2 <= e3
+                if host_3 and host_2 and host_3 != host_2:
+                    # e3 在不同于 e2 源主机的另一台主机上
+                    if dst_ip_2:  # e2 有 destination.ip，说明是跨主机连接
+                        # 验证 IP 匹配（如果 host.ip 存在）
+                        ip_match = True  # 默认匹配（如果 host.ip 不存在，则放宽条件）
+                        if host_3_ips and dst_ip_2:
+                            # 如果 host.ip 存在，验证 destination.ip 是否在 host.ip 列表中
+                            ip_match = dst_ip_2 in host_3_ips
                         
-                        # 检查 e2 和 e3 是否关联：
-                        # - e2 的 destination.ip 对应主机B（需要通过IP映射或直接检查host_3）
-                        # - e3 在主机B上（host_3）
-                        # - 用户相同（可选）
-                        # 
-                        # 注意：由于 e3 没有 source.ip，我们需要通过其他方式关联
-                        # 简化：如果 e2 的 destination.ip 存在，且 e3 在不同于 e2 源主机的另一台主机上
-                        e2_e3_correlated = False
-                        if host_3 and host_2 and host_3 != host_2:
-                            # e3 在不同于 e2 源主机的另一台主机上
-                            # 如果 e2 有 destination.ip，说明是跨主机连接
-                            if dst_ip_2:
-                                # 用户相同则关联
-                                if user_2 and user_3 and user_2 == user_3:
-                                    e2_e3_correlated = True
-                                elif not user_2 or not user_3:
-                                    # 如果用户信息缺失，也允许关联（基于主机和IP）
-                                    e2_e3_correlated = True
+                        if not ip_match:
+                            continue  # IP 不匹配，跳过
                         
-                        if e2_e3_correlated:
-                            # 检查用户一致性（三个事件的用户应该相同）
-                            users_match = True
-                            if user_1 and user_2 and user_3:
-                                users_match = (user_1 == user_2 == user_3)
-                            elif user_1 and user_2:
-                                users_match = (user_1 == user_2)
-                            elif user_2 and user_3:
-                                users_match = (user_2 == user_3)
-                            
-                            if users_match:
-                                # 构建 correlation_id（避免嵌套 f-string）
-                                corr_key = f"{e1.get('id', '')}-{e2.get('id', '')}-{e3.get('id', '')}"
-                                corr_id = f"corr-{hashlib.md5(corr_key.encode()).hexdigest()[:16]}"
-                                
-                                # 计算综合置信度（基于分级判断）
-                                level_1 = e1.get('privilege_level', 0)
-                                level_2 = e2.get('privilege_level', 0)
-                                level_3 = e3.get('privilege_level', 0)
-                                conf_1 = e1.get('privilege_confidence', 0.0)
-                                conf_2 = e2.get('privilege_confidence', 0.0)
-                                conf_3 = e3.get('privilege_confidence', 0.0)
-                                
-                                # 三个事件关联，基础分数更高
-                                base_score = 0.9
-                                if level_1 > 0 or level_2 > 0 or level_3 > 0:
-                                    # 提升置信度（基于分级判断）
-                                    privilege_boost = max(conf_1, conf_2, conf_3) * 0.1  # 最多提升 0.1
-                                    base_score = min(base_score + privilege_boost, 1.0)
-                                
-                                correlations.append({
-                                    "correlation_id": corr_id,
-                                    "rule_id": rule.get('name', 'unknown'),
-                                    "rule_name": rule.get('name', 'unknown'),
-                                    "timestamp": event_1.get('@timestamp'),
-                                    "events": [e1, e2, e3],  # 改为 events
-                                    "findings": [e1, e2, e3],  # 保持兼容性，但实际是 events
-                                    "score": base_score,  # 基于分级判断的分数
-                                    "privilege_levels": [level_1, level_2, level_3],  # 记录分级信息
-                                    "privilege_confidences": [conf_1, conf_2, conf_3]
-                                })
+                        # 检查用户匹配
+                        user_match = False
+                        if user_2 and user_3 and user_2 == user_3:
+                            user_match = True
+                        elif not user_2 or not user_3:
+                            user_match = True  # 用户信息缺失，允许关联
+                        
+                        if user_match and timestamp_3:
+                            try:
+                                ts3 = parse_datetime(timestamp_3)
+                                if ts2 <= ts3:  # 时间顺序正确
+                                    time_diff = (ts3 - ts2).total_seconds()
+                                    if min_time_diff_3 is None or time_diff < min_time_diff_3:
+                                        min_time_diff_3 = time_diff
+                                        best_e3 = e3
+                            except:
+                                pass
+            
+            if not best_e3:
+                continue  # 没有找到匹配的Query3事件
+            
+            # 检查用户一致性（三个事件的用户应该相同）
+            event_1 = best_e1.get('event', {})
+            event_3 = best_e3.get('event', {})
+            user_1 = event_1.get('user', {}).get('name')
+            user_3 = event_3.get('user', {}).get('name')
+            
+            users_match = True
+            if user_1 and user_2 and user_3:
+                users_match = (user_1 == user_2 == user_3)
+            elif user_1 and user_2:
+                users_match = (user_1 == user_2)
+            elif user_2 and user_3:
+                users_match = (user_2 == user_3)
+            
+            if users_match:
+                # 构建 correlation_id
+                corr_key = f"{best_e1.get('id', '')}-{e2.get('id', '')}-{best_e3.get('id', '')}"
+                corr_id = f"corr-{hashlib.md5(corr_key.encode()).hexdigest()[:16]}"
+                
+                # 检查是否已经存在相同的关联（避免重复）
+                existing_corr_ids = {c.get('correlation_id') for c in correlations}
+                if corr_id in existing_corr_ids:
+                    continue  # 已存在，跳过
+                
+                # 计算综合置信度（基于分级判断）
+                level_1 = best_e1.get('privilege_level', 0)
+                level_2 = e2.get('privilege_level', 0)
+                level_3 = best_e3.get('privilege_level', 0)
+                conf_1 = best_e1.get('privilege_confidence', 0.0)
+                conf_2 = e2.get('privilege_confidence', 0.0)
+                conf_3 = best_e3.get('privilege_confidence', 0.0)
+                
+                # 三个事件关联，基础分数更高
+                base_score = 0.9
+                if level_1 > 0 or level_2 > 0 or level_3 > 0:
+                    # 提升置信度（基于分级判断）
+                    privilege_boost = max(conf_1, conf_2, conf_3) * 0.1  # 最多提升 0.1
+                    base_score = min(base_score + privilege_boost, 1.0)
+                
+                correlations.append({
+                    "correlation_id": corr_id,
+                    "rule_id": rule.get('name', 'unknown'),
+                    "rule_name": rule.get('name', 'unknown'),
+                    "timestamp": event_1.get('@timestamp'),
+                    "events": [best_e1, e2, best_e3],  # 改为 events
+                    "findings": [best_e1, e2, best_e3],  # 保持兼容性，但实际是 events
+                    "score": base_score,  # 基于分级判断的分数
+                    "privilege_levels": [level_1, level_2, level_3],  # 记录分级信息
+                    "privilege_confidences": [conf_1, conf_2, conf_3]
+                })
     
     rule_name = rule.get('name', 'unknown')
     print(f"[DEBUG] 应用规则 '{rule_name}' 找到 {len(correlations)} 个关联")
+    
+    # 统计信息：帮助诊断为什么会有这么多关联
+    if len(query_results) >= 3:
+        events_1_count = len(query_results[0].get('events', []))
+        events_2_count = len(query_results[1].get('events', []))
+        events_3_count = len(query_results[2].get('events', []))
+        print(f"[DEBUG] 关联统计: Query1={events_1_count}个事件, Query2={events_2_count}个事件, Query3={events_3_count}个事件")
+        print(f"[DEBUG] 理论最大关联数（笛卡尔积）: {events_1_count * events_2_count * events_3_count}")
+        print(f"[DEBUG] 实际关联数: {len(correlations)}")
+        if len(correlations) > 0:
+            # 统计唯一的主机组合
+            unique_host_combos = set()
+            for corr in correlations[:10]:  # 只检查前10个
+                events = corr.get('events', [])
+                if len(events) >= 3:
+                    host_1 = events[0].get('event', {}).get('host', {}).get('name', 'unknown')
+                    host_2 = events[1].get('event', {}).get('host', {}).get('name', 'unknown')
+                    host_3 = events[2].get('event', {}).get('host', {}).get('name', 'unknown')
+                    unique_host_combos.add(f"{host_1}->{host_2}->{host_3}")
+            print(f"[DEBUG] 前10个关联的唯一主机组合数: {len(unique_host_combos)}")
+            if unique_host_combos:
+                print(f"[DEBUG] 示例主机组合: {list(unique_host_combos)[:3]}")
     
     return correlations
 

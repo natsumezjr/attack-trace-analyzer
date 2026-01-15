@@ -33,7 +33,8 @@ def create_privilege_escalation_event(
     host_name: str,
     user_name: str,
     base_time: datetime,
-    use_suspicious_parent: bool = False
+    use_suspicious_parent: bool = False,
+    host_ip: str = None
 ) -> dict:
     """
     创建提权事件（Query1 和 Query3 匹配）
@@ -44,6 +45,7 @@ def create_privilege_escalation_event(
     - user_name: 用户名
     - base_time: 基准时间
     - use_suspicious_parent: 是否使用可疑父进程（Level 2）
+    - host_ip: 主机IP地址（可选，用于IP到主机的映射验证）
     
     返回: event dict
     """
@@ -64,6 +66,15 @@ def create_privilege_escalation_event(
         command_line = "privilege-escalator.exe --elevate"
         parent_name = "explorer.exe"
     
+    host_obj = {
+        "id": host_id,
+        "name": host_name
+    }
+    
+    # 如果提供了 host_ip，添加到 host 对象中（用于IP到主机的映射验证）
+    if host_ip:
+        host_obj["ip"] = [host_ip]  # ECS 规范中 host.ip 是数组
+    
     return {
         "ecs": {"version": "9.2.0"},
         "@timestamp": timestamp,
@@ -77,10 +88,7 @@ def create_privilege_escalation_event(
             "created": timestamp,
             "ingested": timestamp,
         },
-        "host": {
-            "id": host_id,
-            "name": host_name
-        },
+        "host": host_obj,
         "user": {
             "id": f"user-{user_name}",
             "name": user_name
@@ -265,12 +273,14 @@ def create_lateral_movement_chain_events(
     
     # 可以选择生成提权事件或认证事件（都匹配 Query3）
     # 这里生成提权事件
+    # 注意：添加 host_ip 参数，用于IP到主机的映射验证（Query2 的 destination.ip 应该匹配 host.ip）
     event_3 = create_privilege_escalation_event(
         host_id=host_b,
         host_name=f"server-{host_b.split('-')[-1]}",
         user_name=user_name,
         base_time=event_3_time,
-        use_suspicious_parent=False
+        use_suspicious_parent=False,
+        host_ip=dst_ip  # 主机B的IP地址，用于验证 Query2 的 destination.ip
     )
     events.append(event_3)
     
@@ -438,15 +448,15 @@ def main():
         
         if result.get("success", 0) > 0:
             refresh_index(events_index_name)
-            print(f"    ✓ 成功写入 {result.get('success', 0)} 个 events")
+            print(f"    [OK] 成功写入 {result.get('success', 0)} 个 events")
             
             if result.get("failed", 0) > 0:
-                print(f"    ⚠ 失败: {result.get('failed', 0)} 个 events")
+                print(f"    [WARN] 失败: {result.get('failed', 0)} 个 events")
                 if result.get("errors"):
                     for error in result.get("errors", [])[:5]:  # 只显示前5个错误
                         print(f"      错误: {error}")
         else:
-            print(f"    ✗ 写入失败")
+            print(f"    [ERROR] 写入失败")
             if result.get("errors"):
                 for error in result.get("errors", [])[:5]:
                     print(f"      错误: {error}")
