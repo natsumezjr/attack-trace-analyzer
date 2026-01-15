@@ -288,7 +288,24 @@ if should_start "frontend"; then
         [ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || log_info "nvm 不可用，使用系统默认 Node.js"
     fi
 
-    if ! pgrep -f "next-server" > /dev/null; then
+    # 检查前端是否在运行：检查 PID 文件和端口状态
+    FRONTEND_RUNNING=false
+    if [ -f "$BASE"/run/frontend.pid ]; then
+        FRONTEND_PID=$(cat "$BASE"/run/frontend.pid)
+        if ps -p "$FRONTEND_PID" > /dev/null 2>&1; then
+            FRONTEND_RUNNING=true
+        else
+            # PID 文件存在但进程不存在，清理 PID 文件
+            rm -f "$BASE"/run/frontend.pid
+        fi
+    fi
+    
+    # 检查端口 3000 是否被占用（更可靠的检查方式）
+    if ! $FRONTEND_RUNNING && ss -lntup 2>/dev/null | grep -q ":3000 " || netstat -lntup 2>/dev/null | grep -q ":3000 "; then
+        FRONTEND_RUNNING=true
+    fi
+
+    if ! $FRONTEND_RUNNING; then
         nohup npm run dev -- -H 0.0.0.0 -p 3000 > "$BASE"/run/frontend.log 2>&1 &
         echo $! > "$BASE"/run/frontend.pid
         log_info "前端已启动，PID: $(cat "$BASE"/run/frontend.pid)"

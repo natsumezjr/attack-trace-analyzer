@@ -168,17 +168,41 @@ fi
 # 1. 停止前端（Next.js）
 if should_stop "frontend"; then
     log_info "步骤 1/$TOTAL_STEPS: 停止前端..."
+    FRONTEND_STOPPED=false
+    
+    # 首先尝试通过 PID 文件停止
     if [ -f "$BASE"/run/frontend.pid ]; then
         FRONTEND_PID=$(cat "$BASE"/run/frontend.pid)
         if ps -p "$FRONTEND_PID" > /dev/null 2>&1; then
             kill "$FRONTEND_PID" 2>/dev/null || true
+            sleep 1
+            # 如果进程还在，强制杀死
+            if ps -p "$FRONTEND_PID" > /dev/null 2>&1; then
+                kill -9 "$FRONTEND_PID" 2>/dev/null || true
+                sleep 1
+            fi
+            FRONTEND_STOPPED=true
             log_info "前端进程 $FRONTEND_PID 已停止"
         else
             log_warn "前端进程 $FRONTEND_PID 不存在"
         fi
         rm -f "$BASE"/run/frontend.pid
-    else
-        pkill -f "next-server" 2>/dev/null && log_info "前端进程已停止" || log_warn "未找到前端进程"
+    fi
+    
+    # 使用 pkill 确保所有相关进程都被停止
+    if pkill -f "next-server" 2>/dev/null; then
+        sleep 1
+        FRONTEND_STOPPED=true
+        log_info "前端进程已停止（通过 pkill）"
+    fi
+    
+    # 等待端口释放
+    if $FRONTEND_STOPPED; then
+        sleep 2
+    fi
+    
+    if ! $FRONTEND_STOPPED; then
+        log_warn "未找到前端进程"
     fi
 else
     log_warn "跳过: 前端"
