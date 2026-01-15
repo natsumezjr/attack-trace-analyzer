@@ -93,8 +93,8 @@ def graph_query(req: GraphQueryRequest):
             t_min = req.start_ts.timestamp()
             t_max = req.end_ts.timestamp()
             edges = graph_api.get_edges_in_window(
-                t_min,
-                t_max,
+                t_min=t_min,
+                t_max=t_max,
                 allowed_reltypes=req.allowed_reltypes,
                 only_alarm=req.only_alarm,
             )
