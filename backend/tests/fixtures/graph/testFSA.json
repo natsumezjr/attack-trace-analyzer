@@ -1,594 +1,594 @@
 [
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:00:00.000Z",
-      "event": {
-        "id": "evt-fsa-initial-access-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:00:00.000Z",
-        "ingested": "2026-01-12T10:00:01.000Z",
-        "category": ["network"],
-        "type": ["start"],
-        "action": "network_connection",
-        "outcome": "success",
-        "original": "raw: initial access via email attachment"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "source": {
-        "ip": "192.168.1.100",
-        "port": 443
-      },
-      "destination": {
-        "ip": "10.0.1.10",
-        "port": 443
-      },
-      "network": {
-        "transport": "tcp",
-        "protocol": "tcp"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Initial Access",
-          "id": "TA0001"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-initial-access-001"]
-        }
-      },
-      "message": "Initial Access: Network connection to workstation-01"
+  {
+    "ecs": {
+      "version": "9.2.0"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:00:30.000Z",
-      "event": {
-        "id": "evt-fsa-execution-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:00:30.000Z",
-        "ingested": "2026-01-12T10:00:31.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "original": "raw: process execution"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "pid": 1234,
-        "executable": "C:\\Windows\\System32\\cmd.exe",
-        "entity_id": "p-fsa-app-001",
-        "start": "2026-01-12T10:00:30.000Z",
-        "command_line": "cmd.exe /c powershell.exe -EncodedCommand ...",
-        "name": "cmd.exe"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Execution",
-          "id": "TA0002"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-execution-001"]
-        }
-      },
-      "message": "Execution: Process started on workstation-01"
+    "@timestamp": "2026-01-12T10:00:00.000Z",
+    "event": {
+      "id": "evt-fsa-initial-access-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:00:00.000Z",
+      "ingested": "2026-01-12T10:00:01.000Z",
+      "category": ["network"],
+      "type": ["start"],
+      "action": "network_connection",
+      "outcome": "success",
+      "original": "raw: initial access via email attachment"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:00.000Z",
-      "event": {
-        "id": "evt-fsa-privilege-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:01:00.000Z",
-        "ingested": "2026-01-12T10:01:01.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "original": "raw: privilege escalation attempt"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "pid": 1235,
-        "executable": "C:\\Windows\\System32\\whoami.exe",
-        "entity_id": "p-fsa-privilege-001",
-        "start": "2026-01-12T10:01:00.000Z",
-        "command_line": "whoami.exe /priv",
-        "name": "whoami.exe",
-        "parent": {
-          "entity_id": "p-fsa-app-001"
-        }
-      },
-      "threat": {
-        "tactic": {
-          "name": "Privilege Escalation",
-          "id": "TA0004"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-privilege-001"]
-        }
-      },
-      "message": "Privilege Escalation: Attempting to elevate privileges on workstation-01"
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:15.000Z",
-      "event": {
-        "id": "evt-fsa-privilege-to-lateral-001",
-        "kind": "event",
-        "dataset": "hostlog.process",
-        "created": "2026-01-12T10:01:15.000Z",
-        "ingested": "2026-01-12T10:01:16.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "outcome": "success",
-        "original": "raw: privilege escalated process spawns lateral movement process"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "pid": 1236,
-        "executable": "C:\\Windows\\System32\\cmd.exe",
-        "entity_id": "p-fsa-app-001",
-        "start": "2026-01-12T10:01:15.000Z",
-        "command_line": "cmd.exe /c net use \\\\workstation-02\\share",
-        "name": "cmd.exe",
-        "parent": {
-          "entity_id": "p-fsa-privilege-001"
-        }
-      },
-      "message": "Connection: Privilege escalated process spawns lateral movement process"
+    "source": {
+      "ip": "10.92.35.100",
+      "port": 443
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:30.000Z",
-      "event": {
-        "id": "evt-fsa-lateral-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:01:30.000Z",
-        "ingested": "2026-01-12T10:01:31.000Z",
-        "category": ["network"],
-        "type": ["start"],
-        "action": "network_connection",
-        "outcome": "success",
-        "original": "raw: lateral movement to workstation-02"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
+    "destination": {
+      "ip": "10.92.35.11",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "tcp"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Initial Access",
+        "id": "TA0001"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-initial-access-001"]
+      }
+    },
+    "message": "Initial Access: Network connection to client-01"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:00:30.000Z",
+    "event": {
+      "id": "evt-fsa-execution-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:00:30.000Z",
+      "ingested": "2026-01-12T10:00:31.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "original": "raw: process execution"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "pid": 1234,
+      "executable": "C:\\Windows\\System32\\cmd.exe",
+      "entity_id": "p-fsa-app-001",
+      "start": "2026-01-12T10:00:30.000Z",
+      "command_line": "cmd.exe /c powershell.exe -EncodedCommand ...",
+      "name": "cmd.exe"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Execution",
+        "id": "TA0002"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-execution-001"]
+      }
+    },
+    "message": "Execution: Process started on client-01"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:00.000Z",
+    "event": {
+      "id": "evt-fsa-privilege-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:00.000Z",
+      "ingested": "2026-01-12T10:01:01.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "original": "raw: privilege escalation attempt"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "pid": 1235,
+      "executable": "C:\\Windows\\System32\\whoami.exe",
+      "entity_id": "p-fsa-privilege-001",
+      "start": "2026-01-12T10:01:00.000Z",
+      "command_line": "whoami.exe /priv",
+      "name": "whoami.exe",
+      "parent": {
         "entity_id": "p-fsa-app-001"
-      },
-      "source": {
-        "ip": "10.0.1.10",
-        "port": 445
-      },
-      "destination": {
-        "ip": "10.0.1.20",
-        "port": 445
-      },
-      "network": {
-        "transport": "tcp",
-        "protocol": "smb"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Lateral Movement",
-          "id": "TA0008"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-lateral-001"]
-        }
-      },
-      "message": "Lateral Movement: Moving from workstation-01 to workstation-02"
+      }
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:45.000Z",
-      "event": {
-        "id": "evt-fsa-lateral-to-service-001",
-        "kind": "event",
-        "dataset": "hostlog.process",
-        "created": "2026-01-12T10:01:45.000Z",
-        "ingested": "2026-01-12T10:01:46.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "outcome": "success",
-        "original": "raw: lateral movement connection triggers process on workstation-02"
-      },
-      "host": {
-        "id": "h-fsa-workstation-02",
-        "name": "workstation-02",
-        "ip": ["10.0.1.20"]
-      },
-      "process": {
-        "pid": 5678,
-        "executable": "C:\\Windows\\System32\\powershell.exe",
-        "entity_id": "p-fsa-service-001",
-        "start": "2026-01-12T10:01:45.000Z",
-        "command_line": "powershell.exe -EncodedCommand ...",
-        "name": "powershell.exe"
-      },
-      "source": {
-        "ip": "10.0.1.10",
-        "port": 445
-      },
-      "destination": {
-        "ip": "10.0.1.20",
-        "port": 445
-      },
-      "network": {
-        "transport": "tcp",
-        "protocol": "smb"
-      },
-      "message": "Connection: Lateral movement connection triggers process on workstation-02"
+    "threat": {
+      "tactic": {
+        "name": "Privilege Escalation",
+        "id": "TA0004"
+      }
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:02:00.000Z",
-      "event": {
-        "id": "evt-fsa-remote-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:02:00.000Z",
-        "ingested": "2026-01-12T10:02:01.000Z",
-        "category": ["network"],
-        "type": ["protocol"],
-        "action": "dns_query",
-        "original": "raw: remote communication"
-      },
-      "host": {
-        "id": "h-fsa-workstation-02",
-        "name": "workstation-02",
-        "ip": ["10.0.1.20"]
-      },
-      "process": {
-        "entity_id": "p-fsa-service-001"
-      },
-      "source": {
-        "ip": "10.0.1.20"
-      },
-      "destination": {
-        "ip": "203.0.113.50"
-      },
-      "network": {
-        "transport": "udp",
-        "protocol": "dns"
-      },
-      "dns": {
-        "question": {
-          "name": "api-server.example.com",
-          "type": "A"
-        },
-        "answers": [
-          {
-            "data": "203.0.113.50"
-          }
-        ]
-      },
-      "threat": {
-        "tactic": {
-          "name": "Command and Control",
-          "id": "TA0011"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-remote-001"]
-        }
-      },
-      "message": "Command and Control: Remote communication from workstation-02"
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-privilege-001"]
+      }
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:02:30.000Z",
-      "event": {
-        "id": "evt-fsa-impact-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:02:30.000Z",
-        "ingested": "2026-01-12T10:02:31.000Z",
-        "category": ["file"],
-        "type": ["change"],
-        "action": "file_delete",
-        "outcome": "success",
-        "original": "raw: file operation"
-      },
-      "host": {
-        "id": "h-fsa-workstation-02",
-        "name": "workstation-02",
-        "ip": ["10.0.1.20"]
-      },
-      "process": {
-        "entity_id": "p-fsa-service-001"
-      },
-      "file": {
-        "path": "C:\\Windows\\System32\\critical.dll"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Impact",
-          "id": "TA0040"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-impact-001"]
-        }
-      },
-      "message": "Impact: File operation on workstation-02"
+    "message": "Privilege Escalation: Attempting to elevate privileges on client-01"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:00:15.000Z",
-      "event": {
-        "id": "evt-fsa-noise-normal-001",
-        "kind": "event",
-        "dataset": "hostlog.auth",
-        "created": "2026-01-12T10:00:15.000Z",
-        "ingested": "2026-01-12T10:00:16.000Z",
-        "category": ["authentication"],
-        "type": ["start"],
-        "action": "user_login",
-        "outcome": "success",
-        "original": "raw: normal user login"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "user": {
-        "id": "u-fsa-normal-user-001",
-        "name": "normaluser"
-      },
-      "source": {
-        "ip": "10.0.1.10"
-      },
-      "session": {
-        "id": "sess-fsa-normal-001"
-      },
-      "message": "Normal user login (no attack tag - should be filtered)"
+    "@timestamp": "2026-01-12T10:01:15.000Z",
+    "event": {
+      "id": "evt-fsa-privilege-to-lateral-001",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T10:01:15.000Z",
+      "ingested": "2026-01-12T10:01:16.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "outcome": "success",
+      "original": "raw: privilege escalated process spawns lateral movement process"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:00:45.000Z",
-      "event": {
-        "id": "evt-fsa-noise-normal-002",
-        "kind": "event",
-        "dataset": "hostbehavior.file",
-        "created": "2026-01-12T10:00:45.000Z",
-        "ingested": "2026-01-12T10:00:46.000Z",
-        "category": ["file"],
-        "type": ["access"],
-        "action": "file_read",
-        "original": "raw: normal file access"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "entity_id": "p-fsa-normal-process-001"
-      },
-      "file": {
-        "path": "C:\\Users\\normaluser\\Documents\\readme.txt"
-      },
-      "message": "Normal file access (no attack tag - should be filtered)"
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:15.000Z",
-      "event": {
-        "id": "evt-fsa-noise-illegal-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:01:15.000Z",
-        "ingested": "2026-01-12T10:01:16.000Z",
-        "category": ["network"],
-        "type": ["start"],
-        "action": "network_connection",
-        "outcome": "success",
-        "original": "raw: illegal transition - reconnaissance after execution"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "source": {
-        "ip": "10.0.1.10",
-        "port": 80
-      },
-      "destination": {
-        "ip": "8.8.8.8",
-        "port": 80
-      },
-      "network": {
-        "transport": "tcp",
-        "protocol": "http"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Reconnaissance",
-          "id": "TA0043"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-noise-illegal-001"]
-        }
-      },
-      "message": "Illegal transition: Reconnaissance after Execution (should be POP/DROP)"
+    "process": {
+      "pid": 1236,
+      "executable": "C:\\Windows\\System32\\cmd.exe",
+      "entity_id": "p-fsa-app-001",
+      "start": "2026-01-12T10:01:15.000Z",
+      "command_line": "cmd.exe /c net use \\\\client-02\\share",
+      "name": "cmd.exe",
+      "parent": {
+        "entity_id": "p-fsa-privilege-001"
+      }
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:02:15.000Z",
-      "event": {
-        "id": "evt-fsa-noise-illegal-002",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:02:15.000Z",
-        "ingested": "2026-01-12T10:02:16.000Z",
-        "category": ["network"],
-        "type": ["start"],
-        "action": "network_connection",
-        "outcome": "success",
-        "original": "raw: illegal transition - resource development after remote communication"
-      },
-      "host": {
-        "id": "h-fsa-workstation-02",
-        "name": "workstation-02",
-        "ip": ["10.0.1.20"]
-      },
-      "source": {
-        "ip": "10.0.1.20",
-        "port": 443
-      },
-      "destination": {
-        "ip": "198.51.100.10",
-        "port": 443
-      },
-      "network": {
-        "transport": "tcp",
-        "protocol": "https"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Resource Development",
-          "id": "TA0042"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-noise-illegal-002"]
-        }
-      },
-      "message": "Illegal transition: Resource Development after Remote Communication (should be POP/DROP)"
+    "message": "Connection: Privilege escalated process spawns lateral movement process"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
-      },
-      "@timestamp": "2026-01-12T10:01:45.000Z",
-      "event": {
-        "id": "evt-fsa-noise-time-confused-001",
-        "kind": "alert",
-        "dataset": "finding.canonical",
-        "created": "2026-01-12T10:01:45.000Z",
-        "ingested": "2026-01-12T10:01:46.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "original": "raw: time confused - initial access in middle of chain"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "pid": 9999,
-        "executable": "C:\\Windows\\System32\\notepad.exe",
-        "entity_id": "p-fsa-time-confused-001",
-        "start": "2026-01-12T10:01:45.000Z",
-        "command_line": "notepad.exe",
-        "name": "notepad.exe"
-      },
-      "threat": {
-        "tactic": {
-          "name": "Initial Access",
-          "id": "TA0001"
-        }
-      },
-      "custom": {
-        "evidence": {
-          "event_ids": ["evt-fsa-noise-time-confused-001"]
-        }
-      },
-      "message": "Time confused: Initial Access appears in middle of chain (should be handled by FSA)"
+    "@timestamp": "2026-01-12T10:01:30.000Z",
+    "event": {
+      "id": "evt-fsa-lateral-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:30.000Z",
+      "ingested": "2026-01-12T10:01:31.000Z",
+      "category": ["network"],
+      "type": ["start"],
+      "action": "network_connection",
+      "outcome": "success",
+      "original": "raw: lateral movement to client-02"
     },
-    {
-      "ecs": {
-        "version": "9.2.0"
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "entity_id": "p-fsa-app-001"
+    },
+    "source": {
+      "ip": "10.92.35.11",
+      "port": 445
+    },
+    "destination": {
+      "ip": "10.92.35.12",
+      "port": 445
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "smb"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Lateral Movement",
+        "id": "TA0008"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-lateral-001"]
+      }
+    },
+    "message": "Lateral Movement: Moving from client-01 to client-02"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:45.000Z",
+    "event": {
+      "id": "evt-fsa-lateral-to-service-001",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T10:01:45.000Z",
+      "ingested": "2026-01-12T10:01:46.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "outcome": "success",
+      "original": "raw: lateral movement connection triggers process on client-02"
+    },
+    "host": {
+      "id": "h-9b9c9d9e9f0a1b2c",
+      "name": "client-02",
+      "ip": ["10.92.35.12"]
+    },
+    "process": {
+      "pid": 5678,
+      "executable": "C:\\Windows\\System32\\powershell.exe",
+      "entity_id": "p-fsa-service-001",
+      "start": "2026-01-12T10:01:45.000Z",
+      "command_line": "powershell.exe -EncodedCommand ...",
+      "name": "powershell.exe"
+    },
+    "source": {
+      "ip": "10.92.35.11",
+      "port": 445
+    },
+    "destination": {
+      "ip": "10.92.35.12",
+      "port": 445
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "smb"
+    },
+    "message": "Connection: Lateral movement connection triggers process on client-02"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:02:00.000Z",
+    "event": {
+      "id": "evt-fsa-remote-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:02:00.000Z",
+      "ingested": "2026-01-12T10:02:01.000Z",
+      "category": ["network"],
+      "type": ["protocol"],
+      "action": "dns_query",
+      "original": "raw: remote communication"
+    },
+    "host": {
+      "id": "h-9b9c9d9e9f0a1b2c",
+      "name": "client-02",
+      "ip": ["10.92.35.12"]
+    },
+    "process": {
+      "entity_id": "p-fsa-service-001"
+    },
+    "source": {
+      "ip": "10.92.35.12"
+    },
+    "destination": {
+      "ip": "10.92.35.50"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2.lab.local",
+        "type": "A"
       },
-      "@timestamp": "2026-01-12T10:00:20.000Z",
-      "event": {
-        "id": "evt-fsa-noise-normal-003",
-        "kind": "event",
-        "dataset": "hostlog.process",
-        "created": "2026-01-12T10:00:20.000Z",
-        "ingested": "2026-01-12T10:00:21.000Z",
-        "category": ["process"],
-        "type": ["start"],
-        "action": "process_start",
-        "original": "raw: normal process start"
-      },
-      "host": {
-        "id": "h-fsa-workstation-01",
-        "name": "workstation-01",
-        "ip": ["10.0.1.10"]
-      },
-      "process": {
-        "pid": 5678,
-        "executable": "C:\\Program Files\\NormalApp\\app.exe",
-        "entity_id": "p-fsa-normal-process-002",
-        "start": "2026-01-12T10:00:20.000Z",
-        "command_line": "app.exe --mode=normal",
-        "name": "app.exe"
-      },
-      "message": "Normal process start (no attack tag - should be filtered)"
-    }
-  ]
+      "answers": [
+        {
+          "data": "10.92.35.51"
+        }
+      ]
+    },
+    "threat": {
+      "tactic": {
+        "name": "Command and Control",
+        "id": "TA0011"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-remote-001"]
+      }
+    },
+    "message": "Command and Control: Remote communication from client-02"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:02:30.000Z",
+    "event": {
+      "id": "evt-fsa-impact-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:02:30.000Z",
+      "ingested": "2026-01-12T10:02:31.000Z",
+      "category": ["file"],
+      "type": ["change"],
+      "action": "file_delete",
+      "outcome": "success",
+      "original": "raw: file operation"
+    },
+    "host": {
+      "id": "h-9b9c9d9e9f0a1b2c",
+      "name": "client-02",
+      "ip": ["10.92.35.12"]
+    },
+    "process": {
+      "entity_id": "p-fsa-service-001"
+    },
+    "file": {
+      "path": "C:\\Windows\\System32\\critical.dll"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Impact",
+        "id": "TA0040"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-impact-001"]
+      }
+    },
+    "message": "Impact: File operation on client-02"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:00:15.000Z",
+    "event": {
+      "id": "evt-fsa-noise-normal-001",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-12T10:00:15.000Z",
+      "ingested": "2026-01-12T10:00:16.000Z",
+      "category": ["authentication"],
+      "type": ["start"],
+      "action": "user_login",
+      "outcome": "success",
+      "original": "raw: normal user login"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "user": {
+      "id": "u-fsa-normal-user-001",
+      "name": "normaluser"
+    },
+    "source": {
+      "ip": "10.92.35.11"
+    },
+    "session": {
+      "id": "sess-fsa-normal-001"
+    },
+    "message": "Normal user login (no attack tag - should be filtered)"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:00:45.000Z",
+    "event": {
+      "id": "evt-fsa-noise-normal-002",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-12T10:00:45.000Z",
+      "ingested": "2026-01-12T10:00:46.000Z",
+      "category": ["file"],
+      "type": ["access"],
+      "action": "file_read",
+      "original": "raw: normal file access"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "entity_id": "p-fsa-normal-process-001"
+    },
+    "file": {
+      "path": "C:\\Users\\normaluser\\Documents\\readme.txt"
+    },
+    "message": "Normal file access (no attack tag - should be filtered)"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:15.000Z",
+    "event": {
+      "id": "evt-fsa-noise-illegal-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:15.000Z",
+      "ingested": "2026-01-12T10:01:16.000Z",
+      "category": ["network"],
+      "type": ["start"],
+      "action": "network_connection",
+      "outcome": "success",
+      "original": "raw: illegal transition - reconnaissance after execution"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "source": {
+      "ip": "10.92.35.11",
+      "port": 80
+    },
+    "destination": {
+      "ip": "8.8.8.8",
+      "port": 80
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "http"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Reconnaissance",
+        "id": "TA0043"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-noise-illegal-001"]
+      }
+    },
+    "message": "Illegal transition: Reconnaissance after Execution (should be POP/DROP)"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:02:15.000Z",
+    "event": {
+      "id": "evt-fsa-noise-illegal-002",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:02:15.000Z",
+      "ingested": "2026-01-12T10:02:16.000Z",
+      "category": ["network"],
+      "type": ["start"],
+      "action": "network_connection",
+      "outcome": "success",
+      "original": "raw: illegal transition - resource development after remote communication"
+    },
+    "host": {
+      "id": "h-9b9c9d9e9f0a1b2c",
+      "name": "client-02",
+      "ip": ["10.92.35.12"]
+    },
+    "source": {
+      "ip": "10.92.35.12",
+      "port": 443
+    },
+    "destination": {
+      "ip": "198.51.100.10",
+      "port": 443
+    },
+    "network": {
+      "transport": "tcp",
+      "protocol": "https"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Resource Development",
+        "id": "TA0042"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-noise-illegal-002"]
+      }
+    },
+    "message": "Illegal transition: Resource Development after Remote Communication (should be POP/DROP)"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:01:45.000Z",
+    "event": {
+      "id": "evt-fsa-noise-time-confused-001",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-12T10:01:45.000Z",
+      "ingested": "2026-01-12T10:01:46.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "original": "raw: time confused - initial access in middle of chain"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "pid": 9999,
+      "executable": "C:\\Windows\\System32\\notepad.exe",
+      "entity_id": "p-fsa-time-confused-001",
+      "start": "2026-01-12T10:01:45.000Z",
+      "command_line": "notepad.exe",
+      "name": "notepad.exe"
+    },
+    "threat": {
+      "tactic": {
+        "name": "Initial Access",
+        "id": "TA0001"
+      }
+    },
+    "custom": {
+      "evidence": {
+        "event_ids": ["evt-fsa-noise-time-confused-001"]
+      }
+    },
+    "message": "Time confused: Initial Access appears in middle of chain (should be handled by FSA)"
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-12T10:00:20.000Z",
+    "event": {
+      "id": "evt-fsa-noise-normal-003",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-12T10:00:20.000Z",
+      "ingested": "2026-01-12T10:00:21.000Z",
+      "category": ["process"],
+      "type": ["start"],
+      "action": "process_start",
+      "original": "raw: normal process start"
+    },
+    "host": {
+      "id": "h-8a8b8c8d8e8f9010",
+      "name": "client-01",
+      "ip": ["10.92.35.11"]
+    },
+    "process": {
+      "pid": 5678,
+      "executable": "C:\\Program Files\\NormalApp\\app.exe",
+      "entity_id": "p-fsa-normal-process-002",
+      "start": "2026-01-12T10:00:20.000Z",
+      "command_line": "app.exe --mode=normal",
+      "name": "app.exe"
+    },
+    "message": "Normal process start (no attack tag - should be filtered)"
+  }
+]
