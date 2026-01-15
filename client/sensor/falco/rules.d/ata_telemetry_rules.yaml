@@ -1,52 +1,232 @@
-# ATA telemetry rules (lab-friendly)
+# ATA Falco rules (balanced)
 #
-# Goal: generate deterministic ECS-compatible telemetry for the graph model:
-# - process exec (hostlog.process)
-# - file access (hostbehavior.file / hostlog.file_registry)
-# - outbound connect (hostbehavior.syscall with connect)
+# Purpose
+# - Produce a "not too much, not too little" dataset for the ATA lab demo.
+# - Align with docs/80-规范/84-Neo4j实体图谱规范.md: provide enough Telemetry to build:
+#     - RUNS_ON / SPAWN from hostlog.process
+#     - FILE_ACCESS from hostbehavior.file
+#     - NET_CONNECT from hostbehavior.syscall(connect)
+# - Provide a small set of high-signal Falco alerts (WARNING) that become Raw Findings
+#   via the ECS converter abnormal threshold.
 #
-# Notes:
-# - Keep priorities below WARNING so the converter treats them as Telemetry.
-# - Include proc.pid / proc.exepath / proc.ppid / proc.pexepath in outputs so
-#   we can build doc-compliant process.entity_id values.
+# Important
+# - Keep the Falco default rules disabled (compose mounts a custom falco.yaml with `rules_files`).
+# - Include process identity fields in outputs so the converter can generate process.entity_id:
+#   proc.pid / proc.exepath / proc.ppid / proc.pexepath (+ @timestamp from Falco event).
 
-- rule: ATA Telemetry Process Exec
-  desc: Emit process exec telemetry (execve/execveat) with full process identity fields.
+# ----------------------------
+# Lists & macros (self-contained)
+# ----------------------------
+- list: ata_net_tools
+  items: [curl, wget, ssh, scp, sftp, rsync, nc, netcat, ncat]
+
+- list: ata_file_ops
+  items: [chmod, chown, rm, mv, cp, mkdir, rmdir, touch, sha256sum]
+
+- list: ata_interpreters
+  items: [bash, sh, zsh, python, python3, perl, ruby]
+
+- list: ata_discovery_tools
+  items: [ip, ss, netstat, lsof, ps, whoami, id, uname, hostname, date, ls, find]
+
+- list: ata_sensitive_files
+  items:
+    - /etc/shadow
+    - /etc/sudoers
+    - /etc/ssh/sshd_config
+    - /root/.ssh/authorized_keys
+    - /root/.ssh/id_rsa
+    - /root/.ssh/id_ed25519
+
+- macro: ata_demo_path
+  condition: (fd.name startswith /tmp/apt-demo/ or fd.name startswith /var/tmp/apt-demo/)
+
+- macro: ata_tmp_arg_path
+  condition: (proc.cmdline contains " /tmp/" or proc.cmdline contains " /var/tmp/" or proc.cmdline contains " /dev/shm/")
+
+- macro: ata_is_ssh_session
+  # sshd -> bash -> cmd
+  condition: (proc.aname[2]=sshd or proc.aname[3]=sshd or proc.pname=sshd)
+
+# ----------------------------
+# Telemetry rules (INFO)
+# ----------------------------
+- rule: ATA Telemetry Exec Network Tools
+  desc: Network-related tool execution (curl/wget/ssh/nc) for demo chain visibility.
   condition: >
     evt.type in (execve, execveat) and
-    proc.name in (sudo, su, ssh, scp, sftp, rsync, curl, wget, nc, netcat, ncat, python, python3, perl, ruby) and
-    (user.name=root or proc.pname in (sudo, su, ssh))
+    proc.name in (ata_net_tools)
   output: >
-    ATA telemetry exec | evt_type=%evt.type user=%user.name proc_pid=%proc.pid proc_ppid=%proc.ppid
-    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
-    container_id=%container.id container_name=%container.name
+    ATA telemetry exec(net) | evt_type=%evt.type user=%user.name
+    proc_name=%proc.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath proc_pcmdline=%proc.pcmdline
   priority: INFO
   tags: [ata, telemetry, process]
 
-- rule: ATA Telemetry File Access
-  desc: Emit file access telemetry for a limited set of paths to keep noise manageable in the lab.
+- rule: ATA Telemetry Exec File Ops
+  desc: File operation commands for demo chain (create/copy/move/remove/chmod) with stable process identity.
   condition: >
-    evt.type in (creat, unlink, unlinkat, rename, renameat, renameat2) and
-    fd.typechar='f' and
-    (fd.name in (/etc/shadow, /etc/sudoers, /etc/ssh/sshd_config, /root/.ssh/authorized_keys)) and
-    (user.name=root or proc.pname in (sudo, su))
+    evt.type in (execve, execveat) and
+    proc.name in (ata_file_ops) and
+    (
+      proc.cmdline contains "/tmp/apt-demo" or
+      proc.cmdline contains "/etc/" or
+      proc.cmdline contains "/root/.ssh/"
+    )
   output: >
-    ATA telemetry file | evt_type=%evt.type user=%user.name fd_name=%fd.name proc_pid=%proc.pid proc_ppid=%proc.ppid
-    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
-    container_id=%container.id container_name=%container.name
+    ATA telemetry exec(fileop) | evt_type=%evt.type user=%user.name
+    proc_name=%proc.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath proc_pcmdline=%proc.pcmdline
+  priority: INFO
+  tags: [ata, telemetry, process]
+
+- rule: ATA Telemetry Exec Interpreter (Tmp Args)
+  desc: Interpreter execution where command line references tmp paths (script execution in demo).
+  condition: >
+    evt.type in (execve, execveat) and
+    proc.name in (ata_interpreters) and
+    (ata_tmp_arg_path or proc.cmdline contains "/tmp/apt-demo")
+  output: >
+    ATA telemetry exec(interpreter) | evt_type=%evt.type user=%user.name
+    proc_name=%proc.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath proc_pcmdline=%proc.pcmdline
+  priority: INFO
+  tags: [ata, telemetry, process]
+
+- rule: ATA Telemetry Exec Discovery Over SSH
+  desc: Low-signal discovery commands, only when executed in an sshd session.
+  condition: >
+    evt.type in (execve, execveat) and
+    ata_is_ssh_session and
+    proc.name in (ata_discovery_tools)
+  output: >
+    ATA telemetry exec(discovery) | evt_type=%evt.type user=%user.name
+    proc_name=%proc.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath proc_pcmdline=%proc.pcmdline
+  priority: INFO
+  tags: [ata, telemetry, process]
+
+- rule: ATA Telemetry File Write (Demo Path)
+  desc: File writes under /tmp/apt-demo for deterministic demo evidence.
+  condition: >
+    evt.type in (open, openat, openat2) and
+    evt.is_open_write=true and
+    fd.typechar='f' and
+    ata_demo_path
+  output: >
+    ATA telemetry file(write) | evt_type=%evt.type evt_open_write=%evt.is_open_write user=%user.name
+    fd_name=%fd.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath
   priority: INFO
   tags: [ata, telemetry, file]
 
-- rule: ATA Telemetry Connect
-  desc: Emit connect() syscall telemetry with network 5-tuple info when available.
+- rule: ATA Telemetry File Meta (Create/Rename/Delete)
+  desc: File create/rename/delete events under /tmp/apt-demo (cleanup visibility).
+  condition: >
+    evt.type in (creat, unlink, unlinkat, rename, renameat, renameat2) and
+    fd.typechar='f' and
+    ata_demo_path
+  output: >
+    ATA telemetry file(meta) | evt_type=%evt.type user=%user.name
+    fd_name=%fd.name proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath
+  priority: INFO
+  tags: [ata, telemetry, file]
+
+- rule: ATA Telemetry Connect (Tools)
+  desc: Network connect() initiated by common tooling; provides Process->IP edges for the graph.
   condition: >
     evt.type=connect and
-    fd.ip != "127.0.0.1" and
-    fd.rport in (22, 3389, 445, 5985, 5986, 4444) and
-    proc.name in (ssh, scp, sftp, rsync, nc, netcat, ncat, python, python3, perl, ruby, curl, wget)
+    proc.name in (ata_net_tools) and
+    fd.rport != 0 and
+    fd.ip != "127.0.0.1"
   output: >
-    ATA telemetry connect | evt_type=%evt.type user=%user.name fd_sip=%fd.sip fd_name=%fd.name fd_lport=%fd.lport fd_rport=%fd.rport
-    fd_l4proto=%fd.l4proto proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
-    proc_pname=%proc.pname proc_pexepath=%proc.pexepath container_id=%container.id container_name=%container.name
+    ATA telemetry connect | evt_type=%evt.type user=%user.name
+    connection=%fd.name fd_sip=%fd.sip lport=%fd.lport rport=%fd.rport fd_proto=%fd.l4proto
+    proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath
   priority: INFO
   tags: [ata, telemetry, network]
+
+# ----------------------------
+# Alert rules (WARNING) -> Raw Findings
+# ----------------------------
+- rule: ATA Alert Read Sensitive Files (Creds/Keys)
+  desc: High-signal reads of credential/key materials (avoid being too broad).
+  condition: >
+    evt.type in (open, openat, openat2) and
+    evt.is_open_read=true and
+    fd.typechar='f' and
+    fd.name in (ata_sensitive_files) and
+    proc.name in (cat, grep, awk, sed, python, python3, perl, ruby)
+  output: >
+    ATA alert sensitive read | evt_type=%evt.type user=%user.name file=%fd.name
+    proc=%proc.name pid=%proc.pid ppid=%proc.ppid exepath=%proc.exepath cmdline=%proc.cmdline
+  priority: WARNING
+  tags:
+    - ata
+    - alert
+    - file
+    - threat.tactic.id=TA0006
+    - threat.tactic.name=Credential Access
+    - threat.technique.id=T1552.001
+    - threat.technique.name=Unsecured Credentials
+
+- rule: ATA Alert Write SSH Keys/Config
+  desc: Writing sshd_config or authorized_keys is a strong signal in the lab environment.
+  condition: >
+    (
+      (evt.type in (open, openat, openat2) and evt.is_open_write=true) or
+      (evt.type in (creat, rename, renameat, renameat2))
+    ) and
+    fd.typechar='f' and
+    (
+      fd.name endswith "/.ssh/authorized_keys" or
+      fd.name = "/etc/ssh/sshd_config"
+    )
+  output: >
+    ATA alert ssh config write | evt_type=%evt.type user=%user.name file=%fd.name
+    proc=%proc.name pid=%proc.pid ppid=%proc.ppid exepath=%proc.exepath cmdline=%proc.cmdline
+  priority: WARNING
+  tags:
+    - ata
+    - alert
+    - persistence
+    - threat.tactic.id=TA0003
+    - threat.tactic.name=Persistence
+    - threat.technique.id=T1098
+    - threat.technique.name=Account Manipulation
+
+- rule: ATA Alert Execute Script From Tmp
+  desc: Interpreter execution with tmp path arguments (common in staged script demos).
+  condition: >
+    evt.type in (execve, execveat) and
+    proc.name in (ata_interpreters) and
+    ata_tmp_arg_path
+  output: >
+    ATA alert tmp exec | evt_type=%evt.type user=%user.name proc=%proc.name cmd=%proc.cmdline pid=%proc.pid ppid=%proc.ppid
+  priority: WARNING
+  tags:
+    - ata
+    - alert
+    - threat.tactic.id=TA0002
+    - threat.tactic.name=Execution
+    - threat.technique.id=T1059
+    - threat.technique.name=Command and Scripting Interpreter
+
+- rule: ATA Alert Cleanup Demo Directory
+  desc: rm -rf on the demo directory (defense evasion / cleanup evidence for the story).
+  condition: >
+    evt.type in (execve, execveat) and
+    proc.name = rm and
+    (proc.cmdline contains " /tmp/apt-demo" or proc.cmdline contains "/tmp/apt-demo/")
+  output: >
+    ATA alert cleanup | evt_type=%evt.type user=%user.name proc=%proc.name cmd=%proc.cmdline pid=%proc.pid ppid=%proc.ppid
+  priority: WARNING
+  tags:
+    - ata
+    - alert
+    - threat.tactic.id=TA0005
+    - threat.tactic.name=Defense Evasion
+    - threat.technique.id=T1070.004
+    - threat.technique.name=File Deletion
