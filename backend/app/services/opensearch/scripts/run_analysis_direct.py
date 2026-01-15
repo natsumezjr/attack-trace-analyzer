@@ -12,12 +12,13 @@
 import sys
 from pathlib import Path
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client
-from opensearch.analysis import (
+from app.services.opensearch.internal import get_client
+from app.services.opensearch.analysis import (
     run_security_analytics,
     run_data_analysis,
     deduplicate_findings,
@@ -107,7 +108,7 @@ def run_analysis_direct():
     print("=" * 80)
     
     # 检查是否有Events
-    from opensearch import get_index_name, INDEX_PATTERNS
+    from app.services.opensearch.internal import get_index_name, INDEX_PATTERNS
     from datetime import datetime
     
     client = get_client()
@@ -213,7 +214,7 @@ def check_tactic_extraction_direct():
     print("检查 Tactic 提取")
     print("=" * 80)
     
-    from opensearch import get_index_name, INDEX_PATTERNS
+    from app.services.opensearch.internal import get_index_name, INDEX_PATTERNS
     from datetime import datetime
     
     client = get_client()

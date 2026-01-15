@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ModeToggle } from "@/components/mode-toggle";
+// 1. 确保引入了你的 Providers 组件
+import Providers from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,10 +37,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
-            <ModeToggle />
-          </div>
-          {children}
+          {/* 2. 在这里插入 Providers，包裹住页面内容 */}
+          <Providers>
+            {/* ModeToggle 和 children 都放在 Providers 里面 */}
+            <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
+              <ModeToggle />
+            </div>
+
+            {children}
+          </Providers>
         </ThemeProvider>
       </body>
     </html>

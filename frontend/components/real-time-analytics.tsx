@@ -120,7 +120,7 @@ export function Component() {
   };
 
   return (
-    <div className="bg-background text-foreground p-4 font-sans">
+    <div className="bg-background text-foreground px-4 pb-0 pt-4 font-sans">
       <style jsx>{`
         @keyframes pulse {
           0%,
@@ -319,7 +319,7 @@ export function Component() {
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-4">
+        <div className="mt-10 grid grid-cols-3 gap-4">
           {[
             {
               label: "Average",
@@ -337,9 +337,9 @@ export function Component() {
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-xl border border-border bg-card px-4 py-3 text-center"
+              className="min-h-[96px] rounded-xl border border-border bg-card px-4 py-3 text-center"
             >
-              <div className="mb-1 text-xs text-muted-foreground">
+              <div className="mb-1 text-[20px] text-muted-foreground">
                 {stat.label}
               </div>
               <div className="text-xl font-semibold text-foreground">

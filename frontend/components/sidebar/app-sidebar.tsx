@@ -14,21 +14,21 @@ export function SidebarDemo({ children }: { children?: React.ReactNode }) {
       label: "主页",
       href: "/",
       icon: (
-        <House className="text-sidebar-foreground/70 h-5 w-5 flex-shrink-0" />
+        <House className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
       ),
     },
     {
-      label: "总览",
+      label: "数据总览",
       href: "/dashboard",
       icon: (
-        <LayoutDashboard className="text-sidebar-foreground/70 h-5 w-5 flex-shrink-0" />
+        <LayoutDashboard className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
       ),
     },
     {
       label: "溯源分析",
       href: "/trace",
       icon: (
-        <FishingHook className="text-sidebar-foreground/70 h-5 w-5 flex-shrink-0" />
+        <FishingHook className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
       ),
     },
   ];
@@ -73,7 +73,7 @@ export const Logo = () => {
   return (
     <Link
       href="#"
-      className="font-normal flex items-center text-sm text-sidebar-foreground py-1 relative z-20"
+      className="font-normal flex items-center text-base text-sidebar-foreground py-1 relative z-20"
     >
       <span className="font-medium text-sidebar-foreground whitespace-pre">
         AttackTraceAnalyzer

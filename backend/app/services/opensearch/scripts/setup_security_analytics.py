@@ -8,12 +8,13 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# 添加 backend 目录到路径，以便从 opensearch 包导入
-# 脚本在 backend/opensearch/scripts/，需要回到 backend/ 才能导入 opensearch 包
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch.internal import get_client, INDEX_PATTERNS, get_index_name, initialize_indices, index_exists
+# 使用完整路径导入，避免触发 opensearch/__init__.py 的导入
+from app.services.opensearch.internal import get_client, INDEX_PATTERNS, get_index_name, initialize_indices, index_exists
 
 
 def check_security_analytics_available() -> bool:

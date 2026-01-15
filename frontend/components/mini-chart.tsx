@@ -19,7 +19,7 @@ export function MiniChart() {
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const maxValue = Math.max(...data.map((d) => d.value));
-  const chartHeight = 220;
+  const chartHeight = 280;
 
   useEffect(() => {
     if (hoveredIndex !== null) {
@@ -41,7 +41,7 @@ export function MiniChart() {
       ref={containerRef}
       onMouseEnter={handleContainerEnter}
       onMouseLeave={handleContainerLeave}
-      className="group relative h-full w-full rounded-lg p-6 text-card-foreground transition-colors duration-300 hover:bg-muted/30 flex flex-col gap-4"
+      className="group relative h-full w-full min-h-[300px] rounded-lg p-6 text-card-foreground transition-colors duration-300 hover:bg-muted/30 flex flex-col gap-4"
     >
       <h3 className="text-sm font-semibold text-foreground">事件类型</h3>
       {/* Header */}

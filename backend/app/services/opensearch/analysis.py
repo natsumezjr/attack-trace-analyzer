@@ -1,55 +1,47 @@
 # OpenSearch 数据分析模块
-# 包含 Security Analytics 检测调用和告警融合去重
+# 基于 Correlation Rules 的跨事件关联分析
 
 """
 OpenSearch 数据分析模块
 
-包含 Security Analytics 检测调用和告警融合去重功能。
+专注于使用 Correlation Rules 实现多个事件之间的跨事件分析。
+不再使用 Security Analytics 的单点检测功能，而是通过 correlation rules 
+来关联多个 findings/events，生成高层攻击场景（如横向移动）。
 """
 
 import hashlib
-import os
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 from app.core.time import parse_datetime, to_rfc3339, utc_now_rfc3339
 
-from .client import get_client, search, bulk_index, refresh_index
+from .client import get_client, search, bulk_index, refresh_index, index_exists
 from .index import INDEX_PATTERNS, get_index_name
 
 # ========== 常量定义 ==========
 
 # 时间窗口（分钟），用于时间桶计算
-TIME_WINDOW_MINUTES = 3  # 实验规模小，建议偏小（1-5分钟）
+TIME_WINDOW_MINUTES = 3
 
-# Security Analytics API 路径
-SA_DETECTORS_SEARCH_API = "/_plugins/_security_analytics/detectors/_search"
-SA_DETECTOR_GET_API = "/_plugins/_security_analytics/detectors/{detector_id}"
-SA_DETECTOR_UPDATE_API = "/_plugins/_security_analytics/detectors/{detector_id}"
-SA_FINDINGS_SEARCH_API = "/_plugins/_security_analytics/findings/_search"
-# 注意：某些版本 workflows/_search 不存在或被当成 id 路由，所以只用 monitors/_search
-ALERTING_MONITORS_SEARCH_API = "/_plugins/_alerting/monitors/_search"  # 统一使用 monitors 搜索
-ALERTING_WORKFLOW_EXECUTE_API = "/_plugins/_alerting/monitors/{workflow_id}/_execute"  # workflow ID 就是 monitor ID，用 monitor execute
+# Correlation Rules API 路径
+CORRELATION_RULES_API = "/_plugins/_security_analytics/correlation/rules"
+CORRELATION_RESULTS_API = "/_plugins/_security_analytics/correlations"
+CORRELATION_FINDING_CORRELATE_API = "/_plugins/_security_analytics/findings/correlate"
 
-# 缓存时间窗口（秒）：如果findings在5分钟内，直接使用，不触发新扫描
-FINDINGS_CACHE_WINDOW_SECONDS = 300  # 5分钟
+# Correlation 时间窗口（分钟）
+CORRELATION_TIME_WINDOW_MINUTES = 30  # 默认 30 分钟
 
-# 默认超时设置
-DEFAULT_SCAN_TIMEOUT_SECONDS = 60  # 扫描超时时间（秒）
-DEFAULT_POLL_INTERVAL_SECONDS = 2  # 轮询间隔（秒）
+# 横向移动检测的 Technique ID
+LATERAL_MOVEMENT_TECHNIQUE_ID = "T1021"
+LATERAL_MOVEMENT_TACTIC_ID = "TA0008"
+LATERAL_MOVEMENT_TACTIC_NAME = "Lateral Movement"
 
+# ========== 辅助函数 ==========
 
 def fingerprint_id_from_key(fingerprint_key: str) -> str:
     """
-    将用于分组/融合的“原始指纹 key”转换为 docs 约定的 custom.finding.fingerprint。
-
-    docs/51-ECS字段规范.md 约定（简化表达）：
-    fingerprint = sha1(technique_id + host + entity + time_bucket)
-
-    当前实现中，generate_fingerprint() 返回的是可读的 key：
-    {technique_id}|{host_id}|{entity_id}|{time_bucket}
-
-    这里按文档语义对其做 sha1，再加上 fp- 前缀，得到可存储/可查询/可展示的 fingerprint。
+    将用于分组/融合的"原始指纹 key"转换为 docs 约定的 custom.finding.fingerprint。
     """
     digest = hashlib.sha1(fingerprint_key.encode("utf-8")).hexdigest()
     return f"fp-{digest}"
@@ -98,32 +90,17 @@ def generate_fingerprint(finding: dict[str, Any]) -> str:
 
 def extract_provider(finding: dict[str, Any]) -> str:
     """从 Raw Finding 提取 provider（来源引擎）"""
-    # 如果已经有 custom.finding.providers，取第一个
     custom = finding.get("custom", {})
-    finding_custom = custom.get("finding", {})
-    providers = finding_custom.get("providers")
+    finding_obj = custom.get("finding", {})
+    providers = finding_obj.get("providers", [])
     if isinstance(providers, list) and len(providers) > 0:
         return providers[0]
-
-    dataset = finding.get("event", {}).get("dataset") or finding.get("event.dataset")
-    if isinstance(dataset, str) and dataset.startswith("finding.raw."):
-        provider = dataset.split("finding.raw.", 1)[1]
-        if provider in {"falco", "suricata", "filebeat_sigma", "security_analytics"}:
-            return provider
-
-    # 根据规则来源推断
-    rule_id = finding.get("rule", {}).get("id") or finding.get("rule.id")
-    if rule_id:
-        rule_id_lower = rule_id.lower()
-        if "filebeat" in rule_id_lower or "sigma" in rule_id_lower:
-            return "filebeat_sigma"
-        if "falco" in rule_id_lower:
-            return "falco"
-        if "suricata" in rule_id_lower:
-            return "suricata"
-        if "opensearch" in rule_id_lower or "security_analytics" in rule_id_lower:
-            return "security_analytics"
-
+    
+    # 从 dataset 推断
+    dataset = finding.get("event", {}).get("dataset") or finding.get("event.dataset", "")
+    if "correlation" in dataset.lower():
+        return "correlation_rules"
+    
     return "unknown"
 
 
@@ -132,12 +109,10 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
     if len(findings) == 0:
         raise ValueError("无法合并空数组")
 
-    # 使用第一个 finding 作为基础
     import copy
-
     base = copy.deepcopy(findings[0])
 
-    # 合并 providers（优先信任 custom.finding.providers；缺失时再推断）
+    # 合并 providers
     providers = set()
     for f in findings:
         f_custom = f.get("custom", {})
@@ -149,7 +124,7 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
         if provider != "unknown":
             providers.add(provider)
 
-    # 合并 evidence.event_ids（只允许 Telemetry event.id；不要把 finding 自身的 event.id 混进来）
+    # 合并 evidence.event_ids
     event_ids = set()
     for f in findings:
         f_custom = f.get("custom", {})
@@ -192,8 +167,8 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
         base["event.dataset"] = "finding.canonical"
         base["event.kind"] = "alert"
 
-    # confidence 可按来源数量上调（来源越多，置信度越高）
-    confidence = min(0.5 + (len(providers) * 0.15), 1.0)  # 基础 0.5，每个来源 +0.15，最高 1.0
+    # confidence 可按来源数量上调
+    confidence = min(0.5 + (len(providers) * 0.15), 1.0)
     base["custom"]["confidence"] = confidence
 
     # 生成新的 event.id（基于指纹）
@@ -207,10 +182,1299 @@ def merge_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
     return base
 
 
+# ========== 分级判断函数 ==========
+
+def classify_privilege_escalation_level(event: Dict[str, Any]) -> tuple[int, float]:
+    """
+    分级判断提权事件（基于单条 event）
+    
+    实现思路：
+    - Level 1: 提权尝试（基于进程特征）- 置信度 0.3-0.5
+    - Level 2: 可疑提权行为（提权尝试 + 父进程异常）- 置信度 0.5-0.7
+    - Level 3: 提权成功（提权尝试 + 后续高权限操作）- 置信度 0.8-1.0
+    
+    注意：
+    - Level 1 和 Level 2 可以在单条 event 中判断
+    - Level 3 需要多事件关联，在 correlation 阶段无法单独判断
+    
+    参数：
+    - event: 单个 event 文档（_source）
+    
+    返回: (level, confidence) tuple
+        - level: 0=不是提权, 1=尝试, 2=可疑, 3=成功（单条event无法判断3）
+        - confidence: 置信度 0.0-1.0
+    """
+    event_source = event if isinstance(event, dict) else {}
+    
+    # 提取进程信息
+    process = event_source.get('process', {})
+    process_name = process.get('name', '') or ''
+    command_line = process.get('command_line', '') or ''
+    parent = process.get('parent', {})
+    parent_name = parent.get('name', '') or ''
+    parent_executable = parent.get('executable', '') or ''
+    
+    # 提权关键词
+    privilege_keywords = ['privilege', 'elevate', 'runas', 'sudo', 'su ', 'admin', 'system']
+    
+    # 检查是否包含提权关键词
+    has_privilege_keyword = False
+    if process_name:
+        has_privilege_keyword = any(kw in process_name.lower() for kw in privilege_keywords)
+    if not has_privilege_keyword and command_line:
+        has_privilege_keyword = any(kw in command_line.lower() for kw in privilege_keywords)
+    
+    if not has_privilege_keyword:
+        return (0, 0.0)  # 不是提权相关事件
+    
+    # Level 1: 提权尝试（基于进程特征）
+    level = 1
+    confidence = 0.4  # 基础置信度
+    
+    # Level 2: 可疑提权行为（提权尝试 + 父进程异常）
+    # 父进程异常：从非正常父进程启动（如从浏览器、邮件客户端启动提权工具）
+    suspicious_parents = ['chrome.exe', 'firefox.exe', 'outlook.exe', 'thunderbird.exe', 'iexplore.exe', 'edge.exe']
+    if parent_name:
+        parent_lower = parent_name.lower()
+        if any(sp in parent_lower for sp in suspicious_parents):
+            level = 2
+            confidence = 0.6  # 父进程异常，提高置信度
+    
+    # Level 3: 提权成功（需要后续事件，单条 event 无法判断）
+    # 这个级别需要在 correlation 后处理阶段判断
+    # 如果后续有服务创建、计划任务创建等事件，可以提升到 Level 3
+    
+    return (level, confidence)
+
+
+# ========== Correlation Rules 管理 ==========
+
+def create_lateral_movement_correlation_rule(
+    rule_name: str = "Lateral Movement Detection",
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    enabled: bool = True
+) -> dict[str, Any]:
+    """
+    创建横向移动检测的 Correlation Rule
+    
+    规则逻辑：
+    1. Query1: 主机A上的提权行为（Privilege Escalation）
+    2. Query2: 从A到B的远程连接/登录（Remote Connect/Logon）
+    3. Query3: 主机B上的提权或远程执行行为（Privilege Escalation / Remote Execution）
+    
+    参数：
+    - rule_name: 规则名称
+    - time_window_minutes: 关联时间窗口（分钟）
+    - enabled: 是否启用
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
+    client = get_client()
+    
+    # 获取 events 索引模式（correlation rules 应该在原始 events 中匹配，不是 findings）
+    events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    # ========== 查询条件构建 ==========
+    # 
+    # 重要说明：根据当前 ECS 规范，单条进程创建 event 无法判断"提权成功"
+    # - 当前 ECS events 缺少：process.integrity_level, process.token.elevation, user.effective 等字段
+    # - 只能判断"提权尝试"或"可疑提权行为"（基于进程名/命令行特征）
+    # - 真正的"提权成功"需要结合后续事件（服务创建、计划任务等）或多事件关联
+    #
+    # 策略：使用分级判断（方案2：基于父进程特征）
+    # - Level 1: 提权尝试（基于进程特征）- 置信度 0.3-0.5
+    # - Level 2: 可疑提权行为（提权尝试 + 父进程异常）- 置信度 0.5-0.7
+    # - Level 3: 提权成功（提权尝试 + 后续高权限操作）- 置信度 0.8-1.0（需要多事件关联）
+    
+    # 可疑父进程列表（浏览器、邮件客户端）
+    suspicious_parent_processes = [
+        "chrome.exe",
+        "firefox.exe",
+        "edge.exe",
+        "iexplore.exe",
+        "outlook.exe",
+        "thunderbird.exe"
+    ]
+    
+    # 构建提权检测查询条件（进程特征 + 父进程特征）
+    privilege_detection_conditions = [
+        "process.name:*privilege*",
+        "process.name:*elevate*",
+        "process.command_line:*runas*",
+        "process.command_line:*sudo*",
+        "process.command_line:*su *",
+    ] + [f"process.parent.name:{parent}" for parent in suspicious_parent_processes]
+    
+    privilege_detection_query = " OR ".join(privilege_detection_conditions)
+    
+    # Query1: 主机A上的提权行为（Privilege Escalation）
+    query1 = (
+        "event.category:process AND "
+        "event.action:process_start AND "
+        f"({privilege_detection_query}) AND "
+        "_exists_:host.id"
+    )
+    
+    # Query2: 从A到B的远程连接事件（Remote Connect）
+    query2 = (
+        "event.category:network AND "
+        "_exists_:source.ip AND "
+        "_exists_:destination.ip AND "
+        "network.direction:outbound"
+    )
+    
+    # Query3: 主机B上的提权或远程执行行为（Privilege Escalation / Remote Execution）
+    # 包含进程创建事件（提权尝试）或认证事件（远程登录）
+    process_privilege_query = (
+        "event.category:process AND "
+        "event.action:process_start AND "
+        f"({privilege_detection_query})"
+    )
+    authentication_query = (
+        "event.category:authentication AND "
+        "event.action:user_login"
+    )
+    query3 = (
+        f"(({process_privilege_query}) OR "
+        f"({authentication_query})) AND "
+        "_exists_:host.id"
+    )
+    
+    # ========== 构建 Correlation Rule ==========
+    correlation_rule = {
+        "name": rule_name,
+        "description": "检测横向移动攻击链：A主机提权尝试事件 -> A到B远程连接事件 -> B主机提权尝试/远程执行事件",
+        "tags": ["attack.lateral_movement", "attack.t1021"],
+        "correlate": [
+            {
+                "index": events_index_pattern,
+                "category": "windows",
+                "query": query1
+            },
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query2
+            },
+            {
+                "index": events_index_pattern,
+                "category": "windows",
+                "query": query3
+            }
+        ]
+    }
+    
+    try:
+        # 策略：先检查是否存在同名规则，如果存在则更新，不存在则创建（去重）
+        # 注意：OpenSearch Security Analytics API 不支持 GET 方法查询 correlation rules
+        # 因此使用 POST 搜索端点查询现有规则
+        
+        # Step 1: 先查询是否存在同名规则（去重检查）
+        rule_id = None
+        try:
+            search_response = client.transport.perform_request(
+                'POST',
+                f"{CORRELATION_RULES_API}/_search",
+                body={
+                    "query": {
+                        "match": {
+                            "name": rule_name
+                        }
+                    },
+                    "size": 10
+                }
+            )
+            
+            # 解析搜索结果
+            if isinstance(search_response, dict):
+                hits = search_response.get("hits", {}).get("hits", [])
+                for hit in hits:
+                    rule_source = hit.get("_source", {})
+                    if rule_source.get("name") == rule_name:
+                        rule_id = hit.get("_id")
+                        print(f"[INFO] 找到已存在的 Correlation Rule (ID: {rule_id})，将更新而不是创建新规则")
+                        break
+        except Exception as search_error:
+            print(f"[WARNING] 查询现有规则失败（将尝试创建新规则）: {search_error}")
+        
+        # Step 2: 如果存在同名规则，则更新；否则创建新规则
+        if rule_id:
+            # 更新现有规则（PUT）
+            try:
+                update_response = client.transport.perform_request(
+                    'PUT',
+                    f"{CORRELATION_RULES_API}/{rule_id}",
+                    body=correlation_rule
+                )
+                print(f"[INFO] Correlation Rule 更新成功 (ID: {rule_id})")
+                return {
+                    "success": True,
+                    "rule_id": rule_id,
+                    "message": "规则更新成功（已去重）"
+                }
+            except Exception as update_error:
+                print(f"[WARNING] 更新规则失败: {update_error}，尝试创建新规则...")
+                rule_id = None  # 重置，尝试创建
+        
+        # Step 3: 创建新规则（POST）
+        if not rule_id:
+            try:
+                create_response = client.transport.perform_request(
+                    'POST',
+                    CORRELATION_RULES_API,
+                    body=correlation_rule
+                )
+                
+                # 解析响应获取 rule_id
+                rule_id = None
+                if isinstance(create_response, dict):
+                    rule_id = create_response.get('_id') or create_response.get('id') or create_response.get('rule_id')
+                elif isinstance(create_response, str):
+                    # 某些版本可能直接返回 rule_id
+                    rule_id = create_response
+                
+                if rule_id:
+                    print(f"[INFO] Correlation Rule 创建成功 (ID: {rule_id})")
+                    return {
+                        "success": True,
+                        "rule_id": rule_id,
+                        "message": "规则创建成功"
+                    }
+                else:
+                    print(f"[WARNING] 创建成功但无法提取 rule_id: {create_response}")
+                    return {
+                        "success": True,
+                        "rule_id": None,
+                        "message": "规则创建成功（但无法获取 rule_id）"
+                    }
+            except Exception as create_error:
+                error_msg = str(create_error)
+                print(f"[ERROR] 创建 Correlation Rule 失败: {error_msg}")
+                raise create_error
+        
+        return {
+            "success": True,
+            "rule_id": rule_id,
+            "message": "规则创建成功"
+        }
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[ERROR] 创建 Correlation Rule 失败: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "rule_id": None,
+            "message": f"创建失败: {error_msg}"
+        }
+
+
+def apply_correlation_rule_manually(
+    rule: Dict[str, Any],
+    start_time: datetime,
+    end_time: datetime,
+    events_index_pattern: str = None
+) -> List[Dict[str, Any]]:
+    """
+    手动应用 Correlation Rule（如果 OpenSearch 不支持自动触发）
+    
+    实现逻辑：
+    1. 对 rule 中的每个 correlate 查询，在 events 索引中执行查询
+    2. 对每个匹配的 event，进行分级判断（Level 1/2）
+    3. 根据时间窗口和关联条件，将多个查询的结果关联起来
+    4. 返回关联结果（包含关联的 events 和分级信息）
+    
+    参数：
+    - rule: Correlation Rule 定义
+    - start_time: 开始时间
+    - end_time: 结束时间
+    - events_index_pattern: Events 索引模式（默认：ecs-events-*）
+    
+    返回: List[correlation_result] 每个结果包含关联的 events 和分级信息
+    """
+    if events_index_pattern is None:
+        events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    client = get_client()
+    correlate_queries = rule.get('correlate', [])
+    
+    if len(correlate_queries) < 2:
+        return []
+    
+    # Step 1: 对每个查询执行搜索，获取 events（不是 findings）
+    query_results = []
+    for i, correlate_query in enumerate(correlate_queries):
+        query_string = correlate_query.get('query', '')  # query string 格式
+        index = correlate_query.get('index', events_index_pattern)
+        
+        # 将 query string 转换为 DSL query（添加时间范围）
+        # query string 格式：如 "event.category:process AND _exists_:host.id"
+        # 需要转换为 DSL 并添加时间范围
+        dsl_query = {
+            "bool": {
+                "must": [
+                    {
+                        "query_string": {
+                            "query": query_string
+                        }
+                    },
+                    {
+                        "range": {
+                            "@timestamp": {
+                                "gte": to_rfc3339(start_time),
+                                "lte": to_rfc3339(end_time)
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+        
+        try:
+            response = client.search(
+                index=index,
+                body={
+                    "query": dsl_query,
+                    "size": 1000  # 获取足够多的结果
+                }
+            )
+            
+            hits = response.get('hits', {}).get('hits', [])
+            events = []
+            for hit in hits:
+                event_source = hit.get('_source', {})
+                
+                # 对每个 event 进行分级判断（如果是提权相关事件）
+                level, confidence = classify_privilege_escalation_level(event_source)
+                
+                events.append({
+                    "id": hit.get('_id'),
+                    "_id": hit.get('_id'),
+                    "event": event_source,  # 注意：这里存储的是 event，不是 finding
+                    "privilege_level": level,  # 提权级别（0=不是提权，1=尝试，2=可疑，3=成功）
+                    "privilege_confidence": confidence  # 提权置信度
+                })
+            
+            query_results.append({
+                "query_index": i,
+                "events": events  # 改为 events
+            })
+            
+            # 统计分级结果
+            level_counts = {}
+            for e in events:
+                level = e.get('privilege_level', 0)
+                level_counts[level] = level_counts.get(level, 0) + 1
+            
+            print(f"[DEBUG] Query {i+1} 在 events 索引中找到 {len(events)} 个事件")
+            if level_counts:
+                level_str = ", ".join([f"Level {k}: {v}" for k, v in sorted(level_counts.items()) if k > 0])
+                if level_str:
+                    print(f"[DEBUG]   分级统计: {level_str}")
+            
+        except Exception as e:
+            print(f"[WARNING] 执行查询 {i+1} 失败: {e}")
+            import traceback
+            traceback.print_exc()
+            query_results.append({
+                "query_index": i,
+                "events": []
+            })
+    
+    # Step 2: 应用关联逻辑（基于字段匹配和时间窗口）
+    # 简化实现：查找满足以下条件的 events 组合：
+    # - 来自不同的查询（query_index）
+    # - 在时间窗口内
+    # - 有可关联的字段（host.id, source.ip, destination.ip, user.name）
+    
+    correlations = []
+    
+    # 如果只有2个查询，进行简单的两两关联
+    if len(query_results) == 2:
+        events_1 = query_results[0].get('events', [])
+        events_2 = query_results[1].get('events', [])
+        
+        for e1 in events_1:
+            event_1 = e1.get('event', {})
+            host_1 = event_1.get('host', {}).get('id')
+            src_ip_1 = event_1.get('source', {}).get('ip')
+            dst_ip_1 = event_1.get('destination', {}).get('ip')
+            user_1 = event_1.get('user', {}).get('name')
+            
+            for e2 in events_2:
+                event_2 = e2.get('event', {})
+                host_2 = event_2.get('host', {}).get('id')
+                src_ip_2 = event_2.get('source', {}).get('ip')
+                dst_ip_2 = event_2.get('destination', {}).get('ip')
+                user_2 = event_2.get('user', {}).get('name')
+                
+                # 关联条件：
+                # 1. 主机不同（跨主机）
+                # 2. IP 匹配（src_ip_1 == dst_ip_2 或 dst_ip_1 == src_ip_2）
+                # 3. 用户相同（可选）
+                
+                is_correlated = False
+                
+                # 条件1: 主机不同
+                if host_1 and host_2 and host_1 != host_2:
+                    # 条件2: IP 匹配（A的dst_ip == B的src_ip，表示A连接到B）
+                    if dst_ip_1 and src_ip_2 and dst_ip_1 == src_ip_2:
+                        is_correlated = True
+                    elif src_ip_1 and dst_ip_2 and src_ip_1 == dst_ip_2:
+                        is_correlated = True
+                    
+                    # 条件3: 用户相同（增强关联性）
+                    if is_correlated and user_1 and user_2 and user_1 == user_2:
+                        is_correlated = True
+                
+                if is_correlated:
+                    # 构建 correlation_id（避免嵌套 f-string）
+                    corr_key = f"{e1.get('id', '')}-{e2.get('id', '')}"
+                    corr_id = f"corr-{hashlib.md5(corr_key.encode()).hexdigest()[:16]}"
+                    
+                    # 计算综合置信度（基于分级判断）
+                    level_1 = e1.get('privilege_level', 0)
+                    level_2 = e2.get('privilege_level', 0)
+                    conf_1 = e1.get('privilege_confidence', 0.0)
+                    conf_2 = e2.get('privilege_confidence', 0.0)
+                    
+                    # 如果两个事件都是提权相关，使用较高的置信度
+                    base_score = 0.8
+                    if level_1 > 0 or level_2 > 0:
+                        # 提升置信度（基于分级判断）
+                        privilege_boost = max(conf_1, conf_2) * 0.2  # 最多提升 0.2
+                        base_score = min(base_score + privilege_boost, 1.0)
+                    
+                    correlations.append({
+                        "correlation_id": corr_id,
+                        "rule_id": rule.get('name', 'unknown'),
+                        "rule_name": rule.get('name', 'unknown'),
+                        "timestamp": event_1.get('@timestamp') or event_2.get('@timestamp'),
+                        "events": [e1, e2],  # 改为 events
+                        "findings": [e1, e2],  # 保持兼容性，但实际是 events
+                        "score": base_score,  # 基于分级判断的分数
+                        "privilege_levels": [level_1, level_2],  # 记录分级信息
+                        "privilege_confidences": [conf_1, conf_2]
+                    })
+    
+    # 如果有3个或更多查询，需要更复杂的关联逻辑
+    elif len(query_results) >= 3:
+        # 简化实现：先关联前两个，再关联第三个
+        events_1 = query_results[0].get('events', [])
+        events_2 = query_results[1].get('events', [])
+        events_3 = query_results[2].get('events', [])
+        
+        # 先找前两个的关联
+        # Query1: 主机A上的提权事件（没有网络IP）
+        # Query2: 从A到B的网络连接事件（有source.ip和destination.ip）
+        # Query3: 主机B上的提权事件（没有网络IP）
+        # 
+        # 关联逻辑：
+        # 1. e1 和 e2：e1在主机A上，e2的source.ip对应主机A，且用户相同
+        # 2. e2 和 e3：e2的destination.ip对应主机B，e3在主机B上，且用户相同
+        
+        for e1 in events_1:
+            event_1 = e1.get('event', {})
+            host_1 = event_1.get('host', {}).get('id')
+            user_1 = event_1.get('user', {}).get('name')
+            
+            for e2 in events_2:
+                event_2 = e2.get('event', {})
+                host_2 = event_2.get('host', {}).get('id')
+                src_ip_2 = event_2.get('source', {}).get('ip')
+                dst_ip_2 = event_2.get('destination', {}).get('ip')
+                user_2 = event_2.get('user', {}).get('name')
+                
+                # 检查 e1 和 e2 是否关联：
+                # - e1 在主机A上，e2 的源主机也是主机A（host_1 == host_2）
+                # - 用户相同（可选，但增强关联性）
+                e1_e2_correlated = False
+                if host_1 and host_2 and host_1 == host_2:
+                    # 同一主机上的事件，用户相同则关联
+                    if user_1 and user_2 and user_1 == user_2:
+                        e1_e2_correlated = True
+                    elif not user_1 or not user_2:
+                        # 如果用户信息缺失，也允许关联（基于主机）
+                        e1_e2_correlated = True
+                
+                if e1_e2_correlated:
+                    # 再找第三个
+                    for e3 in events_3:
+                        event_3 = e3.get('event', {})
+                        host_3 = event_3.get('host', {}).get('id')
+                        user_3 = event_3.get('user', {}).get('name')
+                        
+                        # 检查 e2 和 e3 是否关联：
+                        # - e2 的 destination.ip 对应主机B（需要通过IP映射或直接检查host_3）
+                        # - e3 在主机B上（host_3）
+                        # - 用户相同（可选）
+                        # 
+                        # 注意：由于 e3 没有 source.ip，我们需要通过其他方式关联
+                        # 简化：如果 e2 的 destination.ip 存在，且 e3 在不同于 e2 源主机的另一台主机上
+                        e2_e3_correlated = False
+                        if host_3 and host_2 and host_3 != host_2:
+                            # e3 在不同于 e2 源主机的另一台主机上
+                            # 如果 e2 有 destination.ip，说明是跨主机连接
+                            if dst_ip_2:
+                                # 用户相同则关联
+                                if user_2 and user_3 and user_2 == user_3:
+                                    e2_e3_correlated = True
+                                elif not user_2 or not user_3:
+                                    # 如果用户信息缺失，也允许关联（基于主机和IP）
+                                    e2_e3_correlated = True
+                        
+                        if e2_e3_correlated:
+                            # 检查用户一致性（三个事件的用户应该相同）
+                            users_match = True
+                            if user_1 and user_2 and user_3:
+                                users_match = (user_1 == user_2 == user_3)
+                            elif user_1 and user_2:
+                                users_match = (user_1 == user_2)
+                            elif user_2 and user_3:
+                                users_match = (user_2 == user_3)
+                            
+                            if users_match:
+                                # 构建 correlation_id（避免嵌套 f-string）
+                                corr_key = f"{e1.get('id', '')}-{e2.get('id', '')}-{e3.get('id', '')}"
+                                corr_id = f"corr-{hashlib.md5(corr_key.encode()).hexdigest()[:16]}"
+                                
+                                # 计算综合置信度（基于分级判断）
+                                level_1 = e1.get('privilege_level', 0)
+                                level_2 = e2.get('privilege_level', 0)
+                                level_3 = e3.get('privilege_level', 0)
+                                conf_1 = e1.get('privilege_confidence', 0.0)
+                                conf_2 = e2.get('privilege_confidence', 0.0)
+                                conf_3 = e3.get('privilege_confidence', 0.0)
+                                
+                                # 三个事件关联，基础分数更高
+                                base_score = 0.9
+                                if level_1 > 0 or level_2 > 0 or level_3 > 0:
+                                    # 提升置信度（基于分级判断）
+                                    privilege_boost = max(conf_1, conf_2, conf_3) * 0.1  # 最多提升 0.1
+                                    base_score = min(base_score + privilege_boost, 1.0)
+                                
+                                correlations.append({
+                                    "correlation_id": corr_id,
+                                    "rule_id": rule.get('name', 'unknown'),
+                                    "rule_name": rule.get('name', 'unknown'),
+                                    "timestamp": event_1.get('@timestamp'),
+                                    "events": [e1, e2, e3],  # 改为 events
+                                    "findings": [e1, e2, e3],  # 保持兼容性，但实际是 events
+                                    "score": base_score,  # 基于分级判断的分数
+                                    "privilege_levels": [level_1, level_2, level_3],  # 记录分级信息
+                                    "privilege_confidences": [conf_1, conf_2, conf_3]
+                                })
+    
+    rule_name = rule.get('name', 'unknown')
+    print(f"[DEBUG] 应用规则 '{rule_name}' 找到 {len(correlations)} 个关联")
+    
+    return correlations
+
+
+def query_correlation_results(
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    rule_id: Optional[str] = None,
+    limit: int = 100,
+    use_opensearch_api: bool = True
+) -> List[Dict[str, Any]]:
+    """
+    查询 Correlation 结果
+    
+    实现方式（按优先级）：
+    1. 优先使用 OpenSearch Security Analytics API：GET /_plugins/_security_analytics/correlations?start_timestamp=...&end_timestamp=...
+    2. 如果 API 不支持，回退到手动应用规则
+    
+    参数：
+    - start_time: 开始时间（默认：当前时间往前推时间窗口）
+    - end_time: 结束时间（默认：当前时间）
+    - rule_id: 规则ID（可选，过滤特定规则）
+    - limit: 返回结果数量限制
+    - use_opensearch_api: 是否优先使用 OpenSearch API（默认 True）
+    
+    返回: List[correlation_result]
+    """
+    client = get_client()
+    
+    if end_time is None:
+        end_time = datetime.now(timezone.utc)
+    if start_time is None:
+        start_time = end_time - timedelta(minutes=CORRELATION_TIME_WINDOW_MINUTES)
+    
+    # 方式1: 使用 OpenSearch Security Analytics API（GET with query parameters）
+    if use_opensearch_api:
+        try:
+            # 转换为毫秒时间戳（epoch milliseconds）
+            start_timestamp_ms = int(start_time.timestamp() * 1000)
+            end_timestamp_ms = int(end_time.timestamp() * 1000)
+            
+            # 构建 URL（使用 query parameters）
+            # 注意：OpenSearch API 不支持 rule_id 参数，只支持时间范围
+            url = f"{CORRELATION_RESULTS_API}?start_timestamp={start_timestamp_ms}&end_timestamp={end_timestamp_ms}"
+            
+            response = client.transport.perform_request(
+                'GET',
+                url
+            )
+            
+            # 调试：打印原始响应结构
+            print(f"[DEBUG] OpenSearch API 原始响应类型: {type(response)}")
+            if isinstance(response, dict):
+                print(f"[DEBUG] 原始响应 keys: {list(response.keys())}")
+                print(f"[DEBUG] 原始响应内容（前500字符）: {str(response)[:500]}")
+            elif isinstance(response, list):
+                print(f"[DEBUG] 原始响应是列表，长度: {len(response)}")
+                if response:
+                    print(f"[DEBUG] 第一个元素类型: {type(response[0])}")
+                    if isinstance(response[0], dict):
+                        print(f"[DEBUG] 第一个元素的 keys: {list(response[0].keys())}")
+            
+            # 解析响应（可能是数组或对象）
+            correlations = []
+            if isinstance(response, list):
+                correlations = response
+            elif isinstance(response, dict):
+                # 可能是 {"correlations": [...]} 或 {"hits": {"hits": [...]}}
+                if "correlations" in response:
+                    correlations = response["correlations"]
+                elif "hits" in response:
+                    hits = response["hits"].get("hits", [])
+                    for hit in hits:
+                        source = hit.get("_source", {})
+                        correlations.append({
+                            "correlation_id": hit.get("_id"),
+                            "rule_id": source.get("rule_id"),
+                            "rule_name": source.get("rule_name"),
+                            "timestamp": source.get("@timestamp"),
+                            "findings": source.get("findings", []),
+                            "score": source.get("score", 0.0)
+                        })
+                else:
+                    # 直接是 correlation 对象
+                    correlations = [response] if response else []
+            
+            if correlations:
+                print(f"[INFO] 从 OpenSearch API 获取到 {len(correlations)} 个 correlation 结果")
+                # 调试：打印第一个 correlation 的完整结构
+                if correlations:
+                    first_corr = correlations[0]
+                    print(f"[DEBUG] 第一个 correlation 的 keys: {list(first_corr.keys())}")
+                    print(f"[DEBUG] 第一个 correlation 的完整内容: {first_corr}")
+                    
+                    # 检查各种可能的字段
+                    for key in ['findings', 'events', 'correlated_findings', 'findings_list', 'related_findings']:
+                        if key in first_corr:
+                            value = first_corr[key]
+                            print(f"[DEBUG] {key}: 类型={type(value)}, 长度={len(value) if isinstance(value, (list, dict)) else 'N/A'}")
+                            if isinstance(value, list) and value:
+                                print(f"[DEBUG] {key}[0] 的类型: {type(value[0])}")
+                                if isinstance(value[0], dict):
+                                    print(f"[DEBUG] {key}[0] 的 keys: {list(value[0].keys())[:10]}")
+                return correlations[:limit]
+            
+        except Exception as e:
+            print(f"[WARNING] 从 OpenSearch API 查询 Correlation 结果失败: {e}")
+            print(f"[INFO] 回退到手动应用规则模式")
+            use_opensearch_api = False
+    
+    # 方式2: 手动应用规则（回退方案）
+    if not use_opensearch_api:
+        # 获取 correlation rule
+        # 注意：OpenSearch API 不支持 GET 方法获取单个规则，需要使用 POST 搜索
+        rule = None
+        if rule_id:
+            try:
+                # 使用 POST 搜索端点查询特定规则
+                search_response = client.transport.perform_request(
+                    'POST',
+                    f"{CORRELATION_RULES_API}/_search",
+                    body={
+                        "query": {
+                            "ids": {
+                                "values": [rule_id]
+                            }
+                        },
+                        "size": 1
+                    }
+                )
+                # 解析响应
+                if isinstance(search_response, dict):
+                    hits = search_response.get("hits", {}).get("hits", [])
+                    if hits:
+                        rule = hits[0].get("_source", {})
+                        print(f"[INFO] 通过搜索找到规则 (ID: {rule_id})")
+            except Exception as e:
+                print(f"[WARNING] 获取规则失败: {e}")
+        
+        # 如果没有指定 rule_id 或未找到，尝试搜索横向移动规则
+        if not rule:
+            try:
+                # 使用 POST 搜索端点查询规则（GET 方法不支持）
+                search_response = client.transport.perform_request(
+                    'POST',
+                    f"{CORRELATION_RULES_API}/_search",
+                    body={
+                        "query": {
+                            "match": {
+                                "name": "Lateral Movement Detection"
+                            }
+                        },
+                        "size": 10
+                    }
+                )
+                # 解析响应
+                existing_rules = []
+                if isinstance(search_response, dict):
+                    hits = search_response.get("hits", {}).get("hits", [])
+                    if hits:
+                        rule = hits[0].get("_source", {})
+                        rule_id = hits[0].get("_id")
+                        if rule:
+                            print(f"[INFO] 找到横向移动规则 (ID: {rule_id})")
+                elif isinstance(search_response, list):
+                    existing_rules = search_response
+                elif isinstance(search_response, dict):
+                    if "rules" in search_response:
+                        existing_rules = search_response["rules"]
+                    elif "hits" in search_response:
+                        existing_rules = [hit.get("_source", {}) for hit in search_response["hits"].get("hits", [])]
+                
+                # 查找横向移动规则
+                for r in existing_rules:
+                    if isinstance(r, dict) and r.get("name") == "Lateral Movement Detection":
+                        rule = r
+                        break
+            except Exception as e:
+                print(f"[WARNING] 查询规则失败: {e}")
+        
+        # 如果找到了规则，手动应用（在 events 索引中）
+        if rule:
+            return apply_correlation_rule_manually(
+                rule=rule,
+                start_time=start_time,
+                end_time=end_time,
+                events_index_pattern=f"{INDEX_PATTERNS['ECS_EVENTS']}-*"  # 明确指定 events 索引
+            )
+        else:
+            print(f"[WARNING] 未找到 Correlation Rule，无法应用")
+            return []
+    
+    return []
+
+
+# ========== 关联链聚合 ==========
+
+def aggregate_correlation_chains(
+    correlations: List[Dict[str, Any]],
+    events_index_pattern: str = None
+) -> List[Dict[str, Any]]:
+    """
+    聚合关联边，生成攻击链
+    
+    参数：
+    - correlations: Correlation 结果列表（包含关联的 events）
+    - events_index_pattern: Events 索引模式（用于查询详细 event 信息，可选）
+    
+    返回: List[chain] 每个 chain 包含：
+    {
+        "chain_id": str,
+        "events": List[dict],    # 关联的 events（原始事件）
+        "hosts": List[str],      # 涉及的主机
+        "src_ip": str,           # 源IP
+        "dst_ip": str,           # 目标IP
+        "user": str,             # 用户（如果可关联）
+        "timeline": List[dict],  # 时间线
+        "confidence": float      # 置信度
+    }
+    """
+    chains = []
+    
+    for correlation in correlations:
+        # 调试：打印 correlation 结构
+        print(f"[DEBUG] 处理 correlation: {correlation.get('correlation_id', 'unknown')}")
+        print(f"[DEBUG] Correlation keys: {list(correlation.keys())}")
+        
+        # correlation 结果中已经包含了 events（或 findings，但实际是 events）
+        # OpenSearch API 返回的格式可能是：
+        # - {"findings": [...]} 或 {"events": [...]} 或 {"correlated_findings": [...]}
+        events_refs = (
+            correlation.get('events', []) or 
+            correlation.get('findings', []) or 
+            correlation.get('correlated_findings', []) or
+            correlation.get('findings_list', [])
+        )
+        
+        print(f"[DEBUG] 找到 {len(events_refs)} 个 events/findings")
+        if events_refs:
+            print(f"[DEBUG] 第一个 event/finding 的 keys: {list(events_refs[0].keys()) if isinstance(events_refs[0], dict) else 'not a dict'}")
+        
+        if len(events_refs) < 2:  # 至少需要2个 events 才能形成链
+            print(f"[DEBUG] 跳过：events 数量不足 ({len(events_refs)} < 2)")
+            continue
+        
+        # 直接使用 correlation 结果中的 events（不需要重新查询）
+        events_data = []
+        hosts = set()
+        src_ips = set()
+        dst_ips = set()
+        users = set()
+        timeline = []
+        
+        for event_ref in events_refs:
+            # event_ref 可能是 {"id": "...", "event": {...}} 或直接是 event dict
+            if isinstance(event_ref, dict):
+                event = event_ref.get('event', event_ref)  # 兼容两种格式
+                event_id = event_ref.get('id') or event_ref.get('_id')
+            else:
+                continue
+            
+            # 提取主机信息
+            host_id = event.get('host', {}).get('id') or event.get('host.id')
+            if host_id:
+                hosts.add(host_id)
+            
+            # 提取IP信息
+            src_ip = event.get('source', {}).get('ip') or event.get('source.ip')
+            dst_ip = event.get('destination', {}).get('ip') or event.get('destination.ip')
+            if src_ip:
+                src_ips.add(src_ip)
+            if dst_ip:
+                dst_ips.add(dst_ip)
+            
+            # 提取用户信息
+            user = event.get('user', {}).get('name') or event.get('user.name')
+            if user:
+                users.add(user)
+            
+            # 提取时间戳
+            timestamp = event.get('@timestamp') or event.get('event', {}).get('created')
+            
+            # 提取事件类型信息
+            event_category = event.get('event', {}).get('category', [])
+            event_type = event.get('event', {}).get('type', [])
+            event_action = event.get('event', {}).get('action', '')
+            
+            events_data.append({
+                "event_id": event_id,
+                "event": event
+            })
+            
+            timeline.append({
+                "timestamp": timestamp,
+                "event_id": event_id,
+                "host": host_id,
+                "category": event_category,
+                "type": event_type,
+                "action": event_action,
+                "summary": event.get('message', '')[:100] if event.get('message') else f"{event_category} - {event_action}"
+            })
+        
+        # 按时间排序 timeline
+        timeline.sort(key=lambda x: x.get('timestamp', ''))
+        
+        # 判断是否满足横向移动条件
+        # 条件1: 至少涉及2个不同主机
+        # 条件2: 有源IP和目标IP（跨主机连接）
+        # 条件3: 时间顺序合理
+        
+        if len(hosts) >= 2 and (len(src_ips) > 0 or len(dst_ips) > 0):
+            # 计算置信度（基于分级判断）
+            base_confidence = min(0.5 + (len(events_data) * 0.1), 1.0)
+            
+            # 从 correlation 结果中提取分级信息
+            privilege_levels = correlation.get('privilege_levels', [])
+            privilege_confidences = correlation.get('privilege_confidences', [])
+            
+            # 如果有分级信息，提升置信度
+            if privilege_levels:
+                max_level = max(privilege_levels)
+                max_conf = max(privilege_confidences) if privilege_confidences else 0.0
+                
+                # Level 2 或更高，提升置信度
+                if max_level >= 2:
+                    base_confidence = min(base_confidence + 0.1, 1.0)
+                # Level 1，小幅提升
+                elif max_level >= 1:
+                    base_confidence = min(base_confidence + max_conf * 0.1, 1.0)
+            
+            chain = {
+                "chain_id": f"chain-{hashlib.md5(str(correlation.get('correlation_id', '')).encode()).hexdigest()[:16]}",
+                "events": events_data,  # 改为 events
+                "findings": events_data,  # 保持兼容性
+                "hosts": sorted(list(hosts)),
+                "src_ip": list(src_ips)[0] if src_ips else None,
+                "dst_ip": list(dst_ips)[0] if dst_ips else None,
+                "user": list(users)[0] if users else None,
+                "timeline": timeline,
+                "confidence": base_confidence,  # 基于分级判断的置信度
+                "correlation_id": correlation.get('correlation_id'),
+                "privilege_levels": privilege_levels,  # 记录分级信息
+                "privilege_confidences": privilege_confidences
+            }
+            
+            chains.append(chain)
+    
+    return chains
+
+
+# ========== 生成高层事件 ==========
+
+def generate_lateral_movement_finding(
+    chain: Dict[str, Any],
+    timestamp: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """
+    生成横向移动高层事件（Finding）
+    
+    参数：
+    - chain: 攻击链数据（来自 aggregate_correlation_chains）
+    - timestamp: 事件时间戳（默认：当前时间）
+    
+    返回: ECS 格式的 Finding
+    """
+    if timestamp is None:
+        timestamp = datetime.now(timezone.utc)
+    
+    timestamp_str = to_rfc3339(timestamp)
+    
+    # 提取相关 findings 的 event_ids
+    related_event_ids = []
+    related_finding_ids = []
+    
+    # 从 chain 中提取 events（chain 现在包含的是 events，不是 findings）
+    for event_data in chain.get('events', chain.get('findings', [])):
+        event = event_data.get('event', event_data)
+        event_id = event_data.get('event_id') or event_data.get('finding_id')
+        
+        if event_id:
+            related_finding_ids.append(event_id)  # 保持字段名兼容
+        
+        # 提取 event.id（ECS 格式）
+        ecs_event_id = event.get('event', {}).get('id')
+        if ecs_event_id:
+            related_event_ids.append(ecs_event_id)
+    
+    # 生成 finding ID
+    chain_id = chain.get('chain_id', 'unknown')
+    finding_id = f"lateral-movement-{hashlib.md5(chain_id.encode()).hexdigest()[:16]}"
+    
+    # 构建时间线摘要
+    timeline_summary = []
+    for item in chain.get('timeline', []):
+        timeline_summary.append({
+            "ts": item.get('timestamp'),
+            "type": item.get('technique_id', 'unknown'),
+            "finding_id": item.get('finding_id'),
+            "host": item.get('host'),
+            "summary": item.get('summary', '')
+        })
+    
+    # 根据分级判断结果调整置信度和严重性
+    privilege_levels = chain.get('privilege_levels', [])
+    privilege_confidences = chain.get('privilege_confidences', [])
+    
+    # 计算平均级别和置信度
+    avg_level = sum(privilege_levels) / len(privilege_levels) if privilege_levels else 0
+    avg_confidence = sum(privilege_confidences) / len(privilege_confidences) if privilege_confidences else chain.get('confidence', 0.7)
+    
+    # 根据级别调整严重性
+    # Level 1: 60, Level 2: 70, Level 3: 80
+    if avg_level >= 3:
+        severity = 80
+    elif avg_level >= 2:
+        severity = 70
+    elif avg_level >= 1:
+        severity = 60
+    else:
+        severity = 50
+    
+    # 构建 ECS Finding
+    ecs_finding = {
+        "@timestamp": timestamp_str,
+        "ecs": {"version": "9.2.0"},
+        "event": {
+            "id": finding_id,
+            "kind": "alert",
+            "created": timestamp_str,
+            "ingested": timestamp_str,
+            "category": ["intrusion_detection"],
+            "type": ["alert"],
+            "action": "lateral_movement_detection",
+            "dataset": "finding.correlated.lateral_movement",
+            "severity": severity,  # 基于分级判断的严重性
+        },
+        "rule": {
+            "id": "correlation-rule-lateral-movement",
+            "name": "Lateral Movement Detection",
+            "version": "1.0",
+        },
+        "threat": {
+            "tactic": {
+                "id": LATERAL_MOVEMENT_TACTIC_ID,
+                "name": LATERAL_MOVEMENT_TACTIC_NAME
+            },
+            "technique": {
+                "id": LATERAL_MOVEMENT_TECHNIQUE_ID,
+                "name": "Remote Services"
+            }
+        },
+        "custom": {
+            "finding": {
+                "stage": "correlated",
+                "providers": ["correlation_rules"],
+                "fingerprint": fingerprint_id_from_key(
+                    f"{LATERAL_MOVEMENT_TECHNIQUE_ID}|{chain.get('src_ip', 'unknown')}|{chain.get('dst_ip', 'unknown')}|{chain.get('user', 'unknown')}|{int(timestamp.timestamp() // (CORRELATION_TIME_WINDOW_MINUTES * 60))}"
+                )
+            },
+            "confidence": avg_confidence,  # 使用基于分级判断的置信度
+            "privilege_escalation": {
+                "levels": privilege_levels,  # 记录分级信息
+                "confidences": privilege_confidences,
+                "average_level": avg_level,
+                "has_followup_operations": chain.get('has_followup_privilege_operations', False)
+            },
+            "evidence": {
+                "event_ids": list(set(related_event_ids)),  # 去重
+                "finding_ids": related_finding_ids,
+                "chain_id": chain_id
+            },
+            "lateral_movement": {
+                "hosts": chain.get('hosts', []),
+                "src_ip": chain.get('src_ip'),
+                "dst_ip": chain.get('dst_ip'),
+                "user": chain.get('user'),
+                "timeline": timeline_summary,
+                "findings_count": len(chain.get('findings', []))
+            }
+        },
+        "message": f"检测到横向移动攻击：从 {chain.get('src_ip', 'unknown')} 到 {chain.get('dst_ip', 'unknown')}，涉及 {len(chain.get('hosts', []))} 个主机"
+    }
+    
+    # 添加主机信息（如果有）
+    if chain.get('hosts'):
+        ecs_finding["host"] = {
+            "id": chain.get('hosts')[0],  # 主主机
+            "name": chain.get('hosts')[0]
+        }
+    
+    # 添加网络信息（如果有）
+    if chain.get('src_ip') or chain.get('dst_ip'):
+        if "source" not in ecs_finding:
+            ecs_finding["source"] = {}
+        if "destination" not in ecs_finding:
+            ecs_finding["destination"] = {}
+        
+        if chain.get('src_ip'):
+            ecs_finding["source"]["ip"] = chain.get('src_ip')
+        if chain.get('dst_ip'):
+            ecs_finding["destination"]["ip"] = chain.get('dst_ip')
+    
+    return ecs_finding
+
+
+# ========== 主分析函数 ==========
+
+def run_correlation_analysis(
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    create_rule_if_not_exists: bool = True,
+    rule_name: str = "Lateral Movement Detection"
+) -> dict[str, Any]:
+    """
+    运行 Correlation 分析
+    
+    功能：
+    1. 确保 Correlation Rule 存在（如果不存在则创建）
+    2. 查询最近的 Correlation 结果
+    3. 聚合关联链
+    4. 生成横向移动高层事件
+    5. 写入 Raw Findings 索引
+    
+    参数：
+    - time_window_minutes: 查询时间窗口（分钟）
+    - create_rule_if_not_exists: 如果规则不存在是否创建
+    - rule_name: Correlation Rule 名称
+    
+    返回: {
+        "correlations_found": int,
+        "chains_aggregated": int,
+        "findings_generated": int,
+        "errors": int
+    }
+    """
+    client = get_client()
+    today = datetime.now(timezone.utc)
+    raw_index_name = get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today)
+    
+    try:
+        # Step 1: 确保索引存在
+        if not index_exists(raw_index_name):
+            print(f"[INFO] Raw Findings 索引不存在: {raw_index_name}，跳过分析")
+            return {
+                "correlations_found": 0,
+                "chains_aggregated": 0,
+                "findings_generated": 0,
+                "errors": 0
+            }
+        
+        # Step 2: 确保 Correlation Rule 存在
+        rule_id = None
+        if create_rule_if_not_exists:
+            rule_result = create_lateral_movement_correlation_rule(
+                rule_name=rule_name,
+                time_window_minutes=time_window_minutes
+            )
+            if rule_result.get("success"):
+                rule_id = rule_result.get("rule_id")
+                print(f"[INFO] Correlation Rule 就绪: {rule_id}")
+            else:
+                print(f"[WARNING] Correlation Rule 创建失败: {rule_result.get('message')}")
+        
+        # Step 3: 查询 Correlation 结果
+        # 优先使用 OpenSearch Security Analytics API，如果不支持则回退到手动应用
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(minutes=time_window_minutes)
+        
+        # 注意：OpenSearch Security Analytics API 的 correlation 功能可能只在 raw-findings-* 索引中查找
+        # 但我们的 correlation rule 配置的是在 ecs-events-* 索引中匹配 events
+        # 因此需要强制使用手动应用规则模式，直接在 events 索引中查询
+        correlations = query_correlation_results(
+            start_time=start_time,
+            end_time=end_time,
+            rule_id=rule_id,
+            limit=100,
+            use_opensearch_api=False  # 强制使用手动应用规则模式（在 events 索引中查询）
+        )
+        
+        print(f"[INFO] 找到 {len(correlations)} 个 Correlation 结果")
+        
+        if len(correlations) == 0:
+            return {
+                "correlations_found": 0,
+                "chains_aggregated": 0,
+                "findings_generated": 0,
+                "errors": 0
+            }
+        
+        # Step 4: 聚合关联链（基于 events）
+        chains = aggregate_correlation_chains(correlations)
+        print(f"[INFO] 聚合了 {len(chains)} 个攻击链（基于 events）")
+        
+        if len(chains) == 0:
+            return {
+                "correlations_found": len(correlations),
+                "chains_aggregated": 0,
+                "findings_generated": 0,
+                "errors": 0
+            }
+        
+        # Step 5: 生成高层事件并写入
+        findings_to_index = []
+        errors = 0
+        
+        for chain in chains:
+            try:
+                finding = generate_lateral_movement_finding(chain)
+                findings_to_index.append({
+                    "id": finding.get("event", {}).get("id"),
+                    "document": finding
+                })
+            except Exception as e:
+                print(f"[ERROR] 生成 Finding 失败: {e}")
+                errors += 1
+                continue
+        
+        # Step 6: 批量写入 Raw Findings
+        if len(findings_to_index) > 0:
+            result = bulk_index(raw_index_name, findings_to_index)
+            if result.get("success", 0) > 0:
+                refresh_index(raw_index_name)
+                print(f"[INFO] 成功写入 {result.get('success', 0)} 个横向移动 Finding")
+            
+            return {
+                "correlations_found": len(correlations),
+                "chains_aggregated": len(chains),
+                "findings_generated": result.get("success", 0),
+                "errors": errors + result.get("failed", 0)
+            }
+        
+        return {
+            "correlations_found": len(correlations),
+            "chains_aggregated": len(chains),
+            "findings_generated": 0,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        print(f"[ERROR] Correlation 分析失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "correlations_found": 0,
+            "chains_aggregated": 0,
+            "findings_generated": 0,
+            "errors": 1
+        }
+
+
+# ========== 告警融合去重（保留）==========
+
+def select_most_credible_finding(findings: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    从多个 findings 中选择最可信的一个
+    
+    可信度评分规则（优先级从高到低）：
+    1. confidence 值（custom.confidence）
+    2. severity 值（event.severity）
+    3. 时间戳（越新越好）
+    
+    参数：
+    - findings: Finding 列表
+    
+    返回: 最可信的 finding
+    """
+    if len(findings) == 0:
+        raise ValueError("无法从空列表中选择 finding")
+    if len(findings) == 1:
+        return findings[0]
+    
+    def get_credibility_score(finding: dict[str, Any]) -> tuple[float, int, str]:
+        """计算可信度分数，返回 (confidence, severity, timestamp) 用于排序"""
+        # confidence (0.0-1.0)，越高越好
+        confidence = finding.get("custom", {}).get("confidence", 0.0)
+        if not isinstance(confidence, (int, float)):
+            confidence = 0.0
+        
+        # severity (0-100)，越高越好
+        severity = finding.get("event", {}).get("severity", 0)
+        if not isinstance(severity, (int, float)):
+            severity = 0
+        
+        # timestamp，越新越好（用于排序）
+        timestamp = finding.get("@timestamp") or finding.get("event", {}).get("created", "")
+        
+        return (confidence, severity, timestamp)
+    
+    # 按可信度排序：confidence 降序，severity 降序，timestamp 降序
+    sorted_findings = sorted(
+        findings,
+        key=get_credibility_score,
+        reverse=True
+    )
+    
+    return sorted_findings[0]
+
+
 def deduplicate_findings() -> dict[str, Any]:
     """
     告警融合去重（Raw Findings → Canonical Findings）
     根据文档：在时间窗 Δt 内，将满足相同指纹的 Raw Finding 合并为一条 Canonical Finding
+    
+    融合策略：多个 finding 融合时，选择最可信的 finding，直接使用其 source 数据作为新 finding 的 source
     """
     client = get_client()
     today = datetime.now(timezone.utc)
@@ -218,6 +1482,11 @@ def deduplicate_findings() -> dict[str, Any]:
     canonical_index_name = get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today)
 
     try:
+        # 检查 raw-findings 索引是否存在
+        if not index_exists(raw_index_name):
+            print(f"[INFO] Raw Findings索引不存在: {raw_index_name}，跳过去重")
+            return {"total": 0, "merged": 0, "canonical": 0, "errors": 0}
+        
         canonical_ingested_now = utc_now_rfc3339()
 
         # 查询所有 Raw Findings
@@ -244,14 +1513,77 @@ def deduplicate_findings() -> dict[str, Any]:
 
         for fingerprint, findings in fingerprint_groups.items():
             if len(findings) > 1:
-                # 多个 findings 需要合并
-                merged = merge_findings(findings)
-                canonical_findings.append(merged)
+                # 多个 findings 需要融合：选择最可信的 finding
+                most_credible = select_most_credible_finding(findings)
+                import copy
+                canonical = copy.deepcopy(most_credible)
+                
+                # 收集所有 findings 的 providers 和 event_ids
+                providers = set()
+                event_ids = set()
+                
+                for f in findings:
+                    # 收集 providers
+                    f_custom = f.get("custom", {})
+                    f_finding = f_custom.get("finding", {})
+                    f_providers = f_finding.get("providers", [])
+                    if isinstance(f_providers, list):
+                        providers.update(f_providers)
+                    provider = extract_provider(f)
+                    if provider != "unknown":
+                        providers.add(provider)
+                    
+                    # 收集 event_ids
+                    f_evidence = f_custom.get("evidence", {})
+                    f_event_ids = f_evidence.get("event_ids", [])
+                    if isinstance(f_event_ids, list):
+                        event_ids.update(f_event_ids)
+                
+                # 更新 canonical finding 的字段
+                if "custom" not in canonical:
+                    canonical["custom"] = {}
+                if "finding" not in canonical["custom"]:
+                    canonical["custom"]["finding"] = {}
+                
+                canonical["custom"]["finding"]["stage"] = "canonical"
+                canonical["custom"]["finding"]["providers"] = sorted(p for p in providers if isinstance(p, str) and p)
+                canonical["custom"]["finding"]["fingerprint"] = fingerprint_id_from_key(fingerprint)
+                
+                # 更新 evidence.event_ids（合并所有 findings 的 event_ids）
+                if "evidence" not in canonical["custom"]:
+                    canonical["custom"]["evidence"] = {}
+                canonical["custom"]["evidence"]["event_ids"] = sorted(e for e in event_ids if isinstance(e, str) and e)
+                
+                # 更新 severity（取最大值）
+                max_severity = canonical.get("event", {}).get("severity", 0) or 0
+                for f in findings:
+                    severity = f.get("event", {}).get("severity", 0) or 0
+                    if severity > max_severity:
+                        max_severity = severity
+                
+                if "event" in canonical:
+                    canonical["event"]["severity"] = max_severity
+                else:
+                    canonical["event.severity"] = max_severity
+                
+                # 更新 dataset 和 kind
+                if "event" in canonical:
+                    canonical["event"]["dataset"] = "finding.canonical"
+                    canonical["event"]["kind"] = "alert"
+                else:
+                    canonical["event.dataset"] = "finding.canonical"
+                    canonical["event.kind"] = "alert"
+                
+                # 更新 confidence（根据来源数量调整）
+                base_confidence = canonical.get("custom", {}).get("confidence", 0.5)
+                confidence = min(base_confidence + (len(providers) * 0.1), 1.0)
+                canonical["custom"]["confidence"] = confidence
+                
+                canonical_findings.append(canonical)
                 merged_count += len(findings)
             else:
                 # 单个 finding，直接转为 canonical（更新字段）
                 import copy
-
                 single = copy.deepcopy(findings[0])
                 if "custom" not in single:
                     single["custom"] = {}
@@ -271,8 +1603,7 @@ def deduplicate_findings() -> dict[str, Any]:
 
                 canonical_findings.append(single)
 
-        # Canonical Finding 是中心侧生成的“新文档”，入库时间应为生成时刻。
-        # 同时确保三时间字段存在：缺少主时间轴（@timestamp 或可推导字段）则丢弃该 canonical。
+        # Canonical Finding 是中心侧生成的"新文档"，入库时间应为生成时刻。
         normalized_canonicals: list[dict[str, Any]] = []
         for f in canonical_findings:
             ts = f.get("@timestamp")
@@ -292,7 +1623,6 @@ def deduplicate_findings() -> dict[str, Any]:
             if not event_obj.get("created"):
                 event_obj["created"] = ts
 
-            # Decision: canonical 的入库时间为生成时刻（中心侧覆盖）。
             event_obj["ingested"] = canonical_ingested_now
 
             normalized_canonicals.append(f)
@@ -308,9 +1638,9 @@ def deduplicate_findings() -> dict[str, Any]:
             ]
 
             result = bulk_index(canonical_index_name, documents)
-            # 刷新索引，使新写入的 Canonical Findings 立即可搜索
             if result.get("success", 0) > 0:
                 refresh_index(canonical_index_name)
+                print(f"[INFO] 成功写入 {result.get('success', 0)} 个 Canonical Findings 到 {canonical_index_name}")
 
             return {
                 "total": len(raw_findings),
@@ -321,1473 +1651,64 @@ def deduplicate_findings() -> dict[str, Any]:
 
         return {"total": len(raw_findings), "merged": merged_count, "canonical": 0, "errors": 0}
     except Exception as error:
+        error_str = str(error)
+        if 'index_not_found' in error_str.lower() or '404' in error_str:
+            print(f"[INFO] Raw Findings索引不存在，跳过去重: {raw_index_name}")
+            return {"total": 0, "merged": 0, "canonical": 0, "errors": 0}
         print(f"告警融合去重失败: {error}")
         raise
 
 
-# ========== ATT&CK Tactic映射表（从technique ID到tactic ID）==========
-
-# ATT&CK Tactic映射表（从technique ID到tactic ID）
-TECHNIQUE_TO_TACTIC_MAP = {
-    # Initial Access (TA0001)
-    "T1078": "TA0001",  # Valid Accounts
-    "T1190": "TA0001",  # Exploit Public-Facing Application
-    # Execution (TA0002)
-    "T1059": "TA0002",  # Command and Scripting Interpreter
-    "T1106": "TA0002",  # Native API
-    # Persistence (TA0003)
-    "T1546": "TA0003",  # Event Triggered Execution
-    "T1547": "TA0003",  # Boot or Logon Autostart Execution
-    "T1133": "TA0003",  # External Remote Services
-    # Privilege Escalation (TA0004)
-    "T1055": "TA0004",  # Process Injection
-    "T1548": "TA0004",  # Abuse Elevation Control Mechanism
-    # Defense Evasion (TA0005)
-    "T1562": "TA0005",  # Impair Defenses
-    "T1070": "TA0005",  # Indicator Removal on Host
-    # Credential Access (TA0006)
-    "T1003": "TA0006",  # OS Credential Dumping
-    "T1110": "TA0006",  # Brute Force
-    # Discovery (TA0007)
-    "T1083": "TA0007",  # File and Directory Discovery
-    "T1018": "TA0007",  # Remote System Discovery
-    # Lateral Movement (TA0008)
-    "T1021": "TA0008",  # Remote Services
-    "T1072": "TA0008",  # Software Deployment Tools
-    # Collection (TA0009)
-    "T1074": "TA0009",  # Data Staged
-    "T1005": "TA0009",  # Data from Local System
-    # Exfiltration (TA0010)
-    "T1041": "TA0010",  # Exfiltration Over C2 Channel
-    "T1020": "TA0010",  # Automated Exfiltration
-    # Command and Control (TA0011)
-    "T1071": "TA0011",  # Application Layer Protocol
-    "T1095": "TA0011",  # Non-Application Layer Protocol
-    # Impact (TA0040)
-    "T1531": "TA0040",  # Account Access Removal
-    "T1565": "TA0040",  # Data Manipulation
-    "T1489": "TA0040",  # Service Stop
-}
-
-# ATT&CK Tactic名称映射
-TACTIC_NAME_TO_ID_MAP = {
-    "initial_access": "TA0001",
-    "execution": "TA0002",
-    "persistence": "TA0003",
-    "privilege_escalation": "TA0004",
-    "defense_evasion": "TA0005",
-    "credential_access": "TA0006",
-    "discovery": "TA0007",
-    "lateral_movement": "TA0008",
-    "collection": "TA0009",
-    "command_and_control": "TA0011",
-    "exfiltration": "TA0010",
-    "impact": "TA0040",
-}
-
-TACTIC_ID_TO_NAME_MAP = {
-    "TA0001": "Initial Access",
-    "TA0002": "Execution",
-    "TA0003": "Persistence",
-    "TA0004": "Privilege Escalation",
-    "TA0005": "Defense Evasion",
-    "TA0006": "Credential Access",
-    "TA0007": "Discovery",
-    "TA0008": "Lateral Movement",
-    "TA0009": "Collection",
-    "TA0010": "Exfiltration",
-    "TA0011": "Command and Control",
-    "TA0040": "Impact",
-}
-
-
-def _get_tactic_from_technique(technique_id: str) -> str:
-    """从technique ID推断tactic ID"""
-    # 先尝试完整ID（如T1546.013）
-    if technique_id in TECHNIQUE_TO_TACTIC_MAP:
-        return TECHNIQUE_TO_TACTIC_MAP[technique_id]
-    
-    # 尝试基础ID（如T1546）
-    base_id = technique_id.split('.')[0] if '.' in technique_id else technique_id
-    if base_id in TECHNIQUE_TO_TACTIC_MAP:
-        return TECHNIQUE_TO_TACTIC_MAP[base_id]
-    
-    # 如果映射表中没有，根据technique ID的前缀推断（简化版）
-    # T1546属于Persistence (TA0003)
-    if base_id.startswith('T1546'):
-        return "TA0003"  # Persistence
-    
-    return "TA0000"
-
-
-def _get_tactic_id_from_name(tactic_name: str) -> str:
-    """从tactic名称获取tactic ID"""
-    return TACTIC_NAME_TO_ID_MAP.get(tactic_name.lower(), "TA0000")
-
-
-def _get_tactic_name(tactic_id: str) -> str:
-    """从tactic ID获取tactic名称"""
-    return TACTIC_ID_TO_NAME_MAP.get(tactic_id, "Unknown")
-
-
-# ========== 威胁信息提取改进 ==========
-
-def _convert_security_analytics_finding_to_ecs(finding: dict[str, Any]) -> dict[str, Any]:
+def merge_findings_only() -> dict[str, Any]:
     """
-    将 Security Analytics 的 finding 转换为 ECS 格式的 Finding
-    
-    人话解释：
-    - Security Analytics 返回的 finding 格式和我们的 ECS 格式不一样
-    - 这个函数就是把它的格式转换成我们系统能用的格式
-    - 就像把"外国话"翻译成"中国话"
+    仅执行融合去重，不做其他分析
     """
-    # 提取基本信息
-    finding_id = finding.get("id") or f"sa-finding-{int(datetime.now(timezone.utc).timestamp())}"
-    timestamp = to_rfc3339(finding.get("timestamp")) or utc_now_rfc3339()
-    
-    # 提取检测信息
-    detector = finding.get('detector', {})
-    detector_id = detector.get('id', 'unknown')
-    detector_name = detector.get('name', 'Security Analytics Detector')
-    
-    # 提取规则信息
-    queries = finding.get('queries', [])
-    rule_info = {}
-    if queries:
-        # 取第一个查询作为规则信息
-        first_query = queries[0]
-        rule_info = {
-            "id": f"sa-rule-{detector_id}",
-            "name": first_query.get('name', 'Security Analytics Rule'),
-            "version": "1.0",
-        }
-    
-    # 提取tactic信息（优先从queries中的tags提取）
-    tactic_id = None
-    tactic_name = None
-    technique_id = None
-    
-    # 方法1：从finding的tags字段提取（如果Security Analytics传递了tags）
-    tags = finding.get('tags', [])
-    for tag in tags:
-        if isinstance(tag, str) and tag.startswith('attack.'):
-            parts = tag.split('.')
-            if len(parts) >= 2:
-                # 格式: attack.credential_access (tactic名称)
-                tactic_name_from_tag = parts[1]
-                tactic_id = _get_tactic_id_from_name(tactic_name_from_tag)
-                if tactic_id and tactic_id != "TA0000":
-                    tactic_name = _get_tactic_name(tactic_id)
-                    break
-    
-    # 方法2：从queries[0].tags中提取（优先从technique ID映射到tactic）
-    if not tactic_id and queries:
-        first_query = queries[0]
-        query_tags = first_query.get('tags', [])
-        
-        # 优先查找technique ID（如attack.t1546.013），从technique映射到tactic
-        technique_tags = []
-        tactic_name_tags = []
-        
-        for tag in query_tags:
-            if isinstance(tag, str) and tag.startswith('attack.'):
-                parts = tag.split('.')
-                if len(parts) >= 2:
-                    tag_value = parts[1]
-                    
-                    # 检查是否是technique ID（如attack.t1546.013）
-                    if tag_value.startswith('t') and len(tag_value) > 1:
-                        technique_tags.append(tag_value)
-                    # 检查是否是tactic ID（如attack.ta0001）- 这些应该忽略，因为不是technique
-                    elif tag_value.startswith('ta') and len(tag_value) > 2:
-                        # 这是tactic ID标签，跳过（因为我们需要从technique映射到tactic）
-                        continue
-                    else:
-                        # 可能是tactic名称（如attack.credential_access）
-                        # 但优先使用technique映射，所以先收集起来
-                        tactic_name_tags.append(tag_value)
-        
-        # 优先处理technique ID，从technique映射到tactic
-        for tag_value in technique_tags:
-            # 提取technique ID（如T1546.013）
-            technique_id_candidate = 'T' + tag_value[1:] if tag_value[0] == 't' else tag_value.upper()
-            # 从映射表获取tactic
-            tactic_id = _get_tactic_from_technique(technique_id_candidate)
-            if tactic_id and tactic_id != "TA0000":
-                tactic_name = _get_tactic_name(tactic_id)
-                technique_id = technique_id_candidate
-                break
-        
-        # 如果没有找到technique，才使用tactic名称（作为后备）
-        if not tactic_id and tactic_name_tags:
-            for tag_value in tactic_name_tags:
-                tactic_id = _get_tactic_id_from_name(tag_value)
-                if tactic_id and tactic_id != "TA0000":
-                    tactic_name = _get_tactic_name(tactic_id)
-                    break
-    
-    # 构建threat信息
-    threat_info = {
-        "tactic": {
-            "id": tactic_id or "TA0000",
-            "name": tactic_name or "Unknown"
-        }
-    }
-    
-    # 如果有technique ID，也添加到threat_info
-    if technique_id:
-        threat_info["technique"] = {
-            "id": technique_id,
-            "name": "Security Analytics Detection"
-        }
-    
-    # 提取文档信息（原始事件）
-    document_list = finding.get('document_list', [])
-    related_events = []
-    host_info = {}
-    
-    if document_list:
-        # 取第一个文档作为主要事件
-        first_doc = document_list[0]
-        if isinstance(first_doc, dict):
-            # 提取主机信息
-            if 'host' in first_doc:
-                host_info = first_doc['host']
-            elif 'host.id' in first_doc:
-                host_info = {
-                    "id": first_doc.get('host.id'),
-                    "name": first_doc.get('host.name', 'unknown')
-                }
-            
-            # 收集相关事件 ID
-            if 'event' in first_doc and 'id' in first_doc['event']:
-                related_events.append(first_doc['event']['id'])
-    
-    # 构建 ECS 格式的 Finding
-    ecs_finding = {
-        "ecs": {"version": "9.2.0"},
-        "@timestamp": timestamp,
-        "event": {
-            "id": finding_id,
-            "kind": "alert",
-            "created": timestamp,
-            "ingested": timestamp,
-            "category": ["intrusion_detection"],
-            "type": ["alert"],
-            "action": "security_analytics_detection",
-            "dataset": "finding.raw.security_analytics",
-            "severity": finding.get('severity', 50),  # Security Analytics 的严重程度
-        },
-        "rule": rule_info if rule_info else {
-            "id": f"sa-rule-{detector_id}",
-            "name": detector_name,
-            "version": "1.0",
-        },
-        "threat": threat_info,
-        "custom": {
-            "finding": {
-                "stage": "raw",
-                "providers": ["security_analytics"],  # 标记来源（docs/51-ECS字段规范.md）
-            },
-            "confidence": finding.get('confidence', 0.7),
-        },
-        "host": host_info if host_info else {
-            "id": "unknown",
-            "name": "unknown"
-        },
-        "message": finding.get('description', f"Security Analytics detection from {detector_name}"),
-    }
-    
-    # 如果有相关事件，添加到 evidence
-    if related_events:
-        ecs_finding["custom"]["evidence"] = {
-            "event_ids": related_events
-        }
-
-    # 为 raw finding 也生成 fingerprint（便于排障与融合去重可观测）
-    try:
-        fp_key = generate_fingerprint(ecs_finding)
-        ecs_finding["custom"]["finding"]["fingerprint"] = fingerprint_id_from_key(fp_key)
-    except Exception:
-        pass
-    
-    return ecs_finding
+    return deduplicate_findings()
 
 
-def _get_workflow_id_for_detector(client, detector_id: str) -> Optional[str]:
-    """
-    根据detector_id获取对应的workflow_id
-    
-    策略（按优先级）：
-    1. 先检查detector详情里是否有monitor_id（最直接）
-    2. 通过monitors/_search查找workflow（兼容keyword/text字段）
-    
-    注意：某些detector可能没有workflow，这是正常的。如果没有workflow，
-    可以使用schedule方式触发扫描（同样有效）。
-    
-    参数：
-    - client: OpenSearch客户端
-    - detector_id: Detector ID
-    
-    返回：
-    - workflow_id: 如果找到则返回workflow ID（即monitor ID），否则返回None
-    """
-    # 方法1：先检查detector详情里是否有monitor_id（最直接的方式）
-    try:
-        print(f"[DEBUG] 检查detector详情中是否有monitor_id...")
-        detector = _get_detector_details(client, detector_id)
-        if detector:
-            # 检查多种可能的字段名
-            monitor_id = (
-                detector.get('monitor_id') or 
-                detector.get('monitorId') or 
-                (detector.get('monitor_ids', [None])[0] if isinstance(detector.get('monitor_ids'), list) else None) or
-                detector.get('workflow_id') or 
-                detector.get('workflowId')
-            )
-            if monitor_id:
-                print(f"[DEBUG] 在detector详情中找到monitor_id: {monitor_id}")
-                return monitor_id
-            else:
-                print(f"[DEBUG] detector详情中没有monitor_id字段")
-                # 打印detector的所有keys以便调试
-                print(f"[DEBUG] detector的keys: {list(detector.keys())}")
-    except Exception as e:
-        print(f"[DEBUG] 检查detector详情失败: {e}")
-    
-    # 方法2：通过monitors/_search查找workflow（兼容keyword/text字段）
-    try:
-        print(f"[DEBUG] 通过monitors搜索API查找workflow...")
-        
-        # 先查询所有monitors，看看实际返回什么
-        print(f"[DEBUG] 先查询所有monitors（不限制条件）...")
-        all_monitors_resp = client.transport.perform_request(
-            'POST',
-            ALERTING_MONITORS_SEARCH_API,
-            body={"query": {"match_all": {}}, "size": 50}
-        )
-        
-        # 使用统一的提取函数
-        all_hits = all_monitors_resp.get('hits', {}).get('hits', [])
-        
-        print(f"[DEBUG] 找到 {len(all_hits)} 个monitors")
-        print(f"[DEBUG] 响应顶层keys: {list(all_monitors_resp.keys())}")
-        if all_hits:
-            # 打印所有monitor的关键字段以便调试
-            for i, hit in enumerate(all_hits[:3]):  # 只打印前3个
-                source = hit.get('_source', {}) if '_source' in hit else hit
-                hit_id = hit.get('_id') if '_id' in hit else hit.get('id')
-                print(f"[DEBUG] Monitor {i+1}: id={hit_id}, name={source.get('name')}, type={source.get('type')}, monitor_type={source.get('monitor_type')}, owner={source.get('owner')}")
-        
-        # 查询workflow：兼容keyword/text字段
-        # 注意：workflow的type=workflow，monitor_type可能是None（不是composite）
-        # 所以只查询type和owner，不查询monitor_type
-        workflow_query = {
-            "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {"term": {"type": "workflow"}},  # 先尝试非keyword
-                                    {"term": {"type.keyword": "workflow"}},  # 再尝试keyword
-                                    {"match": {"type": "workflow"}}  # 最后用match
-                                ],
-                                "minimum_should_match": 1
-                            }
-                        },
-                        {
-                            "bool": {
-                                "should": [
-                                    {"term": {"owner": "security_analytics"}},  # 先尝试非keyword
-                                    {"term": {"owner.keyword": "security_analytics"}},  # 再尝试keyword
-                                    {"match": {"owner": "security_analytics"}}  # 最后用match
-                                ],
-                                "minimum_should_match": 1
-                            }
-                        }
-                    ]
-                }
-            },
-            "size": 50
-        }
-        
-        # 先尝试严格查询
-        workflow_resp = client.transport.perform_request(
-            'POST',
-            ALERTING_MONITORS_SEARCH_API,
-            body=workflow_query
-        )
-        
-        hits = workflow_resp.get('hits', {}).get('hits', [])
-        
-        # 如果严格查询没结果，直接从所有monitors中筛选（fallback）
-        # 这可能是因为字段映射问题（type/owner字段可能是text类型，term查询需要精确匹配）
-        if not hits:
-            print(f"[DEBUG] 严格查询无结果，直接从所有monitors中筛选workflow...")
-            print(f"[DEBUG] 可能原因：字段映射问题（type/owner可能是text类型，term查询需要精确匹配）")
-            for hit in all_hits:
-                source = hit.get('_source', {}) if '_source' in hit else hit
-                hit_type = source.get('type')
-                hit_owner = source.get('owner')
-                if hit_type == 'workflow' and hit_owner == 'security_analytics':
-                    print(f"[DEBUG] 从所有monitors中找到workflow: {hit.get('_id')}")
-                    hits = [hit]
-                    break
-        
-        print(f"[DEBUG] monitors搜索API（workflow查询）返回了 {len(hits)} 个结果")
-        if hits:
-            for i, hit in enumerate(hits):
-                source = hit.get('_source', {}) if '_source' in hit else hit
-                hit_id = hit.get('_id') if '_id' in hit else hit.get('id')
-                print(f"[DEBUG] Workflow {i+1}: id={hit_id}, name={source.get('name')}, type={source.get('type')}, monitor_type={source.get('monitor_type')}, owner={source.get('owner')}")
-                # 打印inputs结构（可能包含detector关联信息）
-                inputs = source.get('inputs', [])
-                if inputs:
-                    print(f"[DEBUG]   inputs类型: {type(inputs)}")
-                    if isinstance(inputs, list) and len(inputs) > 0:
-                        print(f"[DEBUG]   第一个inputs的keys: {list(inputs[0].keys()) if isinstance(inputs[0], dict) else 'not dict'}")
-        
-        # 简单策略：返回第一个匹配的workflow（通常只有一个）
-        if hits:
-            return hits[0].get('_id')
-    except Exception as e:
-        error_msg = str(e)
-        error_type = type(e).__name__
-        print(f"[DEBUG] monitors搜索API失败: {error_type}: {error_msg}")
-    
-    print(f"[DEBUG] 未找到匹配detector {detector_id} 的workflow")
-    return None
+# ========== 主入口函数（兼容旧接口）==========
 
-
-def _get_latest_findings_timestamp(client, detector_id: Optional[str] = None) -> tuple[int, int]:
-    """
-    获取最新findings的时间戳和数量（用于轮询确认）
-    
-    参数：
-    - client: OpenSearch客户端
-    - detector_id: Detector ID（可选）
-    
-    返回：
-    - (timestamp_ms, count): 最新finding的时间戳（毫秒）和总数
-      如果查询失败或没有findings，返回 (0, 0)
-    """
-    try:
-        params = {
-            'size': 1,  # 只要最新的一个
-            'sortString': 'timestamp',
-            'sortOrder': 'desc'
-        }
-        if detector_id:
-            params['detector_id'] = detector_id
-        
-        findings_resp = client.transport.perform_request(
-            'GET',
-            SA_FINDINGS_SEARCH_API,
-            params=params
-        )
-        
-        # 提取findings
-        findings = findings_resp.get('findings', [])
-        total_findings = findings_resp.get('total_findings', len(findings))
-        
-        if not findings:
-            return (0, total_findings)
-        
-        # 获取最新finding的时间戳
-        latest_finding = findings[0]
-        timestamp_value = latest_finding.get('timestamp') or latest_finding.get('@timestamp')
-        
-        dt = parse_datetime(timestamp_value)
-        timestamp_ms = int(dt.timestamp() * 1000) if dt is not None else 0
-        
-        return (timestamp_ms, total_findings)
-    except Exception as e:
-        print(f"[WARNING] 查询findings时间戳失败: {e}")
-        return (0, 0)
-
-
-def _get_latest_findings_count(client, detector_id: str) -> int:
-    """
-    使用Security Analytics的findings API获取findings数量
-    
-    参数：
-    - client: OpenSearch客户端
-    - detector_id: Detector ID
-    
-    返回：
-    - findings数量（如果查询失败则返回0）
-    """
-    _, count = _get_latest_findings_timestamp(client, detector_id)
-    return count
-
-
-# ========== 辅助函数：查询detector相关 ==========
-
-def _get_detector_id(client) -> Optional[str]:
-    """获取第一个detector的ID"""
-    try:
-        detector_resp = client.transport.perform_request(
-            'POST',
-            SA_DETECTORS_SEARCH_API,
-            body={"query": {"match_all": {}}, "size": 1}
-        )
-        detector_hits = detector_resp.get('hits', {}).get('hits', [])
-        return detector_hits[0].get('_id') if detector_hits else None
-    except Exception:
-        return None
-
-
-def _get_detector_details(client, detector_id: str) -> Optional[dict]:
-    """获取detector详情"""
-    try:
-        detector_resp = client.transport.perform_request(
-            'GET',
-            SA_DETECTOR_GET_API.format(detector_id=detector_id)
-        )
-        return detector_resp.get('detector', {})
-    except Exception:
-        return None
-
-
-def _should_trigger_scan(trigger_scan: bool, baseline_count: int) -> bool:
-    """
-    判断是否需要触发新扫描
-    
-    注意：这个函数已废弃，现在使用更详细的逻辑（检查findings年龄）
-    保留此函数是为了向后兼容
-    """
-    # 旧逻辑：只有当没有findings时才触发
-    # 新逻辑在 run_security_analytics 中实现（检查findings年龄）
-    return trigger_scan and baseline_count == 0
-
-
-# ========== 辅助函数：触发扫描相关 ==========
-
-def _is_timestamp_string(value) -> bool:
-    """判断一个值是否是ISO格式的时间戳字符串"""
-    if not isinstance(value, str):
-        return False
-    # 检查是否是ISO格式的时间戳（如 "2026-01-14T04:44:38.487Z"）
-    import re
-    iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$'
-    return bool(re.match(iso_pattern, value))
-
-
-def _clean_detector_for_update(detector: dict) -> dict:
-    """
-    清理detector对象，移除可能导致更新错误的字段
-    
-    移除的字段：
-    - 时间戳字段（last_update_time, created_at, updated_at等）
-    - OpenSearch元数据字段（_version, _seq_no, _primary_term等）
-    - 任何ISO格式的时间戳字符串值
-    - 保留核心字段：name, type, detector_type, schedule, enabled, inputs等
-    """
-    # 需要移除的字段列表（时间戳和元数据字段）
-    fields_to_remove = [
-        'last_update_time',
-        'created_at',
-        'updated_at',
-        '@timestamp',
-        '_version',
-        '_seq_no',
-        '_primary_term',
-        'monitor_id',  # 可能由系统管理
-        'detector_id',  # 由URL参数提供，不应在body中
-    ]
-    
-    cleaned = detector.copy()
-    
-    # 移除已知的时间戳和元数据字段
-    for field in fields_to_remove:
-        cleaned.pop(field, None)
-    
-    # 递归清理：移除任何值是ISO时间戳字符串的字段
-    def clean_dict_recursive(obj):
-        if isinstance(obj, dict):
-            cleaned_obj = {}
-            for key, value in obj.items():
-                # 跳过时间戳字段名
-                if any(time_word in key.lower() for time_word in ['time', 'date', 'timestamp', 'created', 'updated']):
-                    continue
-                # 跳过ISO时间戳字符串值
-                if _is_timestamp_string(value):
-                    continue
-                # 递归清理嵌套对象
-                cleaned_obj[key] = clean_dict_recursive(value)
-            return cleaned_obj
-        elif isinstance(obj, list):
-            return [clean_dict_recursive(item) for item in obj]
-        else:
-            return obj
-    
-    cleaned = clean_dict_recursive(cleaned)
-    
-    return cleaned
-
-
-def _execute_workflow_manually(client, workflow_id: str) -> bool:
-    """
-    手动执行workflow（立即触发扫描，不等schedule）
-    
-    注意：workflow本质上就是composite monitor，所以使用monitor execute API
-    这是推荐的触发方式：直接调用monitor的_execute API，比临时改schedule更干净
-    
-    参数：
-    - client: OpenSearch客户端
-    - workflow_id: Workflow ID（即monitor ID）
-    
-    返回：
-    - True: 执行成功
-    - False: 执行失败
-    """
-    # 先尝试GET monitor配置，检查是否有读取权限（可选检查，不影响执行）
-    # 注意：即使GET失败，execute API可能仍然可以工作，因为execute可能不需要读取完整配置
-    try:
-        print(f"[DEBUG] 先检查是否有读取monitor配置的权限...")
-        monitor_get_path = f"/_plugins/_alerting/monitors/{workflow_id}"
-        monitor_config = client.transport.perform_request('GET', monitor_get_path)
-        print(f"[DEBUG] GET monitor配置成功，有读取权限")
-    except Exception as get_error:
-        error_msg = str(get_error)
-        error_type = type(get_error).__name__
-        print(f"[WARNING] GET monitor配置失败: {error_type}: {error_msg}")
-        # 注意：即使GET失败，我们仍然尝试执行workflow，因为execute API可能不需要读取完整配置
-        # 某些OpenSearch版本中，execute API的权限检查可能独立于GET API
-        if '403' in error_msg or 'forbidden' in error_msg.lower():
-            print(f"[WARNING] GET权限不足，但继续尝试执行workflow（execute API可能有独立权限）")
-        elif '500' in error_msg and ('indices:data/read/get' in error_msg or 'alerting_exception' in error_msg):
-            print(f"[WARNING] GET时出现权限相关错误，但继续尝试执行workflow")
-        # 不返回False，继续尝试execute
-    
-    # 尝试执行workflow
-    try:
-        print(f"[INFO] 手动执行workflow (monitor_id: {workflow_id})...")
-        api_path = ALERTING_WORKFLOW_EXECUTE_API.format(workflow_id=workflow_id)
-        print(f"[DEBUG] 调用API: POST {api_path}")
-        execute_resp = client.transport.perform_request(
-            'POST',
-            api_path,
-            body={}
-        )
-        
-        # 检查响应是否成功
-        # execute API通常返回执行结果，成功时可能有workflow_run_id、monitor_run_id等字段
-        if execute_resp:
-            print(f"[INFO] Workflow执行请求已提交，响应: {execute_resp}")
-            # 检查响应中是否有执行ID（表示成功）
-            if 'workflow_run_id' in execute_resp or 'monitor_run_id' in execute_resp or 'run_id' in execute_resp:
-                print(f"[INFO] 执行ID: {execute_resp.get('workflow_run_id') or execute_resp.get('monitor_run_id') or execute_resp.get('run_id')}")
-            return True
-        else:
-            print(f"[WARNING] Workflow执行请求返回空响应")
-            return False
-    except Exception as e:
-        error_msg = str(e)
-        error_type = type(e).__name__
-        print(f"[WARNING] 手动执行workflow失败: {error_type}: {error_msg}")
-        
-        # 检查是否是权限问题
-        if '500' in error_msg and ('alerting_exception' in error_msg or 'indices:data/read' in error_msg):
-            print(f"[ERROR] 可能是权限问题：workflow执行时需要读取系统索引，但当前用户可能缺少权限")
-            print(f"[ERROR] 需要权限：")
-            print(f"[ERROR]   1. 对alerting系统索引的read/get权限（.opensearch-alerting-config等）")
-            print(f"[ERROR]   2. 对业务索引的查询权限（ecs-events-*等）")
-            print(f"[ERROR]   3. alerting插件的execute权限")
-            print(f"[ERROR] 建议：将用户映射到alerting_full_access角色，或添加最小权限")
-        
-        import traceback
-        print(f"[DEBUG] 错误详情: {traceback.format_exc()}")
-        return False
-
-
-def _enable_detector_if_needed(client, detector_id: str, detector: dict) -> None:
-    """确保detector已启用"""
-    if detector.get('enabled', False):
-        return
-    
-    print(f"[INFO] 启用detector: {detector_id}")
-    try:
-        client.transport.perform_request(
-            'PUT',
-            SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-            body={**detector, "enabled": True}
-        )
-    except Exception as enable_error:
-        print(f"[WARNING] 启用detector失败: {enable_error}")
-
-
-def _temporarily_shorten_schedule(client, detector_id: str, detector: dict) -> tuple[dict, bool]:
-    """
-    临时缩短schedule以触发扫描
-    
-    返回: (original_schedule, was_shortened)
-    """
-    schedule = detector.get('schedule', {})
-    original_schedule = schedule.copy()
-    original_interval = schedule.get('period', {}).get('interval', 24)
-    original_unit = schedule.get('period', {}).get('unit', 'HOURS')
-    
-    # 如果schedule间隔较长（>1小时），临时缩短为1分钟
-    if original_unit == 'HOURS' and original_interval >= 1:
-        print(f"[INFO] 临时缩短detector schedule以触发扫描...")
-        
-        temp_schedule = {"period": {"interval": 1, "unit": "MINUTES"}}
-        
-        try:
-            cleaned_detector = _clean_detector_for_update(detector)
-            cleaned_detector['schedule'] = temp_schedule
-            cleaned_detector['enabled'] = True
-            client.transport.perform_request(
-                'PUT',
-                SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-                body=cleaned_detector
-            )
-            print(f"[INFO] Schedule已临时设置为1分钟")
-            return original_schedule, True
-        except Exception as e:
-            print(f"[WARNING] 设置临时schedule失败: {e}")
-            return original_schedule, False
-    
-    # 如果schedule已经是分钟级别，说明schedule已经较短，无需修改
-    # 直接返回，让轮询逻辑等待自动扫描
-    if original_unit == 'MINUTES':
-        print(f"[INFO] Schedule已较短（{original_interval}分钟），等待自动扫描...")
-        return original_schedule, False
-    
-    return original_schedule, False
-
-
-def _restore_schedule(client, detector_id: str, original_schedule: dict) -> None:
-    """恢复原始schedule"""
-    try:
-        print(f"[INFO] 准备恢复schedule...")
-        # 重新获取detector最新状态（避免覆盖其他修改）
-        latest_resp = client.transport.perform_request(
-            'POST',
-            SA_DETECTORS_SEARCH_API,
-            body={"query": {"term": {"_id": detector_id}}, "size": 1}
-        )
-        latest_hits = latest_resp.get('hits', {}).get('hits', [])
-        
-        if not latest_hits:
-            print(f"[WARNING] 无法获取detector最新状态，schedule可能未恢复")
-            return
-        
-        latest_detector = latest_hits[0].get('_source', {})
-        original_interval = original_schedule.get('period', {}).get('interval', 24)
-        original_unit = original_schedule.get('period', {}).get('unit', 'HOURS')
-        
-        # 恢复原始schedule
-        client.transport.perform_request(
-            'PUT',
-            SA_DETECTOR_UPDATE_API.format(detector_id=detector_id),
-            body={**latest_detector, "schedule": original_schedule, "enabled": True}
-        )
-        print(f"[INFO] Schedule已恢复为{original_interval} {original_unit}")
-        
-    except Exception as restore_error:
-        print(f"[ERROR] 恢复schedule失败: {restore_error}")
-        print(f"[WARNING] Detector schedule可能仍为1分钟，需要手动检查")
-
-
-def _poll_for_scan_completion(
-    client, 
-    detector_id: str, 
-    baseline_timestamp_ms: int,
-    baseline_count: int, 
-    max_wait_seconds: int
-) -> tuple[bool, int]:
-    """
-    轮询确认扫描完成（优先检查findings数量变化）
-    
-    核心策略：
-    - 优先检查findings数量是否增加（最可靠）
-    - 即使超时返回False，后续仍会查询findings（因为扫描可能已完成，只是轮询未及时检测到）
-    
-    参数：
-    - baseline_timestamp_ms: 基准时间戳（毫秒），用于辅助判断
-    - baseline_count: 基准数量，主要判断依据
-    
-    返回: (scan_completed, scan_wait_ms)
-    """
-    import time
-    
-    start_time = time.time()
-    print(f"[INFO] 开始轮询确认扫描完成（最多等待{max_wait_seconds}秒）...")
-    
-    while (time.time() - start_time) < max_wait_seconds:
-        time.sleep(DEFAULT_POLL_INTERVAL_SECONDS)
-        
-        # 优先检查findings数量变化（最可靠）
-        current_count = _get_latest_findings_count(client, detector_id)
-        
-        if current_count > baseline_count:
-            scan_wait_ms = int((time.time() - start_time) * 1000)
-            print(f"[INFO] 扫描完成！Findings更新: {baseline_count} -> {current_count}")
-            return True, scan_wait_ms
-        
-        # 辅助检查：如果有时间戳信息，也检查时间戳变化
-        if baseline_timestamp_ms > 0:
-            current_timestamp_ms, _ = _get_latest_findings_timestamp(client, detector_id)
-            if current_timestamp_ms > baseline_timestamp_ms:
-                scan_wait_ms = int((time.time() - start_time) * 1000)
-                print(f"[INFO] 扫描完成！发现新findings（时间戳: {baseline_timestamp_ms} -> {current_timestamp_ms}）")
-                return True, scan_wait_ms
-        
-        elapsed = int(time.time() - start_time)
-        if elapsed % 10 == 0:
-            print(f"[INFO] 等待扫描完成... ({elapsed}/{max_wait_seconds}秒)")
-    
-    scan_wait_ms = int((time.time() - start_time) * 1000)
-    print(f"[WARNING] 扫描超时（{scan_wait_ms}ms），可能未完成，但仍会查询findings")
-    return False, scan_wait_ms
-
-
-def _trigger_scan_with_lock(
-    client,
-    detector_id: str,
-    detector: dict,
-    baseline_timestamp_ms: int,
-    baseline_count: int,
-    max_wait_seconds: int
+def run_data_analysis(
+    trigger_correlation: bool = True,
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES
 ) -> dict[str, Any]:
     """
-    使用锁机制触发扫描
+    数据分析主函数（新版本：基于 Correlation Rules）
+    
+    功能：
+    1. 运行 Correlation 分析（按需触发）
+    2. 告警融合去重（Raw → Canonical）
+    
+    参数：
+    - trigger_correlation: 是否触发 Correlation 分析（默认 True）
+    - time_window_minutes: Correlation 时间窗口（分钟）
     
     返回: {
-        "scan_requested": bool,
-        "scan_completed": bool,
-        "scan_wait_ms": int,
-        "source": str
+        "correlation": dict,      # Correlation 分析结果
+        "deduplication": dict     # 去重结果
     }
     """
-    import time
-    from .trigger_lock import get_detector_lock, register_trigger, complete_trigger
+    correlation_result = {}
     
-    # 单飞模式：检查是否有其他线程正在触发
-    is_leader, wait_event = register_trigger(detector_id, timeout_seconds=max_wait_seconds)
-    
-    if not is_leader:
-        print(f"[INFO] 其他线程正在触发detector，等待结果...")
-        wait_event.wait(timeout=max_wait_seconds)
-        print(f"[INFO] 等待完成，继续查询findings")
-        return {
-            "scan_requested": False,
-            "scan_completed": False,
-            "scan_wait_ms": 0,
-            "source": "cached_findings"
-        }
-    
-    print(f"[INFO] 当前线程负责触发detector: {detector_id}")
-    detector_lock = get_detector_lock(detector_id)
-    original_schedule = None
-    schedule_was_shortened = False
-    
-    try:
-        with detector_lock:
-            # 确保detector已启用
-            _enable_detector_if_needed(client, detector_id, detector)
-            
-            # 手动触发扫描：Security Analytics 的 workflow 执行依赖 Alerting 监控配置系统索引，
-            # 在部分 OpenSearch 版本/配置中，即使用 admin + all_access 也可能触发
-            # `alerting_exception ... indices:data/read/get[s]`（系统索引访问限制）。
-            #
-            # 默认策略：优先使用 schedule 方式触发，避免 execute API 的权限/系统索引问题。
-            # 如需优先尝试 workflow execute，可设置环境变量：OPENSEARCH_SA_PREFER_WORKFLOW_EXECUTE=1
-            prefer_workflow_execute = os.getenv("OPENSEARCH_SA_PREFER_WORKFLOW_EXECUTE", "0").lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            )
-
-            workflow_id = _get_workflow_id_for_detector(client, detector_id)
-            execute_success = False
-
-            if workflow_id and prefer_workflow_execute:
-                print("[INFO] 找到workflow，尝试使用workflow _execute API手动触发...")
-                execute_success = _execute_workflow_manually(client, workflow_id)
-                if execute_success:
-                    print("[INFO] Workflow手动触发成功，等待扫描完成...")
-                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
-                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds
-                    )
-                    source = "triggered_scan_execute" if scan_completed else "cached_findings"
-                else:
-                    print("[INFO] Workflow _execute失败，将使用schedule方式触发...")
-            elif workflow_id and not prefer_workflow_execute:
-                print(
-                    "[INFO] 已找到workflow，但默认跳过 execute（避免 alerting 系统索引权限限制），使用 schedule 方式触发。"
-                )
-
-            # 方式：使用 schedule 触发（同样有效）
-            if not execute_success:
-                if not workflow_id:
-                    print("[INFO] 未找到workflow（这是正常的），使用schedule方式触发扫描...")
-
-                original_schedule, schedule_was_shortened = _temporarily_shorten_schedule(
-                    client, detector_id, detector
-                )
-                
-                if schedule_was_shortened:
-                    # 轮询确认扫描完成
-                    scan_completed, scan_wait_ms = _poll_for_scan_completion(
-                        client, detector_id, baseline_timestamp_ms, baseline_count, max_wait_seconds
-                    )
-                    source = "triggered_scan_schedule" if scan_completed else "cached_findings"
-                else:
-                    # schedule较短，等待一个扫描周期后轮询
-                    print("[INFO] Detector schedule较短，等待自动扫描...")
-                    # 等待一个扫描周期（至少30秒）
-                    wait_seconds = max(DEFAULT_POLL_INTERVAL_SECONDS, 30)
-                    time.sleep(wait_seconds)
-                    # 轮询确认是否有新findings（即使超时也会继续查询findings）
-                    remaining_wait = max_wait_seconds - wait_seconds
-                    if remaining_wait > 0:
-                        scan_completed, scan_wait_ms = _poll_for_scan_completion(
-                            client, detector_id, baseline_timestamp_ms, baseline_count, remaining_wait
-                        )
-                    else:
-                        # 如果等待时间已用完，直接标记为未完成，但仍会查询findings
-                        scan_completed = False
-                        scan_wait_ms = wait_seconds * 1000
-                    source = "triggered_scan_schedule" if scan_completed else "cached_findings"
-        
-        return {
-            "scan_requested": True,
-            "scan_completed": scan_completed,
-            "scan_wait_ms": scan_wait_ms,
-            "source": source
-        }
-    
-    finally:
-        # 确保恢复schedule
-        if schedule_was_shortened and original_schedule:
-            _restore_schedule(client, detector_id, original_schedule)
-        
-        # 标记触发完成
-        complete_trigger(detector_id)
-
-
-# ========== 辅助函数：增量处理状态管理 ==========
-
-def _get_last_processed_timestamp(client, detector_id: str) -> Optional[datetime]:
-    """
-    获取上次处理findings的时间戳
-    
-    参数：
-    - client: OpenSearch客户端
-    - detector_id: Detector ID
-    
-    返回：
-    - 上次处理的时间戳（如果不存在则返回None）
-    """
-    from .index import INDEX_PATTERNS, get_index_name
-    
-    try:
-        # 查询raw-findings索引中该detector的最新finding时间戳
-        index_pattern = INDEX_PATTERNS["RAW_FINDINGS"]
-        today = datetime.now(timezone.utc)
-        
-        # 查询最近7天的索引（避免遗漏跨天数据）
-        latest_timestamp = None
-        for days_back in range(7):
-            check_date = datetime(today.year, today.month, today.day, tzinfo=timezone.utc) - timedelta(
-                days=days_back
-            )
-            index_name = get_index_name(index_pattern, check_date)
-            
-            try:
-                # 查询该索引中该detector的最新finding
-                search_resp = client.transport.perform_request(
-                    'POST',
-                    f'/{index_name}/_search',
-                    body={
-                        "query": {
-                            "bool": {
-                                "must": [
-                                    {"term": {"custom.finding.detector_id": detector_id}},
-                                    {"exists": {"field": "@timestamp"}}
-                                ]
-                            }
-                        },
-                        "size": 1,
-                        "sort": [{"@timestamp": {"order": "desc"}}]
-                    }
-                )
-                
-                hits = search_resp.get('hits', {}).get('hits', [])
-                if hits:
-                    doc = hits[0].get('_source', {})
-                    timestamp_str = doc.get('@timestamp')
-                    ts = parse_datetime(timestamp_str)
-                    if ts is not None and (latest_timestamp is None or ts > latest_timestamp):
-                        latest_timestamp = ts
-            except Exception:
-                # 索引可能不存在，继续查询下一个
-                continue
-        
-        return latest_timestamp
-    except Exception:
-        return None
-
-
-def _filter_new_findings(findings: list[dict[str, Any]], last_timestamp: Optional[datetime]) -> list[dict[str, Any]]:
-    """
-    过滤出新的findings（时间戳大于last_timestamp）
-    
-    参数：
-    - findings: findings列表
-    - last_timestamp: 上次处理的时间戳
-    
-    返回：
-    - 新的findings列表
-    """
-    if last_timestamp is None:
-        # 如果没有上次处理时间，返回所有findings
-        return findings
-
-    if last_timestamp.tzinfo is None:
-        last_timestamp = last_timestamp.replace(tzinfo=timezone.utc)
-    
-    new_findings = []
-    for finding in findings:
-        timestamp_value = finding.get('timestamp') or finding.get('@timestamp')
-        if not timestamp_value:
-            # 如果没有时间戳，保守处理：包含它
-            new_findings.append(finding)
-            continue
-        
-        finding_ts = parse_datetime(timestamp_value)
-        if finding_ts is None:
-            new_findings.append(finding)
-            continue
-
-        if finding_ts > last_timestamp:
-            new_findings.append(finding)
-    
-    return new_findings
-
-
-# ========== 辅助函数：查询和存储findings ==========
-
-def _fetch_and_store_findings(client, detector_id: str, only_new: bool = True) -> dict[str, Any]:
-    """
-    查询findings并存储（支持增量处理）
-    
-    参数：
-    - client: OpenSearch客户端
-    - detector_id: Detector ID
-    - only_new: 是否只处理新的findings（默认True，避免重复处理）
-    
-    返回: {
-        "success": bool,
-        "findings_count": int,        # 查询到的findings总数
-        "new_findings_count": int,     # 新的findings数量（过滤后）
-        "stored": int,
-        "failed": int,
-        "duplicated": int,
-        "message": str
-    }
-    """
-    from .storage import store_events
-    
-    # 获取上次处理的时间戳
-    last_timestamp = None
-    if only_new:
-        last_timestamp = _get_last_processed_timestamp(client, detector_id)
-        if last_timestamp:
-            print(f"[INFO] 上次处理时间: {last_timestamp.isoformat()}，将只处理新findings")
-        else:
-            print(f"[INFO] 未找到上次处理时间，将处理所有findings")
-    
-    try:
-        findings_resp = client.transport.perform_request(
-            'GET',
-            SA_FINDINGS_SEARCH_API,
-            params={'detector_id': detector_id, 'size': 1000}
+    if trigger_correlation:
+        correlation_result = run_correlation_analysis(
+            time_window_minutes=time_window_minutes,
+            create_rule_if_not_exists=True
         )
-        findings = findings_resp.get('findings', [])
-        print(f"[INFO] 从Security Analytics API获取到 {len(findings)} 个findings")
-        
-    except Exception as api_error:
-        error_msg = str(api_error)
-        if '404' in error_msg or 'not found' in error_msg.lower():
-            return {
-                "success": False,
-                "message": "Security Analytics 插件未安装或未启用",
-                "findings_count": 0,
-                "new_findings_count": 0,
-                "stored": 0,
-                "failed": 0,
-                "duplicated": 0
-            }
-        raise
     
-    if not findings:
-        return {
-            "success": True,
-            "message": "没有findings",
-            "findings_count": 0,
-            "new_findings_count": 0,
-            "stored": 0,
-            "failed": 0,
-            "duplicated": 0
-        }
-    
-    # 过滤出新的findings（如果启用增量处理）
-    new_findings = findings
-    if only_new and last_timestamp:
-        new_findings = _filter_new_findings(findings, last_timestamp)
-        skipped_count = len(findings) - len(new_findings)
-        if skipped_count > 0:
-            print(f"[INFO] 跳过 {skipped_count} 个已处理的findings，剩余 {len(new_findings)} 个新findings")
-    
-    if not new_findings:
-        return {
-            "success": True,
-            "message": "没有新的findings需要处理",
-            "findings_count": len(findings),
-            "new_findings_count": 0,
-            "stored": 0,
-            "failed": 0,
-            "duplicated": 0
-        }
-    
-    # 转换为ECS格式并存储
-    converted_findings = []
-    for finding in new_findings:
-        try:
-            ecs_finding = _convert_security_analytics_finding_to_ecs(finding)
-            converted_findings.append(ecs_finding)
-        except Exception as convert_error:
-            print(f"[WARNING] 转换finding失败，跳过: {convert_error}")
-            continue
-    
-    if not converted_findings:
-        return {
-            "success": True,
-            "message": "没有可转换的findings",
-            "findings_count": len(findings),
-            "new_findings_count": len(new_findings),
-            "stored": 0,
-            "failed": 0,
-            "duplicated": 0
-        }
-    
-    result = store_events(converted_findings)
-    
-    return {
-        "success": True,
-        "message": f"成功读取并存储 {result['success']} 条findings（共查询到 {len(findings)} 条，其中 {len(new_findings)} 条为新findings）",
-        "findings_count": len(findings),
-        "new_findings_count": len(new_findings),
-        "stored": result['success'],
-        "failed": result.get('failed', 0),
-        "duplicated": result.get('duplicated', 0)
-    }
-
-
-def run_security_analytics(
-    trigger_scan: bool = True,
-    max_wait_seconds: int = 60,
-    force_scan: bool = False,
-) -> dict[str, Any]:
-    """
-    运行 OpenSearch Security Analytics 检测并读取结果写入 raw-findings-*
-    
-    改进策略：
-    1. **优先查询已有findings**（策略2，默认路径）
-    2. **仅在必要时触发新扫描**（策略1，当findings过旧或为空时）
-    3. **使用锁防止并发冲突**
-    4. **轮询确认扫描完成**（而不是固定sleep）
-    5. **确保schedule恢复**（try/finally）
-    6. **增量处理**：自动跳过已处理的findings，只处理新的（基于时间戳）
-    
-    参数：
-    - trigger_scan: 是否允许触发新扫描（默认True，按需触发）
-    - max_wait_seconds: 触发扫描后的最大等待时间（默认60秒）
-    - force_scan: 是否强制触发一次扫描（默认False）。当你明确需要“立刻触发”时使用。
-    
-    返回：
-    - success: 是否成功
-    - findings_count: 查询到的findings总数
-    - new_findings_count: 新的findings数量（已过滤重复）
-    - stored: 存储成功的数量
-    - scan_requested: 是否请求了新扫描
-    - scan_completed: 扫描是否完成（通过轮询确认）
-    - scan_wait_ms: 实际等待时间（毫秒）
-    - source: "triggered_scan_execute" | "triggered_scan_schedule" | "cached_findings" | "no_findings"
-    
-    增量处理说明：
-    - 函数会自动查询raw-findings索引中该detector的最新finding时间戳
-    - 只处理时间戳大于上次处理时间的findings
-    - 避免重复处理已分析的数据，提高效率
-    """
-    from .trigger_lock import complete_trigger
-    
-    client = get_client()
-    detector_id = None
-    
-    try:
-        # 步骤1: 获取detector ID
-        detector_id = _get_detector_id(client)
-        if not detector_id:
-            return {
-                "success": False,
-                "message": "未找到detector",
-                "findings_count": 0,
-                "stored": 0,
-                "scan_requested": False,
-                "scan_completed": False,
-                "scan_wait_ms": 0,
-                "source": "no_findings"
-            }
-        
-        # 步骤2: 查询已有findings的时间戳和数量
-        baseline_timestamp_ms, baseline_count = _get_latest_findings_timestamp(client, detector_id)
-        findings_age_minutes = None
-        
-        if baseline_count > 0:
-            print(f"[INFO] 发现已有findings: {baseline_count} 个")
-            if baseline_timestamp_ms > 0:
-                # 计算findings年龄（分钟）
-                current_timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-                findings_age_minutes = (current_timestamp_ms - baseline_timestamp_ms) / 1000 / 60
-                print(f"[INFO] 最新finding时间戳: {baseline_timestamp_ms}（{findings_age_minutes:.1f}分钟前）")
-        
-        # 步骤3: 判断是否需要触发新扫描
-        need_trigger = False
-        if not trigger_scan:
-            print("[INFO] trigger_scan=False，跳过触发扫描，仅使用已有findings（如有）")
-            need_trigger = False
-        elif force_scan:
-            print("[INFO] force_scan=True，强制触发一次新扫描")
-            need_trigger = True
-        else:
-            if baseline_count == 0:
-                print("[INFO] 没有findings，需要触发新扫描")
-                need_trigger = True
-            elif findings_age_minutes is not None and findings_age_minutes > 5:
-                print(f"[INFO] Findings过旧（{findings_age_minutes:.1f}分钟前），需要触发新扫描")
-                need_trigger = True
-            else:
-                if findings_age_minutes is not None:
-                    print(f"[INFO] Findings较新（{findings_age_minutes:.1f}分钟前），使用已有findings")
-                else:
-                    print("[INFO] Findings时间戳不可用，使用已有findings；如需强制触发请使用 force_scan=True")
-        
-        source = "cached_findings" if baseline_count > 0 else "no_findings"
-        
-        # 步骤4: 如果需要触发，执行触发逻辑
-        scan_info = {
-            "scan_requested": False,
-            "scan_completed": False,
-            "scan_wait_ms": 0,
-            "source": source
-        }
-        
-        if need_trigger:
-            detector = _get_detector_details(client, detector_id)
-            if detector:
-                try:
-                    scan_info = _trigger_scan_with_lock(
-                        client, detector_id, detector, baseline_timestamp_ms, baseline_count, max_wait_seconds
-                    )
-                except Exception as trigger_error:
-                    print(f"[WARNING] 触发检测时出错: {trigger_error}")
-                    complete_trigger(detector_id)
-            else:
-                print(f"[WARNING] 无法获取detector详情，跳过触发")
-        
-        # 步骤5: 查询并存储findings（增量处理，自动跳过已处理的）
-        # 重要：即使扫描超时（scan_completed=False），也要查询findings
-        # 因为扫描可能已完成，只是轮询未及时检测到
-        storage_result = _fetch_and_store_findings(client, detector_id, only_new=True)
-        
-        return {
-            "success": storage_result["success"],
-            "message": storage_result["message"],
-            "findings_count": storage_result["findings_count"],
-            "new_findings_count": storage_result.get("new_findings_count", storage_result["findings_count"]),
-            "stored": storage_result["stored"],
-            "failed": storage_result.get("failed", 0),
-            "duplicated": storage_result.get("duplicated", 0),
-            **scan_info
-        }
-    
-    except Exception as error:
-        error_msg = str(error)
-        print(f"[ERROR] Security Analytics检测失败: {error_msg}")
-        
-        # 确保清理
-        if detector_id:
-            complete_trigger(detector_id)
-        
-        return {
-            "success": False,
-            "message": f"Security Analytics检测失败: {error_msg}",
-            "findings_count": 0,
-            "stored": 0,
-            "scan_requested": False,
-            "scan_completed": False,
-            "scan_wait_ms": 0,
-            "source": "no_findings"
-        }
-
-
-def _check_and_setup_rules_detectors() -> bool:
-    """
-    检查规则和detector，如果没有则提示用户手动导入和创建
-    
-    返回：
-    - True: 规则和detector已就绪
-    - False: 缺少规则或detector
-    """
-    client = get_client()
-    
-    try:
-        # 1. 检查是否有规则
-        rules_resp = client.transport.perform_request(
-            'POST',
-            '/_plugins/_security_analytics/rules/_search',
-            body={"query": {"match_all": {}}, "size": 1}
-        )
-        rules_total = rules_resp.get('hits', {}).get('total', {}).get('value', 0)
-        
-        # 2. 检查是否有detector
-        detectors_resp = client.transport.perform_request(
-            'POST',
-            '/_plugins/_security_analytics/detectors/_search',
-            body={"query": {"match_all": {}}, "size": 1}
-        )
-        detectors_total = detectors_resp.get('hits', {}).get('total', {}).get('value', 0)
-        
-        # 如果规则和detector都存在，直接返回
-        if rules_total > 0 and detectors_total > 0:
-            print(f"[INFO] 规则和detector已就绪（规则: {rules_total}, Detector: {detectors_total}）")
-            return True
-        
-        # 如果没有规则或detector，提示用户
-        print(f"\n[WARNING] 检测到规则或detector缺失:")
-        print(f"  规则数量: {rules_total}")
-        print(f"  Detector数量: {detectors_total}")
-        
-        if rules_total == 0:
-            print(f"\n[INFO] 需要导入规则，请运行:")
-            print(f"  cd backend/app/services/opensearch/scripts")
-            print(f"  uv run python import_sigma_rules.py --auto")
-        
-        if detectors_total == 0:
-            print(f"\n[INFO] 需要创建detector，请运行:")
-            print(f"  cd backend/app/services/opensearch/scripts")
-            print(f"  uv run python setup_security_analytics.py --multiple")
-        
-        # 尝试自动调用脚本（如果scripts目录存在）
-        import sys
-        import os
-        import subprocess
-        from pathlib import Path
-        
-        scripts_dir = Path(__file__).parent / "scripts"
-        if scripts_dir.exists():
-            print(f"\n[INFO] 尝试自动导入规则和创建detector...")
-            
-            try:
-                # 如果没有规则，先导入规则
-                if rules_total == 0:
-                    print("[INFO] 正在导入Sigma规则...")
-                    env = os.environ.copy()
-                    env['PYTHONIOENCODING'] = 'utf-8'
-                    result = subprocess.run(
-                        [sys.executable, str(scripts_dir / "import_sigma_rules.py"), "--auto"],
-                        cwd=str(scripts_dir),
-                        capture_output=False,
-                        timeout=300,  # 5分钟超时
-                        env=env
-                    )
-                    if result.returncode == 0:
-                        print("[OK] 规则导入成功")
-                    else:
-                        print("[WARNING] 规则导入可能失败，请检查输出")
-                
-                # 如果没有detector，创建detector
-                if detectors_total == 0:
-                    print("[INFO] 正在创建detector...")
-                    env = os.environ.copy()
-                    env['PYTHONIOENCODING'] = 'utf-8'
-                    result = subprocess.run(
-                        [sys.executable, str(scripts_dir / "setup_security_analytics.py"), "--multiple"],
-                        cwd=str(scripts_dir),
-                        capture_output=False,
-                        timeout=300,  # 5分钟超时
-                        env=env
-                    )
-                    if result.returncode == 0:
-                        print("[OK] Detector创建成功")
-                    else:
-                        print("[WARNING] Detector创建可能失败，请检查输出")
-                
-                # 再次检查
-                rules_resp = client.transport.perform_request(
-                    'POST',
-                    '/_plugins/_security_analytics/rules/_search',
-                    body={"query": {"match_all": {}}, "size": 1}
-                )
-                rules_total_after = rules_resp.get('hits', {}).get('total', {}).get('value', 0)
-                
-                detectors_resp = client.transport.perform_request(
-                    'POST',
-                    '/_plugins/_security_analytics/detectors/_search',
-                    body={"query": {"match_all": {}}, "size": 1}
-                )
-                detectors_total_after = detectors_resp.get('hits', {}).get('total', {}).get('value', 0)
-                
-                if rules_total_after > 0 and detectors_total_after > 0:
-                    print(f"[OK] 规则和detector设置完成（规则: {rules_total_after}, Detector: {detectors_total_after}）")
-                    return True
-                else:
-                    print(f"[WARNING] 自动设置后仍缺少规则或detector")
-                    return False
-                    
-            except subprocess.TimeoutExpired:
-                print(f"[WARNING] 自动设置超时，请手动运行上述命令")
-                return False
-            except Exception as e:
-                print(f"[WARNING] 自动设置失败: {e}")
-                print(f"[WARNING] 请手动运行上述命令")
-                return False
-        else:
-            return False
-            
-    except Exception as e:
-        print(f"[WARNING] 检查规则和detector失败: {e}")
-        return False
-
-
-def run_data_analysis(trigger_scan: bool = True, force_scan: bool = False) -> dict[str, Any]:
-    """
-    数据分析主函数
-    1. 检查规则和detector（如果没有则自动导入和创建）
-    2. 运行 Security Analytics 检测（按需触发）
-    3. 告警融合去重（Raw → Canonical）
-    
-    参数：
-    - trigger_scan: 是否允许触发Security Analytics扫描（默认True，按需触发模式）
-    - force_scan: 是否强制触发一次扫描（默认False）
-    """
-    # Step 0: 检查规则和detector
-    _check_and_setup_rules_detectors()
-    
-    # Step 1: 运行 Security Analytics 检测（按需触发）
-    detection_result = run_security_analytics(trigger_scan=trigger_scan, force_scan=force_scan)
-
-    # Step 2: 告警融合去重
+    # 告警融合去重
+    print(f"\n[INFO] 开始告警融合去重（Raw Findings → Canonical Findings）...")
     deduplication_result = deduplicate_findings()
+    
+    if deduplication_result:
+        print(f"[INFO] 去重融合完成:")
+        print(f"    - 原始 Findings: {deduplication_result.get('total', 0)} 个")
+        print(f"    - 融合的 Findings: {deduplication_result.get('merged', 0)} 个")
+        print(f"    - 生成的 Canonical Findings: {deduplication_result.get('canonical', 0)} 个")
+        if deduplication_result.get('errors', 0) > 0:
+            print(f"    - 错误: {deduplication_result.get('errors', 0)} 个")
 
     return {
-        "detection": detection_result,
+        "correlation": correlation_result,
         "deduplication": deduplication_result,
     }

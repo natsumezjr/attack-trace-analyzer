@@ -1,33 +1,117 @@
 #!/usr/bin/env python3
 """
-删除所有 Findings 索引
+删除所有 Findings 索引和 Security Analytics Findings
 
 功能：
-1. 删除所有 Raw Findings 索引
-2. 删除所有 Canonical Findings 索引
-3. 可选：删除特定日期的索引
+1. 删除 Security Analytics API 中的 findings（重要！）
+2. 删除所有 Raw Findings 索引
+3. 删除所有 Canonical Findings 索引
+4. 可选：删除特定日期的索引
 """
 
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# 添加 backend 目录到路径
-backend_dir = Path(__file__).parent.parent.parent
+# 添加 backend 目录到路径，以便从 opensearch 包和 app 模块导入
+# 脚本在 backend/app/services/opensearch/scripts/，需要回到 backend/ 才能导入 app 和 opensearch 包
+backend_dir = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from opensearch import get_client, get_index_name, INDEX_PATTERNS
+from app.services.opensearch.internal import get_client, get_index_name, INDEX_PATTERNS
+
+# Security Analytics API
+SA_FINDINGS_SEARCH_API = "/_plugins/_security_analytics/findings/_search"
+SA_FINDINGS_DELETE_API = "/_plugins/_security_analytics/findings/{finding_id}"
+
+
+def delete_security_analytics_findings():
+    """
+    删除 Security Analytics Findings
+    
+    方法：删除 Security Analytics 存储 findings 的索引
+    Security Analytics findings 存储在 .opensearch-sap-<logType>-findings 索引中
+    """
+    client = get_client()
+    
+    print("\n[0] 删除 Security Analytics Findings...")
+    
+    deleted_count = 0
+    
+    try:
+        # 查找所有 Security Analytics findings 索引
+        # 索引命名格式：.opensearch-sap-<logType>-findings
+        indices = client.indices.get_alias(index=".opensearch-sap-*-findings*")
+        sa_indices = [idx for idx in indices.keys() if 'findings' in idx.lower()]
+        
+        if not sa_indices:
+            print("  [INFO] 没有找到 Security Analytics Findings 索引")
+            # 尝试查询 API 确认是否有 findings
+            try:
+                findings_resp = client.transport.perform_request(
+                    'GET',
+                    SA_FINDINGS_SEARCH_API,
+                    params={'size': 1}
+                )
+                total_findings = findings_resp.get('total_findings', 0)
+                if total_findings > 0:
+                    print(f"  [WARNING] API 显示有 {total_findings} 个 findings，但找不到对应的索引")
+                    print("  [INFO] 可能需要手动删除 Security Analytics 系统索引")
+            except:
+                pass
+            return 0
+        
+        print(f"  找到 {len(sa_indices)} 个 Security Analytics Findings 索引:")
+        for idx in sa_indices:
+            print(f"    - {idx}")
+        
+        # 删除每个索引
+        for idx in sa_indices:
+            try:
+                # 先查询索引中的文档数量
+                try:
+                    stats = client.count(index=idx)
+                    doc_count = stats.get('count', 0)
+                    print(f"  [INFO] {idx}: {doc_count:,} 个文档")
+                except:
+                    doc_count = 0
+                
+                # 删除索引
+                client.indices.delete(index=idx)
+                print(f"  [OK] 已删除索引: {idx} ({doc_count:,} 个文档)")
+                deleted_count += 1
+            except Exception as e:
+                print(f"  [ERROR] 删除失败 {idx}: {e}")
+        
+        if deleted_count > 0:
+            print(f"  [OK] 总共删除了 {deleted_count} 个 Security Analytics Findings 索引")
+        
+        return deleted_count
+        
+    except Exception as e:
+        error_str = str(e)
+        if '404' in error_str or 'not found' in error_str.lower():
+            print("  [INFO] Security Analytics Findings 索引不存在")
+        else:
+            print(f"  [WARNING] 删除 Security Analytics Findings 失败: {e}")
+            import traceback
+            traceback.print_exc()
+        return 0
 
 
 def delete_all_findings():
-    """删除所有findings索引"""
+    """删除所有findings索引和 Security Analytics findings"""
     client = get_client()
     
     print("=" * 80)
-    print("删除所有 Findings 索引")
+    print("删除所有 Findings（包括 Security Analytics Findings）")
     print("=" * 80)
     
     deleted_count = 0
+    
+    # 0. 先删除 Security Analytics Findings（重要！）
+    sa_deleted = delete_security_analytics_findings()
+    deleted_count += sa_deleted
     
     # 1. 删除Raw Findings索引
     print("\n[1] 删除 Raw Findings 索引...")
@@ -86,12 +170,15 @@ def delete_all_findings():
     print("\n" + "=" * 80)
     print("删除完成")
     print("=" * 80)
-    print(f"\n总共删除了 {deleted_count} 个索引")
+    print(f"\n总共删除了:")
+    print(f"  - Security Analytics Findings: {sa_deleted} 个")
+    print(f"  - 索引: {deleted_count - sa_deleted} 个")
+    print(f"  - 总计: {deleted_count} 个")
     
     if deleted_count > 0:
         print("\n现在可以重新运行检测:")
-        print("  cd backend/opensearch/scripts")
-        print("  uv run python test_detection.py --all")
+        print("  cd backend/app/services/opensearch/scripts")
+        print("  uv run python run_analysis_direct.py --analysis")
     
     return deleted_count
 
