@@ -216,7 +216,28 @@ if should_stop "client"; then
             
             # 清空数据目录（bind mount 的数据）
             if [ -d "$BASE"/run/client-$i/data ]; then
-                rm -rf "$BASE"/run/client-$i/data/* 2>/dev/null && log_info "client-$i 数据目录已清空" || log_warn "client-$i 数据目录清空失败"
+                # 先尝试普通删除（包括隐藏文件）
+                if rm -rf "$BASE"/run/client-$i/data/* "$BASE"/run/client-$i/data/.[!.]* "$BASE"/run/client-$i/data/..?* 2>/dev/null; then
+                    log_info "client-$i 数据目录已清空"
+                else
+                    # 如果普通删除失败，尝试使用 find 命令（更安全）
+                    if find "$BASE"/run/client-$i/data -mindepth 1 -delete 2>/dev/null; then
+                        log_info "client-$i 数据目录已清空（使用 find）"
+                    else
+                        # 如果还是失败，尝试使用 sudo（如果可用）
+                        if command -v sudo >/dev/null 2>&1; then
+                            if sudo rm -rf "$BASE"/run/client-$i/data/* "$BASE"/run/client-$i/data/.[!.]* "$BASE"/run/client-$i/data/..?* 2>/dev/null; then
+                                log_info "client-$i 数据目录已清空（使用 sudo）"
+                            else
+                                log_warn "client-$i 数据目录清空失败（可能需要手动清理：sudo rm -rf $BASE/run/client-$i/data/*）"
+                            fi
+                        else
+                            log_warn "client-$i 数据目录清空失败（权限不足，可能需要手动清理：rm -rf $BASE/run/client-$i/data/*）"
+                        fi
+                    fi
+                fi
+            else
+                log_info "client-$i 数据目录不存在，跳过清空"
             fi
         else
             log_warn "client-$i 目录不存在"
