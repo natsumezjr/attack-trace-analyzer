@@ -38,8 +38,11 @@ ALERTING_MONITOR_EXECUTE_API = "/_plugins/_alerting/monitors/{monitor_id}/_execu
 DETECTORS_CONFIG_INDEX = ".opensearch-sap-detectors-config"
 
 # 默认超时设置
-DEFAULT_SCAN_TIMEOUT_SECONDS = 60  # 扫描超时时间（秒）
-DEFAULT_POLL_INTERVAL_SECONDS = 2  # 轮询间隔（秒）
+DEFAULT_SCAN_TIMEOUT_SECONDS = 10  # 扫描超时时间（秒）- 缩短为10秒，因为每5秒轮询一次
+DEFAULT_POLL_INTERVAL_SECONDS = 1  # 轮询间隔（秒）- 可以设置得很短（1秒或更短），用于快速检查扫描完成状态
+
+# 数据查询时间窗口（秒）- 只查询最近N秒的数据
+DATA_QUERY_TIME_WINDOW_SECONDS = 5  # 默认5秒，与轮询周期一致
 
 # Correlation Rules API 路径
 CORRELATION_RULES_API = "/_plugins/_security_analytics/correlation/rules"
@@ -1140,26 +1143,55 @@ def _trigger_scan_with_lock(
         complete_trigger(detector_id)
 
 
-def _fetch_and_store_findings(client, detector_id: str, only_new: bool = True) -> dict[str, Any]:
-    """查询findings并存储（支持增量处理）"""
+def _fetch_and_store_findings(
+    client, 
+    detector_id: str, 
+    only_new: bool = True,
+    time_window_seconds: int = DATA_QUERY_TIME_WINDOW_SECONDS
+) -> dict[str, Any]:
+    """
+    查询findings并存储（支持增量处理）
+    
+    参数：
+    - client: OpenSearch客户端
+    - detector_id: Detector ID
+    - only_new: 是否只处理新findings
+    - time_window_seconds: 查询时间窗口（秒），只查询最近N秒的数据
+    """
     from .storage import store_events
+    
+    # 计算查询时间范围（最近N秒）
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(seconds=time_window_seconds)
     
     last_timestamp = None
     if only_new:
+        # 使用时间窗口和上次处理时间中较新的那个
         last_timestamp = _get_last_processed_timestamp(client, detector_id)
         if last_timestamp:
-            print(f"[INFO] 上次处理时间: {last_timestamp.isoformat()}，将只处理新findings")
+            # 取两者中较新的时间（确保只查询最近的数据）
+            if start_time > last_timestamp:
+                last_timestamp = start_time
+            print(f"[INFO] 查询时间范围: {last_timestamp.isoformat()} 至 {end_time.isoformat()}（最近{time_window_seconds}秒）")
         else:
-            print(f"[INFO] 未找到上次处理时间，将处理所有findings")
+            last_timestamp = start_time
+            print(f"[INFO] 未找到上次处理时间，将查询最近{time_window_seconds}秒的数据")
+    else:
+        last_timestamp = start_time
+        print(f"[INFO] 查询最近{time_window_seconds}秒的数据")
     
     try:
+        params = {'size': 1000}
+        if detector_id:
+            params['detector_id'] = detector_id
+        
         findings_resp = client.transport.perform_request(
             'GET',
             SA_FINDINGS_SEARCH_API,
-            params={'detector_id': detector_id, 'size': 1000}
+            params=params
         )
         findings = findings_resp.get('findings', [])
-        print(f"[INFO] 从Security Analytics API获取到 {len(findings)} 个findings")
+        print(f"[INFO] 从Security Analytics API获取到 {len(findings)} 个findings（将过滤为最近{time_window_seconds}秒的数据，从 {last_timestamp.isoformat() if last_timestamp else 'N/A'} 开始）")
         
     except Exception as api_error:
         error_msg = str(api_error)
@@ -1378,7 +1410,7 @@ def _check_and_setup_rules_detectors() -> bool:
 
 def run_security_analytics(
     trigger_scan: bool = True,
-    max_wait_seconds: int = 60,
+    max_wait_seconds: int = DEFAULT_SCAN_TIMEOUT_SECONDS,
     force_scan: bool = False,
 ) -> dict[str, Any]:
     """
@@ -1490,27 +1522,41 @@ def run_security_analytics(
                 execute_end_ms = int(time.time() * 1000)
                 scan_wait_ms = execute_end_ms - execute_start_ms
                 
-                # 等待一段时间让扫描完成（然后轮询确认）
+                # Monitor执行 = 执行一次Detector扫描（异步）
+                # Monitor Execute API调用后，扫描任务被提交并开始执行，但扫描是异步的
+                # 需要等待扫描完成并生成findings，我们通过轮询检查findings是否更新来确认扫描完成
                 if execute_result['executed'] > 0:
-                    print(f"[INFO] 等待扫描完成（最多 {max_wait_seconds} 秒）...")
+                    print(f"[INFO] Monitor执行成功（扫描已触发），等待扫描完成并生成findings（最多 {max_wait_seconds} 秒，每{DEFAULT_POLL_INTERVAL_SECONDS}秒检查一次）...")
                     wait_start_ms = int(time.time() * 1000)
                     
-                    # 轮询确认扫描完成
-                    poll_interval = DEFAULT_POLL_INTERVAL_SECONDS
-                    max_poll_time = max_wait_seconds
+                    # 轮询确认扫描完成（快速检查，不需要等待1分钟）
+                    poll_interval = DEFAULT_POLL_INTERVAL_SECONDS  # 1秒检查一次
+                    max_poll_time = max_wait_seconds  # 最多等待10秒
                     poll_start = time.time()
                     
                     scan_completed = False
+                    check_count = 0
                     while (time.time() - poll_start) < max_poll_time:
+                        check_count += 1
                         # 检查是否有新findings
                         current_timestamp_ms, current_count = _get_latest_findings_timestamp(client, detector_id=None)
                         
                         if current_count > total_baseline_count or (current_timestamp_ms > baseline_timestamp_ms and baseline_timestamp_ms > 0):
                             scan_completed = True
-                            print(f"[INFO] 检测到新findings，扫描已完成")
+                            elapsed = int(time.time() - poll_start)
+                            print(f"[INFO] 检测到新findings，扫描已完成（第{check_count}次检查，耗时{elapsed}秒）")
                             break
                         
+                        # 每5次检查打印一次进度（避免日志过多）
+                        if check_count % 5 == 0:
+                            elapsed = int(time.time() - poll_start)
+                            print(f"[INFO] 等待扫描完成... ({elapsed}/{max_poll_time}秒，已检查{check_count}次)")
+                        
                         time.sleep(poll_interval)
+                    
+                    if not scan_completed:
+                        elapsed = int(time.time() - poll_start)
+                        print(f"[WARNING] 扫描未在{max_poll_time}秒内完成（已等待{elapsed}秒），将使用已有findings")
                     
                     wait_end_ms = int(time.time() * 1000)
                     scan_wait_ms += (wait_end_ms - wait_start_ms)
@@ -1546,7 +1592,12 @@ def run_security_analytics(
         total_duplicated = 0
         
         for detector_id in all_detector_ids:
-            storage_result = _fetch_and_store_findings(client, detector_id, only_new=True)
+            storage_result = _fetch_and_store_findings(
+                client, 
+                detector_id, 
+                only_new=True,
+                time_window_seconds=DATA_QUERY_TIME_WINDOW_SECONDS
+            )
             total_findings_count += storage_result.get("findings_count", 0)
             total_new_findings_count += storage_result.get("new_findings_count", 0)
             total_stored += storage_result.get("stored", 0)
@@ -1698,7 +1749,7 @@ def create_lateral_movement_correlation_rule(
         "correlate": [
             {
                 "index": events_index_pattern,
-                "category": "windows",
+                "category": "process",  # 改为process，不限制为windows
                 "query": query1
             },
             {
@@ -1708,18 +1759,358 @@ def create_lateral_movement_correlation_rule(
             },
             {
                 "index": events_index_pattern,
-                "category": "windows",
+                "category": "process",  # 改为process，不限制为windows
                 "query": query3
             }
         ]
     }
     
+    return _create_or_update_correlation_rule(client, correlation_rule, rule_name)
+
+
+def create_port_scanning_correlation_rule(
+    rule_name: str = "Port Scanning Detection",
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    enabled: bool = True
+) -> dict[str, Any]:
+    """
+    创建端口扫描检测的 Correlation Rule
+    
+    规则逻辑：
+    1. Query1: 短时间内从同一源IP到同一目标IP的多个端口连接尝试（扫描行为）
+    2. Query2: 扫描后的成功连接建立
+    3. Query3: 连接后的异常行为（文件访问、命令执行等）
+    
+    参数：
+    - rule_name: 规则名称
+    - time_window_minutes: 关联时间窗口（分钟）
+    - enabled: 是否启用
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
+    client = get_client()
+    events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    # Query1: 端口扫描行为 - 短时间内访问多个不同端口
+    # 注意：实际扫描检测需要聚合查询，这里使用网络连接事件作为基础
+    query1 = (
+        "event.category:network AND "
+        "event.type:connection AND "
+        "_exists_:source.ip AND "
+        "_exists_:destination.ip AND "
+        "_exists_:destination.port AND "
+        "network.direction:outbound AND "
+        "(tags:attack.discovery OR tags:attack.t1046 OR tags:attack.t1040)"
+    )
+    
+    # Query2: 扫描后的成功连接（建立会话）
+    query2 = (
+        "event.category:network AND "
+        "event.type:connection AND "
+        "event.action:network_connection_established AND "
+        "_exists_:source.ip AND "
+        "_exists_:destination.ip"
+    )
+    
+    # Query3: 连接后的异常行为（文件访问、命令执行、数据访问）
+    query3 = (
+        "(event.category:file AND event.action:file_read) OR "
+        "(event.category:process AND event.action:process_start) OR "
+        "(event.category:network AND event.action:network_flow_end AND network.bytes > 100000)"
+    )
+    
+    correlation_rule = {
+        "name": rule_name,
+        "description": "检测端口扫描攻击链：端口扫描尝试 -> 成功连接建立 -> 后续异常行为",
+        "tags": ["attack.discovery", "attack.t1046", "attack.t1040"],
+        "correlate": [
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query1
+            },
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query2
+            },
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query3
+            }
+        ]
+    }
+    
+    return _create_or_update_correlation_rule(client, correlation_rule, rule_name)
+
+
+def create_privilege_escalation_correlation_rule(
+    rule_name: str = "Privilege Escalation Detection",
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    enabled: bool = True
+) -> dict[str, Any]:
+    """
+    创建权限提升检测的 Correlation Rule
+    
+    规则逻辑：
+    1. Query1: 可疑的提权尝试（sudo、runas、UAC等）
+    2. Query2: 提权后的高权限操作（系统文件访问、服务创建等）
+    3. Query3: 权限滥用行为（敏感目录访问、注册表修改等）
+    
+    参数：
+    - rule_name: 规则名称
+    - time_window_minutes: 关联时间窗口（分钟）
+    - enabled: 是否启用
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
+    client = get_client()
+    events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    # 可疑提权命令和进程
+    privilege_keywords = [
+        "*sudo*", "*runas*", "*elevate*", "*privilege*",
+        "*UAC*", "*gksu*", "*pkexec*", "*su *"
+    ]
+    
+    privilege_query = " OR ".join([f"process.command_line:{kw}" for kw in privilege_keywords])
+    
+    # Query1: 提权尝试
+    query1 = (
+        "event.category:process AND "
+        "event.action:process_start AND "
+        f"({privilege_query} OR tags:attack.privilege_escalation OR tags:attack.t1078 OR tags:attack.t1548) AND "
+        "_exists_:host.name"
+    )
+    
+    # Query2: 提权后的高权限操作（移除Windows特定路径）
+    query2 = (
+        "(event.category:file AND event.action:file_access AND "
+        "(file.path:/etc/* OR file.path:/usr/bin/* OR file.path:/usr/sbin/*)) OR "
+        "(event.category:process AND event.action:process_start AND "
+        "(process.name:*service* OR process.name:*systemd*))"
+    )
+    
+    # Query3: 权限滥用行为（移除Windows注册表和Windows路径）
+    query3 = (
+        "(event.category:file AND event.action:file_modify AND "
+        "(file.path:/etc/passwd OR file.path:/etc/shadow OR file.path:/etc/sudoers)) OR "
+        "(event.category:process AND event.action:process_start AND "
+        "(process.command_line:*chmod* OR process.command_line:*chown* OR process.command_line:*sudo*))"
+    )
+    
+    correlation_rule = {
+        "name": rule_name,
+        "description": "检测权限提升攻击链：提权尝试 -> 高权限操作 -> 权限滥用行为",
+        "tags": ["attack.privilege_escalation", "attack.t1078", "attack.t1548"],
+        "correlate": [
+            {
+                "index": events_index_pattern,
+                "category": "process",
+                "query": query1
+            },
+            {
+                "index": events_index_pattern,
+                "category": "file",
+                "query": query2
+            },
+            {
+                "index": events_index_pattern,
+                "category": "process",
+                "query": query3
+            }
+        ]
+    }
+    
+    return _create_or_update_correlation_rule(client, correlation_rule, rule_name)
+
+
+def create_data_exfiltration_correlation_rule(
+    rule_name: str = "Data Exfiltration Detection",
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    enabled: bool = True
+) -> dict[str, Any]:
+    """
+    创建数据泄露检测的 Correlation Rule
+    
+    规则逻辑：
+    1. Query1: 大量数据传输（大文件读取、批量文件访问）
+    2. Query2: 异常网络连接（到外部IP、非标准端口）
+    3. Query3: 数据传输完成（大流量网络事件）
+    
+    参数：
+    - rule_name: 规则名称
+    - time_window_minutes: 关联时间窗口（分钟）
+    - enabled: 是否启用
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
+    client = get_client()
+    events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    # Query1: 大量数据传输准备（文件读取、压缩、打包）
+    query1 = (
+        "(event.category:file AND event.action:file_read AND file.size:>1000000) OR "
+        "(event.category:process AND event.action:process_start AND "
+        "(process.command_line:*tar* OR process.command_line:*zip* OR process.command_line:*7z* OR "
+        "process.command_line:*rar* OR process.command_line:*compress*)) OR "
+        "tags:attack.collection OR tags:attack.t1005 OR tags:attack.t1074"
+    )
+    
+    # Query2: 异常网络连接（到外部IP、非标准端口）
+    query2 = (
+        "event.category:network AND "
+        "event.type:connection AND "
+        "_exists_:destination.ip AND "
+        "network.direction:outbound AND "
+        "(NOT destination.ip:10.* AND NOT destination.ip:172.16.* AND NOT destination.ip:192.168.*) AND "
+        "(destination.port:>1024 OR destination.port:443 OR destination.port:80)"
+    )
+    
+    # Query3: 大流量数据传输
+    query3 = (
+        "event.category:network AND "
+        "(event.action:network_flow_end OR event.type:flow) AND "
+        "network.bytes:>10000000 AND "
+        "network.direction:outbound"
+    )
+    
+    correlation_rule = {
+        "name": rule_name,
+        "description": "检测数据泄露攻击链：大量数据准备 -> 异常网络连接 -> 大流量传输",
+        "tags": ["attack.exfiltration", "attack.t1041", "attack.t1048"],
+        "correlate": [
+            {
+                "index": events_index_pattern,
+                "category": "file",
+                "query": query1
+            },
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query2
+            },
+            {
+                "index": events_index_pattern,
+                "category": "network",
+                "query": query3
+            }
+        ]
+    }
+    
+    return _create_or_update_correlation_rule(client, correlation_rule, rule_name)
+
+
+def create_persistence_correlation_rule(
+    rule_name: str = "Persistence Detection",
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
+    enabled: bool = True
+) -> dict[str, Any]:
+    """
+    创建持久化攻击检测的 Correlation Rule
+    
+    规则逻辑：
+    1. Query1: 服务/计划任务创建（持久化机制建立）
+    2. Query2: 启动项修改（Linux/Unix持久化）
+    3. Query3: 持久化后的异常执行（定时任务触发、服务启动等）
+    
+    参数：
+    - rule_name: 规则名称
+    - time_window_minutes: 关联时间窗口（分钟）
+    - enabled: 是否启用
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
+    client = get_client()
+    events_index_pattern = f"{INDEX_PATTERNS['ECS_EVENTS']}-*"
+    
+    # Query1: 服务/计划任务创建（移除Windows注册表相关）
+    query1 = (
+        "(event.category:process AND event.action:process_start AND "
+        "(process.command_line:*crontab* OR process.command_line:*systemctl* OR "
+        "process.command_line:*service* OR process.command_line:*at *)) OR "
+        "tags:attack.persistence OR tags:attack.t1543 OR tags:attack.t1547"
+    )
+    
+    # Query2: 启动项修改（移除Windows注册表，只保留Linux/Unix启动项）
+    query2 = (
+        "(event.category:file AND event.action:file_create AND "
+        "(file.path:*\\autostart\\* OR file.path:*\\rc.local* OR file.path:*/.config/autostart* OR "
+        "file.path:/etc/systemd/system/*.service OR file.path:/etc/init.d/*))"
+    )
+    
+    # Query3: 持久化后的异常执行（移除Windows特定进程）
+    query3 = (
+        "(event.category:process AND event.action:process_start AND "
+        "process.parent.name:(*cron* OR *systemd*)) OR "
+        "(event.category:authentication AND event.action:user_login AND "
+        "event.outcome:success)"
+    )
+    
+    correlation_rule = {
+        "name": rule_name,
+        "description": "检测持久化攻击链：服务/任务创建 -> 启动项修改 -> 异常执行",
+        "tags": ["attack.persistence", "attack.t1543", "attack.t1547"],
+        "correlate": [
+            {
+                "index": events_index_pattern,
+                "category": "process",
+                "query": query1
+            },
+            {
+                "index": events_index_pattern,
+                "category": "registry",
+                "query": query2
+            },
+            {
+                "index": events_index_pattern,
+                "category": "process",
+                "query": query3
+            }
+        ]
+    }
+    
+    return _create_or_update_correlation_rule(client, correlation_rule, rule_name)
+
+
+def _create_or_update_correlation_rule(
+    client: Any,
+    correlation_rule: dict[str, Any],
+    rule_name: str
+) -> dict[str, Any]:
+    """
+    通用的创建或更新 Correlation Rule 的辅助函数
+    
+    参数：
+    - client: OpenSearch客户端
+    - correlation_rule: 规则定义
+    - rule_name: 规则名称（用于去重检查）
+    
+    返回: {
+        "success": bool,
+        "rule_id": str,
+        "message": str
+    }
+    """
     try:
-        # 策略：先检查是否存在同名规则，如果存在则更新，不存在则创建（去重）
-        # 注意：OpenSearch Security Analytics API 不支持 GET 方法查询 correlation rules
-        # 因此使用 POST 搜索端点查询现有规则
-        
-        # Step 1: 先查询是否存在同名规则（去重检查）
+        # Step 1: 查询是否存在同名规则
         rule_id = None
         try:
             search_response = client.transport.perform_request(
@@ -1735,7 +2126,6 @@ def create_lateral_movement_correlation_rule(
                 }
             )
             
-            # 解析搜索结果
             if isinstance(search_response, dict):
                 hits = search_response.get("hits", {}).get("hits", [])
                 for hit in hits:
@@ -1749,7 +2139,6 @@ def create_lateral_movement_correlation_rule(
         
         # Step 2: 如果存在同名规则，则更新；否则创建新规则
         if rule_id:
-            # 更新现有规则（PUT）
             try:
                 update_response = client.transport.perform_request(
                     'PUT',
@@ -1764,9 +2153,9 @@ def create_lateral_movement_correlation_rule(
                 }
             except Exception as update_error:
                 print(f"[WARNING] 更新规则失败: {update_error}，尝试创建新规则...")
-                rule_id = None  # 重置，尝试创建
+                rule_id = None
         
-        # Step 3: 创建新规则（POST）
+        # Step 3: 创建新规则
         if not rule_id:
             try:
                 create_response = client.transport.perform_request(
@@ -1775,12 +2164,10 @@ def create_lateral_movement_correlation_rule(
                     body=correlation_rule
                 )
                 
-                # 解析响应获取 rule_id
                 rule_id = None
                 if isinstance(create_response, dict):
                     rule_id = create_response.get('_id') or create_response.get('id') or create_response.get('rule_id')
                 elif isinstance(create_response, str):
-                    # 某些版本可能直接返回 rule_id
                     rule_id = create_response
                 
                 if rule_id:
@@ -1818,6 +2205,103 @@ def create_lateral_movement_correlation_rule(
             "rule_id": None,
             "message": f"创建失败: {error_msg}"
         }
+
+
+def create_all_correlation_rules(
+    time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES
+) -> dict[str, Any]:
+    """
+    批量创建所有预定义的 Correlation Rules
+    
+    参数：
+    - time_window_minutes: 关联时间窗口（分钟）
+    
+    返回: {
+        "success": bool,
+        "rules_created": List[dict],  # 每个规则创建结果
+        "total": int,
+        "successful": int,
+        "failed": int
+    }
+    """
+    rules_to_create = [
+        {
+            "name": "Lateral Movement Detection",
+            "func": create_lateral_movement_correlation_rule,
+            "params": {"time_window_minutes": time_window_minutes}
+        },
+        {
+            "name": "Port Scanning Detection",
+            "func": create_port_scanning_correlation_rule,
+            "params": {"time_window_minutes": time_window_minutes}
+        },
+        {
+            "name": "Privilege Escalation Detection",
+            "func": create_privilege_escalation_correlation_rule,
+            "params": {"time_window_minutes": time_window_minutes}
+        },
+        {
+            "name": "Data Exfiltration Detection",
+            "func": create_data_exfiltration_correlation_rule,
+            "params": {"time_window_minutes": time_window_minutes}
+        },
+        {
+            "name": "Persistence Detection",
+            "func": create_persistence_correlation_rule,
+            "params": {"time_window_minutes": time_window_minutes}
+        }
+    ]
+    
+    results = []
+    successful = 0
+    failed = 0
+    
+    print(f"[INFO] 开始创建 {len(rules_to_create)} 个 Correlation Rules...")
+    
+    for rule_config in rules_to_create:
+        rule_name = rule_config["name"]
+        rule_func = rule_config["func"]
+        rule_params = rule_config["params"]
+        
+        print(f"\n[INFO] 创建规则: {rule_name}")
+        try:
+            result = rule_func(**rule_params)
+            results.append({
+                "name": rule_name,
+                "success": result.get("success", False),
+                "rule_id": result.get("rule_id"),
+                "message": result.get("message", "")
+            })
+            
+            if result.get("success"):
+                successful += 1
+                print(f"[OK] {rule_name} 创建成功 (ID: {result.get('rule_id', 'N/A')})")
+            else:
+                failed += 1
+                print(f"[ERROR] {rule_name} 创建失败: {result.get('message', '')}")
+        except Exception as e:
+            failed += 1
+            error_msg = str(e)
+            print(f"[ERROR] {rule_name} 创建异常: {error_msg}")
+            results.append({
+                "name": rule_name,
+                "success": False,
+                "rule_id": None,
+                "message": f"异常: {error_msg}"
+            })
+    
+    print(f"\n[INFO] Correlation Rules 创建完成:")
+    print(f"  - 总计: {len(rules_to_create)}")
+    print(f"  - 成功: {successful}")
+    print(f"  - 失败: {failed}")
+    
+    return {
+        "success": failed == 0,
+        "rules_created": results,
+        "total": len(rules_to_create),
+        "successful": successful,
+        "failed": failed
+    }
 
 
 def apply_correlation_rule_manually(
@@ -2733,8 +3217,9 @@ def generate_lateral_movement_finding(
 
 def run_correlation_analysis(
     time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
-    create_rule_if_not_exists: bool = True,
-    rule_name: str = "Lateral Movement Detection"
+    create_rules_if_not_exists: bool = True,
+    create_all_rules: bool = True,
+    rule_name: str = None
 ) -> dict[str, Any]:
     """
     运行 Correlation 分析
@@ -2742,22 +3227,24 @@ def run_correlation_analysis(
     功能：
     1. 检查并设置预定义规则和detector（Security Analytics）
     2. 运行 Security Analytics 检测（扫描并获取findings）
-    3. 确保 Correlation Rule 存在（如果不存在则创建）
+    3. 确保 Correlation Rules 存在（如果不存在则创建）
     4. 查询最近的 Correlation 结果
     5. 聚合关联链
-    6. 生成横向移动高层事件
+    6. 生成高层事件
     7. 写入 Raw Findings 索引
     
     参数：
     - time_window_minutes: 查询时间窗口（分钟）
-    - create_rule_if_not_exists: 如果规则不存在是否创建
-    - rule_name: Correlation Rule 名称
+    - create_rules_if_not_exists: 如果规则不存在是否创建
+    - create_all_rules: 是否创建所有预定义规则（True）或仅创建指定规则（False）
+    - rule_name: 如果 create_all_rules=False，指定要创建的单个规则名称
     
     返回: {
         "correlations_found": int,
         "chains_aggregated": int,
         "findings_generated": int,
-        "errors": int
+        "errors": int,
+        "rules_created": dict  # 规则创建结果
     }
     """
     client = get_client()
@@ -2786,49 +3273,101 @@ def run_correlation_analysis(
                 "correlations_found": 0,
                 "chains_aggregated": 0,
                 "findings_generated": 0,
-                "errors": 0
+                "errors": 0,
+                "rules_created": {}
             }
         
-        # Step 4: 确保 Correlation Rule 存在
-        rule_id = None
-        if create_rule_if_not_exists:
-            rule_result = create_lateral_movement_correlation_rule(
-                rule_name=rule_name,
-                time_window_minutes=time_window_minutes
-            )
-            if rule_result.get("success"):
-                rule_id = rule_result.get("rule_id")
-                print(f"[INFO] Correlation Rule 就绪: {rule_id}")
-            else:
-                print(f"[WARNING] Correlation Rule 创建失败: {rule_result.get('message')}")
+        # Step 4: 确保 Correlation Rules 存在
+        rules_created_result = {}
+        if create_rules_if_not_exists:
+            if create_all_rules:
+                print("[INFO] 创建所有预定义 Correlation Rules...")
+                rules_created_result = create_all_correlation_rules(
+                    time_window_minutes=time_window_minutes
+                )
+                print(f"[INFO] Correlation Rules 创建完成: {rules_created_result.get('successful', 0)}/{rules_created_result.get('total', 0)} 成功")
+            elif rule_name:
+                # 创建单个指定规则
+                rule_func_map = {
+                    "Lateral Movement Detection": create_lateral_movement_correlation_rule,
+                    "Port Scanning Detection": create_port_scanning_correlation_rule,
+                    "Privilege Escalation Detection": create_privilege_escalation_correlation_rule,
+                    "Data Exfiltration Detection": create_data_exfiltration_correlation_rule,
+                    "Persistence Detection": create_persistence_correlation_rule,
+                }
+                
+                if rule_name in rule_func_map:
+                    rule_result = rule_func_map[rule_name](
+                        rule_name=rule_name,
+                        time_window_minutes=time_window_minutes
+                    )
+                    rules_created_result = {
+                        "success": rule_result.get("success"),
+                        "rules_created": [{
+                            "name": rule_name,
+                            "success": rule_result.get("success"),
+                            "rule_id": rule_result.get("rule_id"),
+                            "message": rule_result.get("message")
+                        }],
+                        "total": 1,
+                        "successful": 1 if rule_result.get("success") else 0,
+                        "failed": 0 if rule_result.get("success") else 1
+                    }
+                else:
+                    print(f"[WARNING] 未知的规则名称: {rule_name}")
+                    rules_created_result = {"success": False, "rules_created": [], "total": 0, "successful": 0, "failed": 0}
         
-        # Step 3: 查询 Correlation 结果
+        # Step 5: 查询 Correlation 结果
         # 优先使用 OpenSearch Security Analytics API，如果不支持则回退到手动应用
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(minutes=time_window_minutes)
         
-        # 注意：OpenSearch Security Analytics API 的 correlation 功能可能只在 raw-findings-* 索引中查找
-        # 但我们的 correlation rule 配置的是在 ecs-events-* 索引中匹配 events
-        # 因此需要强制使用手动应用规则模式，直接在 events 索引中查询
-        correlations = query_correlation_results(
-            start_time=start_time,
-            end_time=end_time,
-            rule_id=rule_id,
-            limit=100,
-            use_opensearch_api=False  # 强制使用手动应用规则模式（在 events 索引中查询）
-        )
+        # 收集所有成功创建的规则ID
+        rule_ids_to_query = []
+        if rules_created_result.get("rules_created"):
+            for rule_result in rules_created_result["rules_created"]:
+                if rule_result.get("success") and rule_result.get("rule_id"):
+                    rule_ids_to_query.append(rule_result.get("rule_id"))
         
-        print(f"[INFO] 找到 {len(correlations)} 个 Correlation 结果")
+        # 如果没有规则ID，尝试查询横向移动规则（向后兼容）
+        if not rule_ids_to_query and not create_all_rules and rule_name == "Lateral Movement Detection":
+            lateral_result = create_lateral_movement_correlation_rule(
+                rule_name="Lateral Movement Detection",
+                time_window_minutes=time_window_minutes
+            )
+            if lateral_result.get("success") and lateral_result.get("rule_id"):
+                rule_ids_to_query.append(lateral_result.get("rule_id"))
+        
+        # 查询所有规则的结果
+        all_correlations = []
+        for rule_id in rule_ids_to_query:
+            try:
+                correlations = query_correlation_results(
+                    start_time=start_time,
+                    end_time=end_time,
+                    rule_id=rule_id,
+                    limit=100,
+                    use_opensearch_api=False  # 强制使用手动应用规则模式（在 events 索引中查询）
+                )
+                all_correlations.extend(correlations)
+                print(f"[INFO] 规则 {rule_id} 找到 {len(correlations)} 个 Correlation 结果")
+            except Exception as e:
+                print(f"[WARNING] 查询规则 {rule_id} 的 Correlation 结果失败: {e}")
+                continue
+        
+        correlations = all_correlations
+        print(f"[INFO] 总共找到 {len(correlations)} 个 Correlation 结果")
         
         if len(correlations) == 0:
             return {
                 "correlations_found": 0,
                 "chains_aggregated": 0,
                 "findings_generated": 0,
-                "errors": 0
+                "errors": 0,
+                "rules_created": rules_created_result
             }
         
-        # Step 4: 聚合关联链（基于 events）
+        # Step 6: 聚合关联链（基于 events）
         chains = aggregate_correlation_chains(correlations)
         print(f"[INFO] 聚合了 {len(chains)} 个攻击链（基于 events）")
         
@@ -2837,15 +3376,17 @@ def run_correlation_analysis(
                 "correlations_found": len(correlations),
                 "chains_aggregated": 0,
                 "findings_generated": 0,
-                "errors": 0
+                "errors": 0,
+                "rules_created": rules_created_result
             }
         
-        # Step 5: 生成高层事件并写入
+        # Step 7: 生成高层事件并写入
         findings_to_index = []
         errors = 0
         
         for chain in chains:
             try:
+                # 根据chain类型生成不同类型的finding（目前主要支持横向移动）
                 finding = generate_lateral_movement_finding(chain)
                 findings_to_index.append({
                     "id": finding.get("event", {}).get("id"),
@@ -2856,25 +3397,27 @@ def run_correlation_analysis(
                 errors += 1
                 continue
         
-        # Step 6: 批量写入 Raw Findings
+        # Step 8: 批量写入 Raw Findings
         if len(findings_to_index) > 0:
             result = bulk_index(raw_index_name, findings_to_index)
             if result.get("success", 0) > 0:
                 refresh_index(raw_index_name)
-                print(f"[INFO] 成功写入 {result.get('success', 0)} 个横向移动 Finding")
+                print(f"[INFO] 成功写入 {result.get('success', 0)} 个 Correlation Finding")
             
             return {
                 "correlations_found": len(correlations),
                 "chains_aggregated": len(chains),
                 "findings_generated": result.get("success", 0),
-                "errors": errors + result.get("failed", 0)
+                "errors": errors + result.get("failed", 0),
+                "rules_created": rules_created_result
             }
         
         return {
             "correlations_found": len(correlations),
             "chains_aggregated": len(chains),
             "findings_generated": 0,
-            "errors": errors
+            "errors": errors,
+            "rules_created": rules_created_result
         }
         
     except Exception as e:
@@ -2885,7 +3428,8 @@ def run_correlation_analysis(
             "correlations_found": 0,
             "chains_aggregated": 0,
             "findings_generated": 0,
-            "errors": 1
+            "errors": 1,
+            "rules_created": rules_created_result if 'rules_created_result' in locals() else {}
         }
 
 
@@ -3161,7 +3705,8 @@ def run_data_analysis(
     if trigger_correlation:
         correlation_result = run_correlation_analysis(
             time_window_minutes=time_window_minutes,
-            create_rule_if_not_exists=True
+            create_rules_if_not_exists=True,
+            create_all_rules=True  # 创建所有预定义的correlation rules
         )
     
     # 告警融合去重
