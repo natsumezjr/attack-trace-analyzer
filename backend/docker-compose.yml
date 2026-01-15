@@ -18,12 +18,17 @@ services:
     environment:
       - discovery.type=single-node
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}
-      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms2g -Xmx2g}
+      # Increase HTTP line length limit to handle long correlation query URLs (16KB)
+      - HTTP_MAX_INITIAL_LINE_LENGTH=16kb
     ports:
       - "9200:9200"
       - "9600:9600"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
+      # 注意：挂载配置文件会覆盖默认配置，可能导致启动失败
+      # 如果遇到启动问题，可以注释掉下面这行，改用环境变量或动态配置
+      # - ./opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
     ulimits:
       memlock:
         soft: -1
@@ -68,12 +73,18 @@ services:
       - "7687:7687" # bolt
     environment:
       - NEO4J_AUTH=${NEO4J_AUTH:-neo4j/password}
+      # Enable Graph Data Science (GDS) so the backend can run shortest-path / projection queries (CALL gds.*).
+      # It will be downloaded automatically by the official Neo4j image entrypoint.
+      - NEO4J_PLUGINS=${NEO4J_PLUGINS:-["graph-data-science"]}
+      - NEO4J_dbms_security_procedures_unrestricted=${NEO4J_dbms_security_procedures_unrestricted:-gds.*}
+      - NEO4J_dbms_security_procedures_allowlist=${NEO4J_dbms_security_procedures_allowlist:-gds.*}
       - NEO4J_server_memory_pagecache_size=${NEO4J_server_memory_pagecache_size:-1G}
       - NEO4J_server_memory_heap_initial__size=${NEO4J_server_memory_heap_initial__size:-1G}
       - NEO4J_server_memory_heap_max__size=${NEO4J_server_memory_heap_max__size:-1G}
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
       interval: 30s
@@ -117,6 +128,7 @@ volumes:
   opensearch-data:
   neo4j_data:
   neo4j_logs:
+  neo4j_plugins:
 
 networks:
   backend-net:

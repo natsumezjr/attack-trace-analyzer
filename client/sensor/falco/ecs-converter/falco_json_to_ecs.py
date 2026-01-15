@@ -7,6 +7,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, Optional
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
@@ -59,6 +60,50 @@ def is_abnormal(priority: str, threshold: str) -> bool:
     return priority_rank(priority) >= priority_rank(threshold)
 
 
+def parse_tags(tags_val):
+    if tags_val is None:
+        return []
+    if isinstance(tags_val, list):
+        return [str(t).strip() for t in tags_val if str(t).strip()]
+    if isinstance(tags_val, str):
+        raw = tags_val.replace(",", " ").split()
+        return [t.strip() for t in raw if t.strip()]
+    return [str(tags_val).strip()]
+
+
+def parse_tag_kv(tag: str):
+    if "=" in tag:
+        key, val = tag.split("=", 1)
+        return key.strip(), val.strip()
+    if ":" in tag:
+        key, val = tag.split(":", 1)
+        return key.strip(), val.strip()
+    return tag.strip(), ""
+
+
+def extract_attack_from_tags(tags, attack_map: Dict):
+    tactic_id = tactic_name = technique_id = technique_name = None
+    for tag in tags:
+        key, val = parse_tag_kv(tag)
+        mapped = attack_map.get(tag) or attack_map.get(key)
+        if isinstance(mapped, dict):
+            tactic_id = mapped.get("tactic_id") or tactic_id
+            tactic_name = mapped.get("tactic_name") or tactic_name
+            technique_id = mapped.get("technique_id") or technique_id
+            technique_name = mapped.get("technique_name") or technique_name
+
+        if key in ("threat.tactic.id", "mitre.tactic.id", "attack.tactic.id", "tactic.id"):
+            tactic_id = val or tactic_id
+        if key in ("threat.tactic.name", "mitre.tactic.name", "attack.tactic", "tactic.name"):
+            tactic_name = val or tactic_name
+        if key in ("threat.technique.id", "mitre.technique.id", "attack.technique.id", "technique.id"):
+            technique_id = val or technique_id
+        if key in ("threat.technique.name", "mitre.technique.name", "attack.technique", "technique.name"):
+            technique_name = val or technique_name
+
+    return tactic_id, tactic_name, technique_id, technique_name
+
+
 def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     out_fields = evt.get("output_fields") or {}
     ecs: Dict = {}
@@ -73,6 +118,18 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     rule = evt.get("rule")
     if rule:
         ecs.setdefault("rule", {})["name"] = rule
+    # 如果存在规则到 ATT&CK 的本地映射，则优先使用它来填充 `threat.*`
+    mapped = None
+    rule_map = {}
+    try:
+        RULE_MAP_PATH = Path(__file__).parent / "rule_to_attack.json"
+        if RULE_MAP_PATH.exists():
+            with open(RULE_MAP_PATH, "r", encoding="utf-8") as _f:
+                rule_map = json.load(_f) or {}
+            mapped = rule_map.get(rule)
+    except Exception:
+        mapped = None
+        rule_map = {}
 
     output = evt.get("output")
     if output:
@@ -147,6 +204,58 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     else:
         ecs.setdefault("event", {})["kind"] = "event"
         ecs.setdefault("event", {})["category"] = ["host"]
+
+    # Minimal ATT&CK enrichment: 填充 `threat.*` 字段。
+    # 优先从 Falco 的 output_fields 中获取已有的 ATT&CK 信息，否则使用默认值。
+    tactic_id = (
+        out_fields.get("threat.tactic.id")
+        or out_fields.get("mitre.tactic.id")
+        or out_fields.get("attack.tactic.id")
+        or out_fields.get("tactic.id")
+    )
+    tactic_name = (
+        out_fields.get("threat.tactic.name")
+        or out_fields.get("mitre.tactic.name")
+        or out_fields.get("attack.tactic")
+        or out_fields.get("tactic.name")
+    )
+    technique_id = (
+        out_fields.get("threat.technique.id")
+        or out_fields.get("mitre.technique.id")
+        or out_fields.get("attack.technique.id")
+        or out_fields.get("technique.id")
+    )
+    technique_name = (
+        out_fields.get("threat.technique.name")
+        or out_fields.get("mitre.technique.name")
+        or out_fields.get("attack.technique")
+        or out_fields.get("technique.name")
+    )
+
+    tags = parse_tags(evt.get("tags") or out_fields.get("tags"))
+    if tags:
+        t_id, t_name, te_id, te_name = extract_attack_from_tags(tags, rule_map)
+        tactic_id = tactic_id or t_id
+        tactic_name = tactic_name or t_name
+        technique_id = technique_id or te_id
+        technique_name = technique_name or te_name
+
+    # 如果通过规则映射命中，则覆盖对应字段
+    if mapped:
+        try:
+            tactic_id = mapped.get("tactic_id") or tactic_id
+            tactic_name = mapped.get("tactic_name") or tactic_name
+            technique_id = mapped.get("technique_id") or technique_id
+            technique_name = mapped.get("technique_name") or technique_name
+        except Exception:
+            pass
+
+    threat = ecs.setdefault("threat", {})
+    threat["framework"] = "MITRE ATT&CK"
+    threat.setdefault("tactic", {})["id"] = tactic_id or "TA0000"
+    threat.setdefault("tactic", {})["name"] = tactic_name or "Unknown"
+    threat.setdefault("technique", {})["id"] = technique_id or "T0000"
+    threat.setdefault("technique", {})["name"] = technique_name or "Unknown"
 
     ecs["falco"] = evt
     return ecs

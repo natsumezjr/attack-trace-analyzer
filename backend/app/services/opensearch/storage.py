@@ -634,9 +634,9 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             }
             total_success += result["success"]
             total_failed += result.get("failed", 0)
-            # 刷新索引，使新文档立即可搜索
-            if result["success"] > 0:
-                refresh_index(index_name)
+            # 优化：减少refresh频率，避免OOM
+            # 只在批量写入大量数据后refresh一次，而不是每次写入都refresh
+            # refresh_index(index_name)  # 注释掉，减少内存压力
         except Exception as error:
             print(f"存储到索引 {index_name} 失败: {error}")
             details[index_name] = {
