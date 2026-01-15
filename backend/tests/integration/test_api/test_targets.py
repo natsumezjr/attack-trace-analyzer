@@ -4,7 +4,7 @@
 """
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.requires_opensearch]
 
 
 class TestTargetsAPI:
@@ -13,7 +13,7 @@ class TestTargetsAPI:
     @pytest.mark.asyncio
     async def test_list_targets(self, async_client):
         """测试列出目标节点"""
-        response = await async_client.get("/api/v1/targets/")
+        response = await async_client.get("/api/v1/targets")
         assert response.status_code == 200
         data = response.json()
-        assert "ok" in data
+        assert data["status"] == "ok"

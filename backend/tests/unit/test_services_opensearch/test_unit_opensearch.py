@@ -10,22 +10,22 @@ OpenSearch 模块单元测试
 4. 数据分析（analysis.py）
 """
 
-import pytest
 from datetime import datetime
 from typing import Any
 
-pytestmark = [pytest.mark.unit, pytest.mark.requires_opensearch]
+import pytest
 
-
-from .test_utils import (
-    create_test_event,
-    create_test_finding,
-    create_test_finding_with_process,
-    create_test_finding_with_destination,
-    create_test_finding_with_file,
+from tests.fixtures.common import (
     assert_event_structure,
     assert_finding_structure,
+    create_test_event,
+    create_test_finding,
+    create_test_finding_with_destination,
+    create_test_finding_with_file,
+    create_test_finding_with_process,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.requires_opensearch]
 
 
 # ========== 客户端操作测试 ==========

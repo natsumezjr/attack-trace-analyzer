@@ -11,8 +11,8 @@ from app.services.neo4j import ingest as graph_ingest
 
 
 def _fixtures_dir() -> Path:
-    # tests/graph/test_*.py -> tests/fixtures
-    return Path(__file__).resolve().parents[1] / "fixtures"
+    # backend/tests/integration/test_services_neo4j/* -> backend/tests/fixtures
+    return Path(__file__).resolve().parents[2] / "fixtures"
 
 
 def _load_fixture_events() -> list[dict[str, Any]]:

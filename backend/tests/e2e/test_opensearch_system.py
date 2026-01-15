@@ -10,22 +10,22 @@ OpenSearch 模块系统测试（端到端集成测试）
 4. 多索引协同工作
 """
 
-import pytest
 from datetime import datetime, timedelta
 from typing import Any
 
-pytestmark = [pytest.mark.system, pytest.mark.integration, pytest.mark.requires_opensearch]
+import pytest
 
-
-from .test_utils import (
-    create_test_event,
-    create_test_finding,
-    create_test_finding_with_process,
-    create_test_finding_with_destination,
-    create_test_finding_with_file,
+from tests.fixtures.common import (
     assert_event_structure,
     assert_finding_structure,
+    create_test_event,
+    create_test_finding,
+    create_test_finding_with_destination,
+    create_test_finding_with_file,
+    create_test_finding_with_process,
 )
+
+pytestmark = [pytest.mark.system, pytest.mark.integration, pytest.mark.requires_opensearch]
 
 
 class TestEndToEndWorkflow:

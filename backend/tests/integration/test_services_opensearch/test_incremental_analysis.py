@@ -4,13 +4,14 @@ Analysis模块增量处理功能测试
 测试重构后的辅助函数和增量处理逻辑
 """
 
-import pytest
 from datetime import datetime, timedelta
 from typing import Any
 
-pytestmark = pytest.mark.requires_opensearch
+import pytest
 
-from .test_utils import create_test_finding
+from tests.fixtures.common import create_test_finding
+
+pytestmark = pytest.mark.requires_opensearch
 
 
 @pytest.mark.unit

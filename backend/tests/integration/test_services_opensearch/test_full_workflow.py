@@ -4,19 +4,19 @@
 测试端到端的完整流程，包括增量处理
 """
 
-import pytest
 from datetime import datetime, timedelta
 from typing import Any
 
-pytestmark = pytest.mark.requires_opensearch
+import pytest
 
-
-from .test_utils import (
-    create_test_event,
-    create_test_finding,
+from tests.fixtures.common import (
     assert_event_structure,
     assert_finding_structure,
+    create_test_event,
+    create_test_finding,
 )
+
+pytestmark = pytest.mark.requires_opensearch
 
 
 @pytest.mark.integration
