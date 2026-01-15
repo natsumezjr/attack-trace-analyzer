@@ -101,7 +101,7 @@ Falco 转换器输出为**嵌套对象形态**（非点号扁平键）。
 ```json
 {
   "@timestamp": "2026-01-14T12:00:00.000Z",
-  "ecs": {"version": "8.11.0"},
+  "ecs": {"version": "9.2.0"},
   "event": {"kind": "event", "dataset": "hostlog.process"},
   "host": {"name": "client-01", "id": "h-1111111111111111"},
   "process": {"pid": 1234, "executable": "/usr/bin/bash"},
@@ -112,7 +112,7 @@ Falco 转换器输出为**嵌套对象形态**（非点号扁平键）。
 
 说明：
 
-1. Falco 转换器产生的 `ecs.version` 会在中心机入库时被规范化为 `9.2.0`，权威口径见 `../../80-规范/81-ECS字段规范.md`。
+1. Falco 转换器输出 `ecs.version="9.2.0"`；中心机入库前仍会执行最终规范化，保证权威口径一致（见 `../../80-规范/81-ECS字段规范.md`）。
 2. Falco 原始事件完整保存在 `falco` 字段中，用于审计与回放。
 3. Telemetry 的 `event.dataset` 会根据事件类型选择为 `hostlog.process` / `hostbehavior.file` / `hostlog.file_registry` / `hostbehavior.syscall`，以满足 `../../80-规范/84-Neo4j实体图谱规范.md` 的抽取条件。
 4. 为保证三传感器数据在同一主机上可关联，转换器支持：

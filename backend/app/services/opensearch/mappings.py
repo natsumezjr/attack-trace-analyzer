@@ -121,6 +121,7 @@ canonical_findings_mapping = {
         "rule.id": {"type": "keyword"},
         "rule.name": {"type": "keyword"},
         "rule.version": {"type": "keyword"},
+        "rule.ruleset": {"type": "keyword"},
         "threat.tactic.id": {"type": "keyword"},
         "threat.tactic.name": {"type": "keyword"},
         "threat.technique.id": {"type": "keyword"},

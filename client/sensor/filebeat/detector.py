@@ -443,10 +443,8 @@ class AnomalyDetector:
             log_entry['event']['category'] = ['intrusion_detection']
             log_entry['event']['type'] = ['indicator']
             log_entry['event']['severity'] = matched_rules[0]['severity_num']
-            dataset = log_entry.get('event', {}).get('dataset')
-            if not dataset or dataset == 'finding.raw':
-                dataset = 'finding.raw.filebeat_sigma'
-            log_entry['event']['dataset'] = dataset
+            # Enforce provider/dataset naming per docs/81 + docs/83.
+            log_entry['event']['dataset'] = 'finding.raw.filebeat_sigma'
 
             # 添加rule字段（ECS标准）
             log_entry['rule'] = {
@@ -484,12 +482,8 @@ class AnomalyDetector:
             log_entry['custom'] = {
                 'finding': {
                     'stage': 'raw',
-                    'providers': ['sigma-detector'],
-                    'fingerprint': f"fp-{matched_rules[0]['rule_id']}-{log_entry.get('host', {}).get('id', 'unknown')}"
+                    'providers': ['filebeat_sigma'],
                 },
-                'evidence': {
-                    'event_ids': [log_entry.get('event', {}).get('id', 'unknown')]
-                }
             }
 
             # 保留原有的anomaly字段（向后兼容）
@@ -557,7 +551,19 @@ class AnomalyDetector:
                                     out.write(json.dumps(processed_entry) + '\n')
 
                                 # Publish to RabbitMQ (both anomalies and normal logs)
-                                self.publish_log_entry(processed_entry)
+                                event_obj = processed_entry.get("event")
+                                kind = event_obj.get("kind") if isinstance(event_obj, dict) else None
+                                dataset = event_obj.get("dataset") if isinstance(event_obj, dict) else None
+
+                                should_publish = False
+                                if isinstance(kind, str) and isinstance(dataset, str):
+                                    if kind == "alert":
+                                        should_publish = True
+                                    elif kind == "event" and dataset == "hostlog.auth":
+                                        should_publish = True
+
+                                if should_publish:
+                                    self.publish_log_entry(processed_entry)
 
                                 # Write anomalies to separate file
                                 if 'anomaly' in processed_entry:
