@@ -45,7 +45,7 @@ export type GraphQueryRequest = {
 export async function fetchGraphQuery(
   payload: GraphQueryRequest
 ): Promise<GraphQueryResponse> {
-  const response = await fetch("/api/graph/query", {
+  const response = await fetch("/api/v1/graph/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

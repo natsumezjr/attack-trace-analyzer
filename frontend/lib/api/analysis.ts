@@ -66,7 +66,7 @@ export type AnalysisTasksQuery = {
 export async function createAnalysisTask(
   payload: CreateAnalysisTaskPayload
 ): Promise<CreateAnalysisTaskResponse> {
-  const response = await fetch("/api/analysis/tasks", {
+  const response = await fetch("/api/v1/analysis/tasks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -95,7 +95,7 @@ export async function fetchAnalysisTasks(
   }
 
   const response = await fetch(
-    `/api/analysis/tasks${searchParams.toString() ? `?${searchParams}` : ""}`
+    `/api/v1/analysis/tasks${searchParams.toString() ? `?${searchParams}` : ""}`
   );
 
   if (!response.ok) {
@@ -106,7 +106,9 @@ export async function fetchAnalysisTasks(
 }
 
 export async function fetchAnalysisTask(taskId: string): Promise<AnalysisTaskResponse> {
-  const response = await fetch(`/api/analysis/tasks/${encodeURIComponent(taskId)}`);
+  const response = await fetch(
+    `/api/v1/analysis/tasks/${encodeURIComponent(taskId)}`
+  );
 
   if (!response.ok) {
     try {
