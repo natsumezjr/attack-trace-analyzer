@@ -134,9 +134,10 @@ npm run dev
 cd client
 cp .env.example .env
 
-# 必填：中心机后端地址（用于 targets/register）
-# 例：SERVER_IP=10.0.0.10:8000
-vim .env
+# 重要：客户机 Go backend 启动时会向中心机注册（POST /api/v1/targets/register）。
+# 本项目将 SERVER_IP / SELF_IP 固定写在 docker-compose.yml（backend 服务的 environment）里，
+# 因此请根据你的靶场环境修改：
+#   client/docker-compose.yml -> services.backend.environment.SERVER_IP / SELF_IP
 
 docker compose up -d --build
 ```
@@ -178,7 +179,7 @@ cd backend
 - 后端连不上 OpenSearch/Neo4j：确认 `docker compose up -d` 已启动且端口未被占用；如修改过密码，记得导出对应环境变量。
 - 报错 `ATT&CK Enterprise CTI file not found`：执行 `backend/scripts/fetch_mitre_attack_cti.sh` 下载 CTI bundle，或设置 `ATTACK_CTI_PATH`。
 - 前端报 `BACKEND_BASE_URL is not configured.`：创建 `frontend/.env.local` 并设置 `BACKEND_BASE_URL=http://localhost:8000`。
-- 客户机启动报 `SERVER_IP is required`：在 `client/.env` 填写中心机后端地址（例如 `10.0.0.10:8000`）。
+- 客户机启动报 `SERVER_IP is required`：检查 `client/docker-compose.yml` 中 `services.backend.environment.SERVER_IP` 是否已按当前靶场配置。
 
 ## 免责声明
 
