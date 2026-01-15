@@ -12,6 +12,11 @@ NC='\033[0m'
 export BASE=/home/ubuntu/attack-trace-analyzer
 export REPO="$BASE"/repo/attack-trace-analyzer
 
+# 自动加载 nvm（如果已安装）
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || true
+
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -71,10 +76,23 @@ sleep 3
 # 5. 启动中心机前端（Next.js）
 log_info "步骤 5/6: 启动前端..."
 cd "$REPO"/frontend
+
+# 确保使用 Node.js 20（如果 nvm 可用）
+[ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || true
+
+# 检查 Node.js 版本
+NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1 || echo "0")
+if [ "$NODE_VERSION" -lt 20 ]; then
+    log_info "当前 Node.js 版本: $(node --version 2>/dev/null || echo '未知')"
+    log_info "尝试使用 nvm 切换到 Node.js 20..."
+    [ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || log_info "nvm 不可用，使用系统默认 Node.js"
+fi
+
 if ! pgrep -f "next-server" > /dev/null; then
     nohup npm run dev -- -H 0.0.0.0 -p 3000 > "$BASE"/run/frontend.log 2>&1 &
     echo $! > "$BASE"/run/frontend.pid
     log_info "前端已启动，PID: $(cat "$BASE"/run/frontend.pid)"
+    log_info "Node.js 版本: $(node --version 2>/dev/null || echo '未知')"
 fi
 sleep 3
 
