@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // ⚠️ 注意：要在组件内部创建 QueryClient，确保数据不会在不同用户请求间共享
@@ -23,6 +24,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <Toaster position="top-center" />
       {/* 生产环境会自动隐藏 DevTools */}
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

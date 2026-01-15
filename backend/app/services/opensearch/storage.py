@@ -189,6 +189,22 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
         event_obj = {}
         doc["event"] = event_obj
 
+    telemetry_datasets = {
+        # Telemetry datasets (docs/81-ECS字段规范.md)
+        "hostlog.auth",
+        "hostlog.process",
+        "hostlog.file_registry",
+        "hostbehavior.syscall",
+        "hostbehavior.file",
+        "hostbehavior.memory",
+        "netflow.flow",
+        "netflow.dns",
+        "netflow.http",
+        "netflow.tls",
+        "netflow.icmp",
+    }
+    finding_providers = {"falco", "suricata", "filebeat_sigma", "security_analytics"}
+
     # event.kind (required; may infer only when missing)
     kind_raw = event_obj.get("kind")
     kind = kind_raw.lower().strip() if isinstance(kind_raw, str) else ""
@@ -222,6 +238,20 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
             dataset = "hostbehavior.syscall"
 
     event_obj["dataset"] = dataset
+
+    # Enforce the dataset whitelist (docs/81-ECS字段规范.md).
+    if kind == "event":
+        if dataset not in telemetry_datasets:
+            return None
+    else:
+        if dataset == "finding.canonical":
+            pass
+        elif dataset.startswith("finding.raw."):
+            provider = dataset.split("finding.raw.", 1)[1]
+            if provider not in finding_providers:
+                return None
+        else:
+            return None
 
     # ecs.version (fixed)
     ecs_obj = doc.get("ecs")
@@ -257,12 +287,10 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
     # event.id (idempotency key)
     event_id = event_obj.get("id")
     if not isinstance(event_id, str) or not event_id.strip():
-        original = event_obj.get("original")
-        if isinstance(original, str) and original:
-            event_obj["id"] = f"evt-{_sha1_hex(original)[:16]}"
-        else:
-            # Cannot safely backfill a stable id without raw payload bytes.
-            return None
+        # Cannot safely backfill a stable id without the raw payload bytes
+        # (docs/81-ECS字段规范.md: event.id = evt- + sha1(raw_payload_bytes)[:16]).
+        # Client-side pull API is responsible for generating stable event.id.
+        return None
 
     # Finding-only required fields (minimum set for downstream graph & dedup)
     if kind == "alert":

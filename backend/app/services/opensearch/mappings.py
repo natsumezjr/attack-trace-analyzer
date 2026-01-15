@@ -11,6 +11,7 @@ ecs_events_mapping = {
         "event.category": {"type": "keyword"},
         "event.type": {"type": "keyword"},
         "event.action": {"type": "keyword"},
+        "event.outcome": {"type": "keyword"},
         "event.module": {"type": "keyword"},
         "event.dataset": {"type": "keyword"},
         "event.created": {"type": "date"},
@@ -22,7 +23,11 @@ ecs_events_mapping = {
         "user.name": {"type": "keyword"},
         "process.entity_id": {"type": "keyword"},
         "process.pid": {"type": "long"},
+        "process.executable": {"type": "keyword"},
         "process.parent.pid": {"type": "long"},
+        "process.parent.entity_id": {"type": "keyword"},
+        "process.parent.executable": {"type": "keyword"},
+        "process.parent.name": {"type": "keyword"},
         "process.name": {"type": "keyword"},
         "process.command_line": {
             "type": "text",
@@ -42,6 +47,8 @@ ecs_events_mapping = {
                 "keyword": {"type": "keyword", "ignore_above": 256}
             }
         },
+        "dns.answers.data": {"type": "keyword"},
+        "dns.answers.type": {"type": "keyword"},
         "file.path": {"type": "keyword"},
         "file.hash.sha256": {"type": "keyword"},
         "session.id": {"type": "keyword"},
@@ -114,6 +121,7 @@ canonical_findings_mapping = {
         "rule.id": {"type": "keyword"},
         "rule.name": {"type": "keyword"},
         "rule.version": {"type": "keyword"},
+        "rule.ruleset": {"type": "keyword"},
         "threat.tactic.id": {"type": "keyword"},
         "threat.tactic.name": {"type": "keyword"},
         "threat.technique.id": {"type": "keyword"},

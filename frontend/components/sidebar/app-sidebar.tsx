@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
-import { LayoutDashboard, Settings, FishingHook } from "lucide-react";
+import { LayoutDashboard, ClipboardList, FishingHook } from "lucide-react";
 import { House } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,13 @@ export function SidebarDemo({ children }: { children?: React.ReactNode }) {
       href: "/trace",
       icon: (
         <FishingHook className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
+      ),
+    },
+    {
+      label: "溯源任务",
+      href: "/analysis/tasks",
+      icon: (
+        <ClipboardList className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
       ),
     },
   ];

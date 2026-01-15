@@ -1,6 +1,10 @@
 services:
   rabbitmq:
     image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -27,6 +31,8 @@ services:
       - /etc:/host/etc:ro
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/tracing:/sys/kernel/tracing
+      # Custom telemetry rules (loaded via the default rules_file list).
+      - ./sensor/falco/rules.d:/etc/falco/rules.d:ro
       - ./data:/data
     command:
       - falco
@@ -48,6 +54,9 @@ services:
     environment:
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_QUEUE: "data.falco"
+      # Ensure all sensors share the same host identity in OpenSearch/Neo4j.
+      HOST_NAME: ${HOST_NAME:-client-01}
+      HOST_ID: ${HOST_ID:-sensor-01}
     volumes:
       - ./data:/data
     command:
@@ -73,6 +82,9 @@ services:
       - TZ=${TZ:-Asia/Shanghai}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - RABBITMQ_QUEUE=data.filebeat
+      # Ensure all sensors share the same host identity in OpenSearch/Neo4j.
+      - HOST_NAME=${HOST_NAME:-client-01}
+      - HOST_ID=${HOST_ID:-sensor-01}
     logging:
       driver: "json-file"
       options:
@@ -115,7 +127,7 @@ services:
         condition: service_healthy
     environment:
       HOST_ID: ${HOST_ID:-sensor-01}
-      HOST_NAME: ${HOST_NAME:-suricata-sensor}
+      HOST_NAME: ${HOST_NAME:-client-01}
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_QUEUE: "data.suricata"
     volumes:
@@ -132,7 +144,7 @@ services:
       FILEBEAT_QUEUE: "data.filebeat"
       SURICATA_QUEUE: "data.suricata"
       # Required: registration server host[:port], e.g. "host.docker.internal:8080".
-      SERVER_IP: http://10.21.251.127:8000
+      SERVER_IP: http://10.21.251.127:8001
       # Optional override; otherwise backend auto-detects a non-loopback IPv4.
       SELF_IP: 10.122.243.144
     depends_on:

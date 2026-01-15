@@ -12,8 +12,9 @@ import re
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from hashlib import sha1
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Tuple
 
 try:
     import yaml
@@ -143,6 +144,82 @@ class AnomalyDetector:
     _ATTACK_TECHNIQUE_TAG_RE = re.compile(r"^attack\.t(\d{4})(?:\.(\d{3}))?$", re.IGNORECASE)
     _ATTACK_TACTIC_TAG_RE = re.compile(r"^attack\.ta(\d{4})$", re.IGNORECASE)
 
+    # Common auth.log patterns (Ubuntu/OpenSSH)
+    _SSH_ACCEPTED_RE = re.compile(
+        r"sshd\[(?P<pid>\d+)\]:\s+Accepted\s+\S+\s+for\s+(?P<user>\S+)\s+from\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3})",
+        re.IGNORECASE,
+    )
+    _SSH_FAILED_RE = re.compile(
+        r"sshd\[(?P<pid>\d+)\]:\s+Failed\s+\S+\s+for\s+(?:invalid user\s+)?(?P<user>\S+)\s+from\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3})",
+        re.IGNORECASE,
+    )
+    _SSH_DISCONNECTED_RE = re.compile(
+        r"sshd\[(?P<pid>\d+)\]:\s+Disconnected\s+from\s+user\s+(?P<user>\S+)\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3})",
+        re.IGNORECASE,
+    )
+
+    def _infer_telemetry_dataset(self, log_entry: Dict[str, Any]) -> Optional[str]:
+        log_type = log_entry.get("log_type")
+        if isinstance(log_type, str):
+            lt = log_type.strip().lower()
+            if lt == "auth":
+                return "hostlog.auth"
+        return None
+
+    def _parse_auth_message(self, message: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+        """
+        Return (user_name, source_ip, action, outcome) best-effort from auth.log line.
+
+        action/outcome follow docs/81-ECS字段规范.md hostlog.auth conventions.
+        """
+        m = self._SSH_ACCEPTED_RE.search(message or "")
+        if m:
+            return m.group("user"), m.group("ip"), "user_login", "success"
+        m = self._SSH_FAILED_RE.search(message or "")
+        if m:
+            return m.group("user"), m.group("ip"), "logon_failed", "failure"
+        m = self._SSH_DISCONNECTED_RE.search(message or "")
+        if m:
+            # Treat as logout with the best-effort IP captured in the disconnect line.
+            return m.group("user"), m.group("ip"), "user_logout", "success"
+        return None, None, None, None
+
+    def _normalize_host_identity(self, log_entry: Dict[str, Any]) -> None:
+        """
+        Enforce consistent host identity across sensors.
+
+        - If env HOST_NAME is set, override host.name.
+        - If env HOST_ID is set, override host.id (preferred; aligns with docs/89 环境变量规范).
+        - Otherwise, derive host.id as a safe fallback:
+          host.id = "h-" + sha1(host.name)[:16] (docs/81-ECS字段规范.md).
+        """
+        host_obj = log_entry.get("host")
+        if not isinstance(host_obj, dict):
+            host_obj = {}
+            log_entry["host"] = host_obj
+
+        host_name_override = os.getenv("HOST_NAME")
+        if isinstance(host_name_override, str) and host_name_override.strip():
+            host_obj["name"] = host_name_override.strip()
+
+        host_name = host_obj.get("name")
+        if not isinstance(host_name, str) or not host_name.strip():
+            return
+        host_name = host_name.strip()
+        host_obj["name"] = host_name
+
+        host_id_override = os.getenv("HOST_ID")
+        if isinstance(host_id_override, str) and host_id_override.strip():
+            host_obj["id"] = host_id_override.strip()
+            return
+
+        host_id_existing = host_obj.get("id")
+        if isinstance(host_id_existing, str) and host_id_existing.strip():
+            host_obj["id"] = host_id_existing.strip()
+            return
+
+        host_obj["id"] = f"h-{sha1(host_name.encode('utf-8')).hexdigest()[:16]}"
+
     def load_rules(self):
         """Load all Sigma rules from rules directory"""
         print(f"Loading Sigma rules from {self.rules_dir}...")
@@ -228,6 +305,8 @@ class AnomalyDetector:
         """Process a single log entry and mark if anomalous"""
         self.total_logs += 1
 
+        self._normalize_host_identity(log_entry)
+
         # 确保ECS版本正确
         if 'ecs' not in log_entry:
             log_entry['ecs'] = {}
@@ -238,6 +317,57 @@ class AnomalyDetector:
             log_entry['event'] = {}
         if 'ingested' not in log_entry['event']:
             log_entry['event']['ingested'] = datetime.utcnow().isoformat() + 'Z'
+
+        # Best-effort Telemetry normalization:
+        # Only emit doc-compliant hostlog.auth telemetry when we can populate the required fields.
+        inferred_dataset = self._infer_telemetry_dataset(log_entry)
+        if inferred_dataset == "hostlog.auth":
+            message = log_entry.get("message", "")
+            user_name, source_ip, action, outcome = self._parse_auth_message(message if isinstance(message, str) else "")
+
+            user_obj_existing = log_entry.get("user") if isinstance(log_entry.get("user"), dict) else {}
+            source_obj_existing = log_entry.get("source") if isinstance(log_entry.get("source"), dict) else {}
+            existing_user_name = user_obj_existing.get("name") if isinstance(user_obj_existing.get("name"), str) else None
+            existing_source_ip = source_obj_existing.get("ip") if isinstance(source_obj_existing.get("ip"), str) else None
+
+            final_user = (existing_user_name or user_name or "").strip()
+            final_ip = (existing_source_ip or source_ip or "").strip()
+
+            if final_user and final_ip and action and outcome:
+                if not isinstance(log_entry['event'].get('kind'), str) or not log_entry['event']['kind'].strip():
+                    log_entry['event']['kind'] = 'event'
+                if not isinstance(log_entry['event'].get('dataset'), str) or not log_entry['event']['dataset'].strip():
+                    log_entry['event']['dataset'] = inferred_dataset
+
+                cats = log_entry['event'].get('category')
+                if not isinstance(cats, list):
+                    cats = []
+                cats_norm = [c for c in cats if isinstance(c, str) and c]
+                if "authentication" not in cats_norm:
+                    cats_norm.append("authentication")
+                log_entry['event']['category'] = cats_norm
+
+                user_obj = log_entry.get("user")
+                if not isinstance(user_obj, dict):
+                    user_obj = {}
+                    log_entry["user"] = user_obj
+                user_obj.setdefault("name", final_user)
+
+                src_obj = log_entry.get("source")
+                if not isinstance(src_obj, dict):
+                    src_obj = {}
+                    log_entry["source"] = src_obj
+                src_obj.setdefault("ip", final_ip)
+
+                log_entry['event'].setdefault('action', action)
+                log_entry['event'].setdefault('outcome', outcome)
+
+                if action == "user_login":
+                    log_entry['event'].setdefault('type', ['start'])
+                elif action == "user_logout":
+                    log_entry['event'].setdefault('type', ['end'])
+                else:
+                    log_entry['event'].setdefault('type', ['info'])
 
         # Check against all rules
         matched_rules = []
@@ -313,10 +443,8 @@ class AnomalyDetector:
             log_entry['event']['category'] = ['intrusion_detection']
             log_entry['event']['type'] = ['indicator']
             log_entry['event']['severity'] = matched_rules[0]['severity_num']
-            dataset = log_entry.get('event', {}).get('dataset')
-            if not dataset or dataset == 'finding.raw':
-                dataset = 'finding.raw.filebeat_sigma'
-            log_entry['event']['dataset'] = dataset
+            # Enforce provider/dataset naming per docs/81 + docs/83.
+            log_entry['event']['dataset'] = 'finding.raw.filebeat_sigma'
 
             # 添加rule字段（ECS标准）
             log_entry['rule'] = {
@@ -354,12 +482,8 @@ class AnomalyDetector:
             log_entry['custom'] = {
                 'finding': {
                     'stage': 'raw',
-                    'providers': ['sigma-detector'],
-                    'fingerprint': f"fp-{matched_rules[0]['rule_id']}-{log_entry.get('host', {}).get('id', 'unknown')}"
+                    'providers': ['filebeat_sigma'],
                 },
-                'evidence': {
-                    'event_ids': [log_entry.get('event', {}).get('id', 'unknown')]
-                }
             }
 
             # 保留原有的anomaly字段（向后兼容）
@@ -427,7 +551,19 @@ class AnomalyDetector:
                                     out.write(json.dumps(processed_entry) + '\n')
 
                                 # Publish to RabbitMQ (both anomalies and normal logs)
-                                self.publish_log_entry(processed_entry)
+                                event_obj = processed_entry.get("event")
+                                kind = event_obj.get("kind") if isinstance(event_obj, dict) else None
+                                dataset = event_obj.get("dataset") if isinstance(event_obj, dict) else None
+
+                                should_publish = False
+                                if isinstance(kind, str) and isinstance(dataset, str):
+                                    if kind == "alert":
+                                        should_publish = True
+                                    elif kind == "event" and dataset == "hostlog.auth":
+                                        should_publish = True
+
+                                if should_publish:
+                                    self.publish_log_entry(processed_entry)
 
                                 # Write anomalies to separate file
                                 if 'anomaly' in processed_entry:

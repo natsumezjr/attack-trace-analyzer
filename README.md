@@ -5,13 +5,13 @@ Attack Trace Analyzer (ATA) 是一个分布式安全监控与溯源分析系统�
 
 - 中心机：`backend/`（FastAPI）+ `frontend/`（Next.js）
 - 客户机：`client/`（Falco/Filebeat(+Sigma)/Suricata + RabbitMQ + Go 后端）
-- 课程交付文档（唯一正式文档）：`new-docs/`
+- 课程交付文档（唯一正式文档）：`docs/`
 
 ## 快速链接
 
-- 文档入口：`new-docs/README.md`
-- 一键编排（靶场 / 演示固定流程）：`new-docs/90-运维与靶场/92-一键编排.md`
-- 环境变量与配置规范（权威口径）：`new-docs/80-规范/89-环境变量与配置规范.md`
+- 文档入口：`docs/README.md`
+- 一键编排（靶场 / 演示固定流程）：`docs/90-运维与靶场/92-一键编排.md`
+- 环境变量与配置规范（权威口径）：`docs/80-规范/89-环境变量与配置规范.md`
 - 后端测试说明：`backend/tests/README.md`
 
 ## 核心能力（概览）
@@ -33,7 +33,7 @@ flowchart TD
   C --> D[Step 4: ECS → Graph\n写入 Neo4j 图谱]
 ```
 
-更完整的机制、数据分层与验收/复现剧本，请直接阅读 `new-docs/`（README 只保留“怎么跑起来”）。
+更完整的机制、数据分层与验收/复现剧本，请直接阅读 `docs/`（README 只保留“怎么跑起来”）。
 
 ## 快速启动（本地单机：中心机）
 
@@ -86,16 +86,16 @@ cd backend
 ```bash
 cd backend
 uv sync
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 后端会在启动时：初始化 OpenSearch 索引、启动客户机轮询、启动溯源任务 runner。
 
 常用访问地址：
 
-- 后端根路由：`http://localhost:8000/`
-- 健康检查：`http://localhost:8000/health`
-- API 文档（Swagger UI）：`http://localhost:8000/docs`
+- 后端根路由：`http://localhost:8001/`
+- 健康检查：`http://localhost:8001/health`
+- API 文档（Swagger UI）：`http://localhost:8001/docs`
 
 注意：后端应用不会自动加载 `backend/.env`。如果你修改了 Docker Compose 中的账号/密码/地址，需要在启动后端时显式导出：
 
@@ -144,7 +144,7 @@ docker compose up -d --build
 
 </details>
 
-多节点靶场、网络规划、固定演示启动顺序，请按文档执行：`new-docs/90-运维与靶场/92-一键编排.md`。
+多节点靶场、网络规划、固定演示启动顺序，请按文档执行：`docs/90-运维与靶场/92-一键编排.md`。
 
 ## 目录结构
 
@@ -154,7 +154,7 @@ docker compose up -d --build
 | `backend/` | Python FastAPI + uv | 中心机后端：轮询调度、检测融合、OpenSearch/Neo4j 与 API |
 | `frontend/` | Next.js + TypeScript | 中心机前端：图谱可视化、溯源任务交互 |
 | `deploy/` | Docker Compose | 靶场辅助组件（如 C2） |
-| `new-docs/` | Markdown | 课程交付文档体系（唯一正式文档） |
+| `docs/` | Markdown | 课程交付文档体系（唯一正式文档） |
 
 ## 开发与测试
 
@@ -178,7 +178,7 @@ cd backend
 - `curl https://localhost:9200` 报证书错误：开发环境是自签名证书，使用 `curl -k -u admin:...`。
 - 后端连不上 OpenSearch/Neo4j：确认 `docker compose up -d` 已启动且端口未被占用；如修改过密码，记得导出对应环境变量。
 - 报错 `ATT&CK Enterprise CTI file not found`：执行 `backend/scripts/fetch_mitre_attack_cti.sh` 下载 CTI bundle，或设置 `ATTACK_CTI_PATH`。
-- 前端报 `BACKEND_BASE_URL is not configured.`：创建 `frontend/.env.local` 并设置 `BACKEND_BASE_URL=http://localhost:8000`。
+- 前端报 `BACKEND_BASE_URL is not configured.`：创建 `frontend/.env.local` 并设置 `BACKEND_BASE_URL=http://localhost:8001`。
 - 客户机启动报 `SERVER_IP is required`：检查 `client/docker-compose.yml` 中 `services.backend.environment.SERVER_IP` 是否已按当前靶场配置。
 
 ## 免责声明

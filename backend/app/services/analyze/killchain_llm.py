@@ -280,7 +280,7 @@ def build_choose_prompt(payload: Mapping[str, Any], *, require_pair_explanations
     """
     schema_hint = {
         "chosen_path_ids": ["p-... (one per pair, in pair order)"],
-        "explanation": "详细的全局解释，使用中文，10-20 句话，详细描述整个攻击链的完整过程，必须说明每个关键节点的主谓宾结构",
+        "explanation": "详细的全局解释，使用中文，10-20 句话，详细描述整个攻击链的完整过程，必须说明每个关键节点的主谓宾结构。在解释中，请使用易懂的形式加上括号，比如 p_c2 (pid:1234) 代表c2进程，host_web (host.id:host-001) 代表web主机等",
         "confidence": 0.85,  # 可信度评分 (0.0-1.0)，表示对整个 killchain 的置信度
         "pair_explanations": [
             {"pair_idx": 0, "path_id": "p-...", "why": "使用中文，1-3 句话解释为什么选择此路径"},
@@ -301,6 +301,8 @@ def build_choose_prompt(payload: Mapping[str, Any], *, require_pair_explanations
         "所有解释必须使用中文，并且要详细（10-20 句话）。"
         "在 explanation 字段中，你必须为每个关键节点明确说明主谓宾结构，"
         "即：谁（主语）做了什么（谓语）对什么/在哪里（宾语/状语）。"
+        "在解释中，请使用易懂的形式加上括号，比如 p_c2 (pid:1234) 代表c2进程，"
+        "host_web (host.id:host-001) 代表web主机，user_admin (user.name:admin) 代表管理员用户等。"
         "重要：在描述网络连接时，必须严格区分攻击者 IP（source.ip）和受害主机 IP（destination.ip 或 host.ip）。"
         "在 Initial Access 阶段，攻击者 IP 是发起连接的源 IP，受害主机 IP 是目标 IP。"
         "在攻击者归因部分，必须使用正确的攻击者 IP 地址（通常是 Initial Access 阶段的 source.ip），而不是受害主机的 IP。"
@@ -320,6 +322,7 @@ def build_choose_prompt(payload: Mapping[str, Any], *, require_pair_explanations
             "如果检测到权限提升或 C2，解释必须包括：(1) 初始入侵点识别，(2) 攻击者在内部网络中的横向移动路径，(3) 权限提升路径分析，(4) 从存储的完整数据泄露路径，(5) 通过提取攻击工具、脚本和配置文件的指纹特征进行攻击者归因，(6) 攻击者和 C2 服务器 IP 地址分析",
             "explanation 字段必须使用中文，详细描述整个攻击链的完整过程，长度应在 10-20 句话之间",
             "explanation 字段中，对于每个关键节点（进程、主机、IP、域名等实体），必须明确说明主谓宾结构：主语（谁/什么实体）+ 谓语（执行了什么动作）+ 宾语/状语（对什么/在哪里/通过什么方式）",
+            "在解释中，请使用易懂的形式加上括号，比如 p_c2 (pid:1234) 代表c2进程，host_web (host.id:host-001) 代表web主机，user_admin (user.name:admin) 代表管理员用户等，使解释更加清晰易懂",
             "在描述 Initial Access 阶段时，必须明确区分：攻击者 IP（source.ip，发起连接的源 IP）和受害主机 IP（destination.ip 或 host.ip，被攻击的目标 IP）。例如：'攻击者从外部 IP 地址 [source.ip] 连接到受害主机 [host.name] (IP: [host.ip])'",
             "在攻击者归因部分，必须使用正确的攻击者 IP 地址（通常是 Initial Access 阶段的 source.ip），而不是受害主机的 IP 地址。如果数据中没有明确的攻击者 IP，应说明无法确定攻击者 IP",
             "在描述网络连接时，必须明确说明连接的源和目标：谁（主语，攻击者/进程）从哪个 IP（源 IP）连接到哪个 IP/主机（目标 IP/主机）",

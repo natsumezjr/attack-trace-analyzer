@@ -1,0 +1,52 @@
+# ATA telemetry rules (lab-friendly)
+#
+# Goal: generate deterministic ECS-compatible telemetry for the graph model:
+# - process exec (hostlog.process)
+# - file access (hostbehavior.file / hostlog.file_registry)
+# - outbound connect (hostbehavior.syscall with connect)
+#
+# Notes:
+# - Keep priorities below WARNING so the converter treats them as Telemetry.
+# - Include proc.pid / proc.exepath / proc.ppid / proc.pexepath in outputs so
+#   we can build doc-compliant process.entity_id values.
+
+- rule: ATA Telemetry Process Exec
+  desc: Emit process exec telemetry (execve/execveat) with full process identity fields.
+  condition: >
+    evt.type in (execve, execveat) and
+    proc.name in (sudo, su, ssh, scp, sftp, rsync, curl, wget, nc, netcat, ncat, python, python3, perl, ruby) and
+    (user.name=root or proc.pname in (sudo, su, ssh))
+  output: >
+    ATA telemetry exec | evt_type=%evt.type user=%user.name proc_pid=%proc.pid proc_ppid=%proc.ppid
+    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
+    container_id=%container.id container_name=%container.name
+  priority: INFO
+  tags: [ata, telemetry, process]
+
+- rule: ATA Telemetry File Access
+  desc: Emit file access telemetry for a limited set of paths to keep noise manageable in the lab.
+  condition: >
+    evt.type in (creat, unlink, unlinkat, rename, renameat, renameat2) and
+    fd.typechar='f' and
+    (fd.name in (/etc/shadow, /etc/sudoers, /etc/ssh/sshd_config, /root/.ssh/authorized_keys)) and
+    (user.name=root or proc.pname in (sudo, su))
+  output: >
+    ATA telemetry file | evt_type=%evt.type user=%user.name fd_name=%fd.name proc_pid=%proc.pid proc_ppid=%proc.ppid
+    proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline proc_pname=%proc.pname proc_pexepath=%proc.pexepath
+    container_id=%container.id container_name=%container.name
+  priority: INFO
+  tags: [ata, telemetry, file]
+
+- rule: ATA Telemetry Connect
+  desc: Emit connect() syscall telemetry with network 5-tuple info when available.
+  condition: >
+    evt.type=connect and
+    fd.ip != "127.0.0.1" and
+    fd.rport in (22, 3389, 445, 5985, 5986, 4444) and
+    proc.name in (ssh, scp, sftp, rsync, nc, netcat, ncat, python, python3, perl, ruby, curl, wget)
+  output: >
+    ATA telemetry connect | evt_type=%evt.type user=%user.name fd_sip=%fd.sip fd_name=%fd.name fd_lport=%fd.lport fd_rport=%fd.rport
+    fd_l4proto=%fd.l4proto proc_pid=%proc.pid proc_ppid=%proc.ppid proc_exepath=%proc.exepath proc_cmdline=%proc.cmdline
+    proc_pname=%proc.pname proc_pexepath=%proc.pexepath container_id=%container.id container_name=%container.name
+  priority: INFO
+  tags: [ata, telemetry, network]

@@ -29,7 +29,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function ChartRadialText() {
+export function ChartRadialText({ className }: { className?: string }) {
   const { data: targetsLen } = useQuery({
     queryKey: ["targets", "len"],
     queryFn: getTargetsLen,
@@ -45,8 +45,12 @@ export function ChartRadialText() {
     },
   ];
 
+  const cardClassName = ["flex flex-col h-full", className]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <Card className="flex flex-col">
+    <Card className={cardClassName}>
       <CardHeader className="items-center pb-0">
         <CardTitle>在线靶机</CardTitle>
         <CardDescription>当前在线数量</CardDescription>

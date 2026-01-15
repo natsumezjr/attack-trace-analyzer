@@ -34,7 +34,11 @@ from .utils import (
 # 用于批量写入时生成 MERGE 语句的键条件
 _NODE_TYPE_TO_KEY_FIELDS: dict[NodeType, list[str]] = {
     NodeType.HOST: ["host.id"],
-    NodeType.USER: ["user.id"],  # 备选: ["host.id", "user.name"]
+    # NOTE: User 节点的唯一键是"按数据选择"的（见 docs/80-规范/84-Neo4j实体图谱规范.md）：
+    # - 有 user.id 时：Key = user.id
+    # - 缺失 user.id 时：Key = (host.id, user.name)
+    # 批量写入时不能对同一 NodeType 混用不同键字段，所以 USER 会在 _merge_nodes_in_batch() 内再分桶处理。
+    NodeType.USER: ["user.id"],
     NodeType.PROCESS: ["process.entity_id"],
     NodeType.FILE: ["host.id", "file.path"],
     NodeType.DOMAIN: ["domain.name"],
@@ -185,6 +189,11 @@ def _build_unwind_params(
         param = {"props": node.merged_props()}
         # 提取键值到扁平结构
         for i, key_field in enumerate(key_fields):
+            if key_field not in node.key:
+                raise KeyError(
+                    f"Node key missing required field '{key_field}' for batch MERGE; "
+                    f"ntype={node.ntype.value} key={node.key}"
+                )
             if len(key_fields) == 1:
                 param["key_val"] = node.key[key_field]
             else:
@@ -356,13 +365,23 @@ def _merge_nodes_in_batch(tx, nodes: Sequence[GraphNode]) -> int:
     if not nodes:
         return 0
 
-    # 按类型分组
-    grouped = _group_nodes_by_type(nodes)
+    def _key_fields_for_node(node: GraphNode) -> list[str]:
+        # User keys are polymorphic by spec: prefer user.id; fallback to (host.id, user.name).
+        if node.ntype == NodeType.USER:
+            if "user.id" in node.key:
+                return ["user.id"]
+            return ["host.id", "user.name"]
+        return _NODE_TYPE_TO_KEY_FIELDS[node.ntype]
+
+    # 按 (节点类型, 唯一键字段) 分组
+    grouped: dict[tuple[NodeType, tuple[str, ...]], list[GraphNode]] = {}
+    for node in nodes:
+        key_fields = tuple(_key_fields_for_node(node))
+        grouped.setdefault((node.ntype, key_fields), []).append(node)
     total_count = 0
 
-    for ntype, node_list in grouped.items():
-        # 获取唯一键字段
-        key_fields = _NODE_TYPE_TO_KEY_FIELDS[ntype]
+    for (ntype, key_fields_tuple), node_list in grouped.items():
+        key_fields = list(key_fields_tuple)
 
         # 构建 UNWIND 参数
         params_list = _build_unwind_params(node_list, key_fields)
