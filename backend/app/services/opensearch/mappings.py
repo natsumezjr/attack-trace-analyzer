@@ -1,5 +1,5 @@
 # OpenSearch索引映射定义
-# 根据 docs/31-OpenSearch模块规格说明书.md 与 docs/51-ECS字段规范.md 中的规范
+# 根据 docs/80-规范/82-OpenSearch索引与Mapping规范.md 与 docs/80-规范/81-ECS字段规范.md 中的规范
 
 # ECS Events索引映射
 ecs_events_mapping = {
