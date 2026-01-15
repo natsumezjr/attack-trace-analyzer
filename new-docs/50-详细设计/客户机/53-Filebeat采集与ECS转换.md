@@ -53,6 +53,11 @@ detector 会对每条日志执行以下固定补齐：
 - `ecs.version` 固定写为 `9.2.0`
 - `event.ingested` 缺失时写入当前时间
 
+为保证三传感器数据可在中心机侧汇聚到同一 `Host`，detector 还会执行主机身份规范化：
+
+- 支持通过环境变量 `HOST_NAME` 覆盖 `host.name`
+- 优先使用环境变量 `HOST_ID` 覆盖 `host.id`；当 `HOST_ID` 缺失时，按 `81-ECS字段规范.md` 回退生成 `host.id`：`h-` + sha1(host.name)[:16]
+
 当命中 Sigma 规则时，detector 将该事件标记为告警并补齐：
 
 - `event.kind="alert"`
@@ -60,6 +65,16 @@ detector 会对每条日志执行以下固定补齐：
 - `event.type=["indicator"]`
 - `event.dataset="finding.raw.filebeat_sigma"`
 - `rule.*`、`threat.*`、`custom.*` 等结构化字段
+
+当日志来自 `auth.log` 且能够解析出 SSH 登录关键信息时，detector 还会输出 Telemetry（用于登录链路与横向移动线索）：
+
+- `event.kind="event"`
+- `event.dataset="hostlog.auth"`
+- `event.category=["authentication"]`
+- `event.action`：`user_login` / `user_logout` / `logon_failed`
+- `event.outcome`：`success` / `failure`
+- `event.type`：`start` / `end` / `info`
+- `user.name`、`source.ip`：必须存在（若无法解析则不强制输出该 Telemetry，避免产生不符合 `81-ECS字段规范.md` 的无效事件）
 
 ## 3. 会话重建字段
 

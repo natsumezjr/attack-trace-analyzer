@@ -22,14 +22,39 @@ export type AnalysisTaskItem = {
   "task.window.end_ts": string;
   "task.started_at"?: string | null;
   "task.finished_at"?: string | null;
+  "task.error"?: string | null;
+  "task.result.summary"?: string | null;
+  "task.result.ttp_similarity.attack_tactics"?: string[] | null;
+  "task.result.ttp_similarity.attack_techniques"?: string[] | null;
+  "task.result.ttp_similarity.similar_apts"?: unknown[] | null;
+  "task.result.trace.updated_edges"?: number | null;
+  "task.result.trace.path_edges"?: number | null;
 };
 
-export type AnalysisTasksResponse = {
-  ok: boolean;
-  total: number;
-  items: AnalysisTaskItem[];
-  server_time?: string;
-};
+export type AnalysisTasksResponse =
+  | {
+      status: "ok";
+      total: number;
+      items: AnalysisTaskItem[];
+      server_time?: string;
+    }
+  | {
+      status: "error";
+      error: { code: string; message: string };
+      server_time?: string;
+    };
+
+export type AnalysisTaskResponse =
+  | {
+      status: "ok";
+      task: AnalysisTaskItem;
+      server_time?: string;
+    }
+  | {
+      status: "error";
+      error: { code: string; message: string };
+      server_time?: string;
+    };
 
 export type AnalysisTasksQuery = {
   status?: string;
@@ -75,6 +100,25 @@ export async function fetchAnalysisTasks(
 
   if (!response.ok) {
     throw new Error("Failed to fetch analysis tasks");
+  }
+
+  return response.json();
+}
+
+export async function fetchAnalysisTask(taskId: string): Promise<AnalysisTaskResponse> {
+  const response = await fetch(`/api/analysis/tasks/${encodeURIComponent(taskId)}`);
+
+  if (!response.ok) {
+    try {
+      const data = await response.json();
+      return data;
+    } catch {
+      const text = await response.text();
+      return {
+        status: "error",
+        error: { code: "HTTP_ERROR", message: text || "Failed to fetch analysis task" },
+      };
+    }
   }
 
   return response.json();

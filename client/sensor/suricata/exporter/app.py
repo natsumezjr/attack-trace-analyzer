@@ -5,6 +5,7 @@ import threading
 import time
 import traceback
 from datetime import datetime, timezone
+from hashlib import sha1
 from typing import Any, Dict, Optional
 
 from flask import Flask, jsonify
@@ -124,7 +125,19 @@ def shannon_entropy(s: str) -> float:
     return ent
 
 
+def make_host_id(host_name: str) -> str:
+    return f"h-{sha1(host_name.encode('utf-8')).hexdigest()[:16]}"
+
+
 def base_event(event: Dict[str, Any], raw_line: str, kind: str, dataset: str) -> Dict[str, Any]:
+    host_name = (HOST_NAME or "").strip()
+    host_id = (HOST_ID or "").strip()
+    if not host_name:
+        host_name = "unknown"
+    # Prefer HOST_ID when provided (docs/89). Otherwise derive a stable fallback id.
+    if not host_id:
+        host_id = make_host_id(host_name)
+
     ecs = {
         "ecs.version": "9.2.0",
         "@timestamp": normalize_timestamp(event.get("timestamp")),
@@ -132,8 +145,8 @@ def base_event(event: Dict[str, Any], raw_line: str, kind: str, dataset: str) ->
         "event.ingested": now_iso(),
         "event.kind": kind,
         "event.dataset": dataset,
-        "host.id": HOST_ID,
-        "host.name": HOST_NAME,
+        "host.id": host_id,
+        "host.name": host_name,
         "agent.name": AGENT_NAME,
         "agent.version": AGENT_VERSION,
         "event.original": raw_line.strip(),
@@ -219,6 +232,29 @@ def map_dns(event: Dict[str, Any], raw_line: str) -> Dict[str, Any]:
         ecs["dns.question.type"] = dns.get("rrtype")
     if dns.get("rcode"):
         ecs["dns.response_code"] = dns.get("rcode")
+
+    answers = dns.get("answers")
+    if isinstance(answers, list):
+        ecs_answers = []
+        for ans in answers:
+            if not isinstance(ans, dict):
+                continue
+            data = ans.get("rdata") or ans.get("data") or ans.get("ip")
+            rrtype = ans.get("rrtype") or ans.get("type")
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, str) and item.strip():
+                        item_obj = {"data": item.strip()}
+                        if rrtype:
+                            item_obj["type"] = rrtype
+                        ecs_answers.append(item_obj)
+            elif isinstance(data, str) and data.strip():
+                item_obj = {"data": data.strip()}
+                if rrtype:
+                    item_obj["type"] = rrtype
+                ecs_answers.append(item_obj)
+        if ecs_answers:
+            ecs["dns.answers"] = ecs_answers
 
     return ecs
 
@@ -396,13 +432,16 @@ def process_event(publish, event: Dict[str, Any], raw_line: str) -> None:
     if etype == "flow":
         insert_event(publish, map_flow(event, raw_line))
     elif etype == "dns":
-        return
+        insert_event(publish, map_dns(event, raw_line))
+        alert = build_dns_tunnel_alert(event, raw_line)
+        if alert is not None:
+            insert_event(publish, alert)
     elif etype == "http":
-        return
+        insert_event(publish, map_http(event, raw_line))
     elif etype == "tls":
-        return
+        insert_event(publish, map_tls(event, raw_line))
     elif etype == "icmp":
-        return
+        insert_event(publish, map_icmp(event, raw_line))
     elif etype == "alert":
         insert_event(publish, map_alert(event, raw_line))
 
