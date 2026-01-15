@@ -137,14 +137,22 @@ def graph_query(req: GraphQueryRequest):
                     found=False,
                     cost=None,
                     edges=[],
+                    nodes=[],
                     server_time=utc_now_rfc3339(),
                 )
 
             cost, edges = result
+            uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
+            nodes: list[dict[str, Any]] = []
+            for uid in sorted(uids):
+                node = graph_api.get_node(uid)
+                if node is not None:
+                    nodes.append(_node_to_dict(node))
             return ok(
                 found=True,
                 cost=cost,
                 edges=[_edge_to_dict(e) for e in edges],
+                nodes=nodes,
                 server_time=utc_now_rfc3339(),
             )
 
