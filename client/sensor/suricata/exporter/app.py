@@ -387,6 +387,11 @@ def insert_event(publish, payload: Dict[str, Any]) -> None:
 
 
 def process_event(publish, event: Dict[str, Any], raw_line: str) -> None:
+    src_port = event.get("src_port")
+    dst_port = event.get("dest_port")
+    if src_port == 8888 or dst_port == 8888:
+        return
+
     etype = event.get("event_type")
     if etype == "flow":
         insert_event(publish, map_flow(event, raw_line))
