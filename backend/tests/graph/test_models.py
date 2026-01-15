@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.graph import models
+from app.services.neo4j import models
 
 
 def test_build_uid_single_key_includes_key_name() -> None:

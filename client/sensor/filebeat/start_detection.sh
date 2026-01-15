@@ -35,7 +35,7 @@ echo ""
 echo "[4/6] 清理旧的检测器 JSON 输出..."
 mkdir -p output
 rm -f output/ecs_logs_with_anomalies.json output/anomalies.json
-echo "✓ JSON 输出文件已清理（保留数据库）"
+echo "✓ JSON 输出文件已清理"
 echo ""
 
 # 5. 后台启动Filebeat
@@ -81,6 +81,7 @@ echo "✓ JSON 输出文件已清理"
 
 echo ""
 echo "查看结果："
-echo "  python3 query_database.py"
-echo "  数据库文件: output/data.db"
+echo "  运行中输出: output/ecs_logs_with_anomalies.json"
+echo "  运行中输出: output/anomalies.json"
+echo "  注意：脚本结束时会清理上述文件；如需保留请注释掉清理步骤。"
 echo ""

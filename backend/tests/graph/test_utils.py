@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.services.graph.utils import _parse_ts_to_float
+from app.services.neo4j.utils import _parse_ts_to_float
 
 
 def test_parse_ts_to_float_none_or_empty() -> None:

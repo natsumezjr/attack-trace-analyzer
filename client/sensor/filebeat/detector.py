@@ -9,7 +9,6 @@ using Sigma rules, marking suspicious events in the output.
 import json
 import os
 import re
-import sqlite3
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -21,6 +20,47 @@ try:
 except ImportError:
     print("Error: PyYAML not installed. Run: pip3 install pyyaml")
     exit(1)
+
+
+class RabbitPublisher:
+    def __init__(self, amqp_url: str, queue_name: str):
+        try:
+            import pika
+        except ImportError:
+            print("Error: pika not installed. Add it to requirements.txt")
+            exit(1)
+        self._pika = pika
+        self.amqp_url = amqp_url
+        self.queue_name = queue_name
+        self.connection = None
+        self.channel = None
+        self._connect()
+
+    def _connect(self):
+        params = self._pika.URLParameters(self.amqp_url)
+        self.connection = self._pika.BlockingConnection(params)
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue=self.queue_name, durable=True)
+
+    def publish(self, payload: Dict[str, Any]):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        try:
+            if self.connection.is_closed or self.channel.is_closed:
+                self._connect()
+            self.channel.basic_publish(
+                exchange="",
+                routing_key=self.queue_name,
+                body=body,
+                properties=self._pika.BasicProperties(delivery_mode=2),
+            )
+        except Exception:
+            self._connect()
+            self.channel.basic_publish(
+                exchange="",
+                routing_key=self.queue_name,
+                body=body,
+                properties=self._pika.BasicProperties(delivery_mode=2),
+            )
 
 
 class SigmaRule:
@@ -95,14 +135,10 @@ class AnomalyDetector:
         self.cleanup_interval = timedelta(minutes=1)  # 每 1 分钟检查一次
         self.retention_period = timedelta(minutes=5)  # 保留 5 分钟内的记录
 
-        # SQLite database
-        db_path = os.getenv('DB_PATH')
-        if db_path:
-            self.db_path = Path(db_path)
-        else:
-            self.db_path = self.output_dir / 'data.db'
-        self.table_name = os.getenv('TABLE_NAME', 'filebeat')
-        self.init_database()
+        # RabbitMQ publisher
+        amqp_url = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq:5672/')
+        queue_name = os.getenv('RABBITMQ_QUEUE', 'data.filebeat')
+        self.publisher = RabbitPublisher(amqp_url, queue_name)
 
     def load_rules(self):
         """Load all Sigma rules from rules directory"""
@@ -124,55 +160,12 @@ class AnomalyDetector:
 
         print(f"Loaded {len(self.rules)} detection rules\n")
 
-    def init_database(self):
-        """Initialize SQLite database and create table if not exists"""
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA busy_timeout=30000;")
-        cursor = conn.cursor()
-
-        # Create data table
-        cursor.execute(f'''
-            CREATE TABLE IF NOT EXISTS {self.table_name} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_json TEXT NOT NULL
-            )
-        ''')
-
-        conn.commit()
-        conn.close()
-        print(f"Database initialized: {self.db_path}\n")
-
-    def insert_log_entry(self, log_entry: Dict[str, Any]):
-        """Insert a log entry into the database"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA busy_timeout=30000;")
-        cursor = conn.cursor()
-
-        event_json = json.dumps(log_entry)
-
-        for _ in range(5):
-            try:
-                cursor.execute(
-                    f'INSERT INTO {self.table_name} (event_json) VALUES (?)',
-                    (event_json,),
-                )
-                conn.commit()
-                conn.close()
-                return
-            except sqlite3.OperationalError as exc:
-                if "locked" not in str(exc).lower():
-                    conn.close()
-                    raise
-                time.sleep(0.2)
-
-        conn.close()
-        raise sqlite3.OperationalError("database is locked")
+    def publish_log_entry(self, log_entry: Dict[str, Any]):
+        """Publish a log entry to RabbitMQ"""
+        self.publisher.publish(log_entry)
 
     def cleanup_old_json_records(self):
-        """清理 JSON 文件中 5 分钟之前的记录（数据库中已保存）"""
+        """清理 JSON 文件中 5 分钟之前的记录（已发送到消息队列）"""
         try:
             current_time = datetime.utcnow()
             cutoff_time = current_time - self.retention_period
@@ -188,7 +181,7 @@ class AnomalyDetector:
             if anomalies_file.exists():
                 self._cleanup_json_file(anomalies_file, cutoff_time)
 
-            print(f"[清理] 已清理 5 分钟前的 JSON 记录 (数据已在数据库中保存)")
+            print(f"[清理] 已清理 5 分钟前的 JSON 记录 (数据已在消息队列中发送)")
 
         except Exception as e:
             print(f"[清理] 清理失败: {e}")
@@ -307,7 +300,10 @@ class AnomalyDetector:
             log_entry['event']['category'] = ['intrusion_detection']
             log_entry['event']['type'] = ['indicator']
             log_entry['event']['severity'] = matched_rules[0]['severity_num']
-            log_entry['event']['dataset'] = log_entry.get('event', {}).get('dataset', 'finding.raw')
+            dataset = log_entry.get('event', {}).get('dataset')
+            if not dataset or dataset == 'finding.raw':
+                dataset = 'finding.raw.filebeat_sigma'
+            log_entry['event']['dataset'] = dataset
 
             # 添加rule字段（ECS标准）
             log_entry['rule'] = {
@@ -414,8 +410,8 @@ class AnomalyDetector:
                                 with open(output_file, 'a') as out:
                                     out.write(json.dumps(processed_entry) + '\n')
 
-                                # Insert into database (both anomalies and normal logs)
-                                self.insert_log_entry(processed_entry)
+                                # Publish to RabbitMQ (both anomalies and normal logs)
+                                self.publish_log_entry(processed_entry)
 
                                 # Write anomalies to separate file
                                 if 'anomaly' in processed_entry:
@@ -467,9 +463,8 @@ class AnomalyDetector:
             print(f"\nFinal stats:")
             print(f"  Total logs processed: {self.total_logs}")
             print(f"  Anomalies detected: {self.anomalies_found}")
-            print(f"  Database file: {self.db_path}")
-            print(f"  Total database records: {self.total_logs}")
-            print(f"\n所有数据已保存在数据库中: {self.db_path}")
+            print(f"  Total published records: {self.total_logs}")
+            print(f"\n所有数据已发送到消息队列")
 
 
 def main():

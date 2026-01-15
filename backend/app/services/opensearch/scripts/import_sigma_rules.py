@@ -49,7 +49,7 @@ sys.path.insert(0, str(backend_dir))
 def get_client():
     """延迟导入 get_client"""
     try:
-        from opensearch import get_client as _get_client
+        from opensearch.internal import get_client as _get_client
         return _get_client()
     except ImportError as e:
         print("\n[ERROR] 无法导入 opensearch 模块")
@@ -60,29 +60,19 @@ def get_client():
         raise
 
 # OpenSearch 配置
-# 默认使用 HTTP（如果禁用了安全插件）
-# 如果启用了安全插件，请设置环境变量 OPENSEARCH_URL=https://localhost:9200
-OPENSEARCH_URL = os.getenv("OPENSEARCH_URL") or os.getenv("OPENSEARCH_NODE") or "http://localhost:9200"
-OPENSEARCH_USER = os.getenv("OPENSEARCH_USER") or os.getenv("OPENSEARCH_USERNAME") or "admin"
+OPENSEARCH_URL = os.getenv("OPENSEARCH_URL", "https://localhost:9200")
+OPENSEARCH_USER = os.getenv("OPENSEARCH_USER", "admin")
 OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "OpenSearch@2024!Dev")
 
 def test_opensearch_connection() -> bool:
     """测试OpenSearch连接"""
-    from urllib.parse import urlparse
-    parsed = urlparse(OPENSEARCH_URL)
-    use_ssl = parsed.scheme == "https"
-    
     try:
-        # 只有在启用 SSL 时才使用认证
-        client_kwargs = {
-            "verify": False,
-            "timeout": httpx.Timeout(10.0, connect=5.0),
-            "follow_redirects": True
-        }
-        if use_ssl:
-            client_kwargs["auth"] = (OPENSEARCH_USER, OPENSEARCH_PASSWORD)
-        
-        client = httpx.Client(**client_kwargs)
+        client = httpx.Client(
+            auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+            verify=False,
+            timeout=httpx.Timeout(10.0, connect=5.0),
+            follow_redirects=True
+        )
         try:
             response = client.get(f"{OPENSEARCH_URL}/", follow_redirects=True)
             if response.status_code == 200:
@@ -108,8 +98,9 @@ def test_opensearch_connection() -> bool:
         print(f"\n[错误] 连接测试失败: {type(e).__name__}: {e}")
         return False
 
-# Sigma 规则目录（在 opensearch 目录下，不在 scripts 目录下）
-SIGMA_RULES_DIR = Path(__file__).parent.parent / "sigma-rules"
+# Sigma 规则目录
+# 脚本在 scripts/ 目录下，sigma 目录在 opensearch/ 目录下
+SIGMA_RULES_DIR = Path(__file__).parent.parent / "sigma"
 
 # ECS 字段映射（Sigma 字段 -> ECS 字段）
 SIGMA_TO_ECS_MAPPING = {
@@ -185,7 +176,8 @@ def find_sigma_rules(
     
     if not rules_dir.exists():
         print(f"错误: Sigma 规则目录不存在: {rules_dir}")
-        print("请先运行: cd backend/opensearch/sigma-rules && git clone https://github.com/SigmaHQ/sigma.git .")
+        print(f"请先运行: cd backend/opensearch && git clone https://github.com/SigmaHQ/sigma.git sigma")
+        print(f"或者确保 sigma 目录存在于: {rules_dir}")
         return []
     
     search_paths = []
@@ -339,7 +331,7 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             rule_data = yaml.safe_load(f)
         
         if not rule_data:
-            print(f"[X] 导入失败: {rule_file.name} (无法解析 YAML)")
+            print(f"✗ 导入失败: {rule_file.name} (无法解析 YAML)")
             return False
         
         # 序列化日期字段（date 和 modified）
@@ -385,33 +377,26 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
         url = f"{OPENSEARCH_URL}/_plugins/_security_analytics/rules"
         params = {"category": category}
         
-        # 根据 URL 协议决定是否使用认证
-        from urllib.parse import urlparse
-        parsed = urlparse(OPENSEARCH_URL)
-        use_ssl = parsed.scheme == "https"
-        
+        # 配置httpx客户端，处理HTTPS连接问题
         try:
             # 创建客户端，禁用SSL验证并配置连接池
-            client_kwargs = {
-                "verify": False,  # 禁用SSL验证（开发环境）
-                "timeout": httpx.Timeout(30.0, connect=10.0),  # 连接超时10秒，总超时30秒
-                "follow_redirects": True,  # 跟随重定向
-                "limits": httpx.Limits(
+            client = httpx.Client(
+                auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+                verify=False,  # 禁用SSL验证（开发环境）
+                timeout=httpx.Timeout(30.0, connect=10.0),  # 连接超时10秒，总超时30秒
+                follow_redirects=True,  # 跟随重定向
+                limits=httpx.Limits(
                     max_keepalive_connections=5,
                     max_connections=10,
                     keepalive_expiry=5.0
                 )
-            }
-            if use_ssl:
-                client_kwargs["auth"] = (OPENSEARCH_USER, OPENSEARCH_PASSWORD)
-            
-            client = httpx.Client(**client_kwargs)
+            )
             try:
                 response = client.post(url, params=params, json=rule_data)
             finally:
                 client.close()  # 确保关闭连接
         except httpx.ConnectError as e:
-            print(f"[X] 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_URL}")
+            print(f"✗ 连接错误: {rule_file.name} - 无法连接到 {OPENSEARCH_URL}")
             print(f"  错误详情: {e}")
             print(f"  请检查:")
             print(f"    1) OpenSearch服务是否运行 (docker ps)")
@@ -419,35 +404,35 @@ def import_rule(rule_file: Path, dry_run: bool = False) -> bool:
             print(f"    3) 防火墙/网络是否允许连接")
             return False
         except httpx.TimeoutException as e:
-            print(f"[X] 超时错误: {rule_file.name} - 连接超时")
+            print(f"✗ 超时错误: {rule_file.name} - 连接超时")
             print(f"  错误详情: {e}")
             print(f"  提示: OpenSearch可能响应缓慢，请检查服务状态")
             return False
         except httpx.HTTPStatusError as e:
-            print(f"[X] HTTP状态错误: {rule_file.name} - {e.response.status_code}")
+            print(f"✗ HTTP状态错误: {rule_file.name} - {e.response.status_code}")
             print(f"  响应: {e.response.text[:300]}")
             return False
         except httpx.HTTPError as e:
-            print(f"[X] HTTP错误: {rule_file.name} - {e}")
+            print(f"✗ HTTP错误: {rule_file.name} - {e}")
             return False
         except Exception as e:
-            print(f"[X] 未知错误: {rule_file.name} - {type(e).__name__}: {e}")
+            print(f"✗ 未知错误: {rule_file.name} - {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
             return False
         
         if response.status_code in [200, 201]:
-            print(f"[OK] 成功导入: {rule_file.name} (category: {category})")
+            print(f"✓ 成功导入: {rule_file.name} (category: {category})")
             return True
         else:
-            print(f"[X] 导入失败: {rule_file.name} (状态码: {response.status_code})")
+            print(f"✗ 导入失败: {rule_file.name} (状态码: {response.status_code})")
             print(f"  响应: {response.text[:300]}")
             return False
     except yaml.YAMLError as e:
-        print(f"[X] 导入错误: {rule_file.name} - YAML 解析失败: {e}")
+        print(f"✗ 导入错误: {rule_file.name} - YAML 解析失败: {e}")
         return False
     except Exception as e:
-        print(f"[X] 导入错误: {rule_file.name} - {e}")
+        print(f"✗ 导入错误: {rule_file.name} - {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -501,77 +486,35 @@ def get_imported_rules() -> List[str]:
 
 
 def create_or_update_detector(rule_ids: List[str]) -> bool:
-    """创建或更新 detector"""
-    if not rule_ids:
-        print("警告: 没有规则，无法创建 detector")
-        return False
-    
-    client = get_client()  # 这里会调用延迟导入的函数
-    
-    # 只使用前20个规则（避免 detector 配置过大）
-    rules_to_use = rule_ids[:20]
-    
-    detector_config = {
-        "name": "ecs-events-detector",
-        "description": "检测 ECS 事件中的可疑行为（自动创建）",
-        "detector_type": "network",  # 使用 network 类型（适合 ECS 事件）
-        "enabled": True,
-        "schedule": {
-            "period": {
-                "interval": 1,
-                "unit": "MINUTES"
-            }
-        },
-        "inputs": [
-            {
-                "detector_input": {
-                    "description": "扫描所有 ecs-events 索引",
-                    "indices": ["ecs-events-*"],
-                    "custom_rules": [{"id": rule_id} for rule_id in rules_to_use]
-                }
-            }
-        ],
-        "triggers": []
-    }
-    
+    """创建或更新 detector（使用setup_security_analytics.py中的统一函数）"""
+    # 导入setup_security_analytics模块中的函数
+    sys.path.insert(0, str(Path(__file__).parent))
     try:
-        # 检查是否已存在
-        try:
-            response = client.transport.perform_request(
-                'POST',
-                '/_plugins/_security_analytics/detectors/_search',
-                body={"size": 100}
-            )
-            detectors = response.get('hits', {}).get('hits', [])
-            for hit in detectors:
-                detector = hit.get('_source', {})
-                if detector.get('name') == 'ecs-events-detector':
-                    detector_id = hit.get('_id')
-                    print(f"[INFO] Detector 已存在 (ID: {detector_id})，尝试更新...")
-                    # 更新现有 detector
-                    update_response = client.transport.perform_request(
-                        'PUT',
-                        f'/_plugins/_security_analytics/detectors/{detector_id}',
-                        body=detector_config
-                    )
-                    print(f"[OK] Detector 更新成功")
-                    return True
-        except Exception as e:
-            print(f"[WARNING] 检查现有 detector 失败: {e}，尝试创建新 detector...")
+        from setup_security_analytics import create_or_update_detector_from_rules
         
-        # 创建新 detector
-        response = client.transport.perform_request(
-            'POST',
-            '/_plugins/_security_analytics/detectors',
-            body=detector_config
-        )
-        detector_id = response.get('_id')
-        print(f"[OK] Detector 创建成功 (ID: {detector_id})")
-        print(f"     使用了 {len(rules_to_use)} 个规则")
-        return True
+        result = create_or_update_detector_from_rules(rule_ids)
         
-    except Exception as e:
-        print(f"[ERROR] 创建/更新 detector 失败: {e}")
+        if result.get("success"):
+            detector_id = result.get("detector_id")
+            detector_name = result.get("detector_name", "ecs-events-detector")
+            detector_type = result.get("detector_type", "unknown")
+            rules_count = result.get("rules_count", 0)
+            print(f"\n✅ Detector ID: {detector_id}")
+            print(f"   名称: {detector_name}")
+            print(f"   类型: {detector_type}")
+            print(f"   规则数量: {rules_count}")
+            return True
+        else:
+            print(f"[ERROR] 创建/更新detector失败: {result.get('message', '未知错误')}")
+            return False
+    except ImportError as e:
+        print(f"[ERROR] 无法导入setup_security_analytics模块: {e}")
+        print("[WARNING] 回退到简单实现...")
+        # 如果导入失败，使用简单的实现（向后兼容）
+        if not rule_ids:
+            print("警告: 没有规则，无法创建 detector")
+            return False
+        print("[WARNING] 请使用 setup_security_analytics.py 来创建detector")
         return False
 
 
@@ -595,7 +538,7 @@ def main():
         if not test_opensearch_connection():
             print("\n连接失败，退出。")
             sys.exit(1)
-        print("[OK] 连接成功\n")
+        print("✓ 连接成功\n")
     
     if args.list:
         list_categories()

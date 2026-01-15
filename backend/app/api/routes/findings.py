@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
-from app.services.opensearch.client import get_client
-from app.services.opensearch.index import INDEX_PATTERNS
+from app.core.time import format_rfc3339
+from app.services.opensearch.internal import INDEX_PATTERNS, get_client
 
 
 router = APIRouter()
@@ -39,8 +39,7 @@ class FindingsSearchRequest(BaseModel):
 
 
 def _iso(dt: datetime) -> str:
-    s = dt.isoformat()
-    return s.replace("+00:00", "Z")
+    return format_rfc3339(dt)
 
 
 def _build_query(req: FindingsSearchRequest) -> dict[str, Any]:
@@ -115,4 +114,3 @@ def search_findings(req: FindingsSearchRequest):
         items=items,
         server_time=utc_now_rfc3339(),
     )
-

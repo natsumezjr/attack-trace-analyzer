@@ -1,7 +1,25 @@
 services:
+  rabbitmq:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   falco:
-    image: falcosecurity/falco:0.42.0
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/falcosecurity/falco:0.42.1
     container_name: falco
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     privileged: true
     pid: host
     volumes:
@@ -29,25 +47,30 @@ services:
       context: ./sensor/falco/ecs-converter
     container_name: falco-ecs
     depends_on:
-      - falco
+      falco:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     environment:
-      TABLE_NAME: "falco"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      RABBITMQ_QUEUE: "data.falco"
     volumes:
       - ./data:/data
     command:
       - --input
       - /data/falco.jsonl
       - --follow
-      - --sqlite
-      - /data/falco.db
-      - --reset
-      - --no-json
+      - --queue
+      - data.falco
 
   filebeat:
     build:
       context: ./sensor/filebeat
       dockerfile: Dockerfile
     container_name: filebeat
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - /var/log:/var/log/host:ro
       - ./data/filebeat-output:/app/output
@@ -55,8 +78,8 @@ services:
     restart: unless-stopped
     environment:
       - TZ=${TZ:-Asia/Shanghai}
-      - DB_PATH=/data/filebeat.db
-      - TABLE_NAME=filebeat
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_QUEUE=data.filebeat
     logging:
       driver: "json-file"
       options:
@@ -66,6 +89,9 @@ services:
   suricata:
     build:
       context: ./sensor/suricata/engine
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     command: ["/bin/sh", "/run-suricata.sh"]
     volumes:
       - ./data:/data
@@ -90,12 +116,15 @@ services:
     build:
       context: ./sensor/suricata/exporter
     depends_on:
-      - suricata
+      suricata:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     environment:
       HOST_ID: ${HOST_ID:-sensor-01}
       HOST_NAME: ${HOST_NAME:-suricata-sensor}
-      DB_FILE: "/data/suricata.db"
-      TABLE_NAME: "suricata"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      RABBITMQ_QUEUE: "data.suricata"
     volumes:
       - ./data:/data
 
@@ -105,18 +134,21 @@ services:
     container_name: backend
     ports:
       - "8888:8888"
-    volumes:
-      - ./data:/data
-    command:
-      - -falco-db
-      - /data/falco.db
-      - -filebeat-db
-      - /data/filebeat.db
-      - -suricata-db
-      - /data/suricata.db
+    environment:
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      FALCO_QUEUE: "data.falco"
+      FILEBEAT_QUEUE: "data.filebeat"
+      SURICATA_QUEUE: "data.suricata"
     depends_on:
-      - falco
-      - falco-ecs
-      - filebeat
-      - suricata
-      - suricata-exporter
+      rabbitmq:
+        condition: service_healthy
+      falco:
+        condition: service_started
+      falco-ecs:
+        condition: service_started
+      filebeat:
+        condition: service_started
+      suricata:
+        condition: service_started
+      suricata-exporter:
+        condition: service_started

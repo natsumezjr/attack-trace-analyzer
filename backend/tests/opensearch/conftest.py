@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from app.services.opensearch import get_client, initialize_indices
+from app.services.opensearch.internal import get_client, initialize_indices
 from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
 
 
@@ -35,7 +35,6 @@ def clean_test_indices(opensearch_client):
         get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today),
         get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today),
         get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today),
-        get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today),
     ]
 
     for index_name in test_indices:

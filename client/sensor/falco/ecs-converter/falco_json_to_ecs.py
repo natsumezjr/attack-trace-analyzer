@@ -4,13 +4,13 @@
 import argparse
 import json
 import os
-import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-TABLE_NAME = os.getenv("TABLE_NAME", "falco")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+QUEUE_NAME = os.getenv("RABBITMQ_QUEUE", "data.falco")
 
 PRIORITY_RANK = {
     "DEBUG": 1,
@@ -38,7 +38,10 @@ PRIORITY_SEVERITY = {
 def iso_utc(ts: Optional[str]) -> Optional[str]:
     if not ts:
         return None
-    return ts
+    s = ts.strip()
+    if not s:
+        return None
+    return s.replace("+00:00", "Z")
 
 
 def to_int(x):
@@ -60,7 +63,10 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     out_fields = evt.get("output_fields") or {}
     ecs: Dict = {}
 
-    ecs["@timestamp"] = iso_utc(evt.get("time")) or datetime.now(timezone.utc).isoformat()
+    ecs["@timestamp"] = (
+        iso_utc(evt.get("time"))
+        or datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
     ecs["ecs"] = {"version": "8.11.0"}
     ecs.setdefault("event", {})["dataset"] = "falco"
 
@@ -175,10 +181,6 @@ def parse_args():
     parser.add_argument("--normal", help="Output JSONL for normal behavior.")
     parser.add_argument("--abnormal", help="Output JSONL for abnormal behavior.")
     parser.add_argument(
-        "--sqlite",
-        help="SQLite DB file path to store ECS events.",
-    )
-    parser.add_argument(
         "--abnormal-priority",
         default="WARNING",
         help="Priority threshold treated as abnormal (default: WARNING).",
@@ -191,51 +193,66 @@ def parse_args():
     parser.add_argument(
         "--reset",
         action="store_true",
-        help="Clear output files and sqlite db on startup.",
+        help="Clear output files on startup.",
     )
     parser.add_argument(
-        "--no-json",
-        action="store_true",
-        help="Skip writing JSONL files; only write to sqlite.",
+        "--amqp-url",
+        default=RABBITMQ_URL,
+        help="RabbitMQ URL (default: env RABBITMQ_URL).",
+    )
+    parser.add_argument(
+        "--queue",
+        default=QUEUE_NAME,
+        help="RabbitMQ queue name (default: env RABBITMQ_QUEUE).",
     )
     return parser.parse_args()
 
+def build_publisher(amqp_url: str, queue_name: str):
+    try:
+        import pika
+    except ImportError:
+        print("Missing dependency: pika. Install it in the container.", file=sys.stderr)
+        sys.exit(2)
 
-def init_db(db_path: str) -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
-    conn = sqlite3.connect(db_path, timeout=30)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA busy_timeout=30000;")
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_json TEXT
-        )
-        """
-    )
-    conn.commit()
-    return conn
+    def _connect():
+        params = pika.URLParameters(amqp_url)
+        backoff = 1.0
+        while True:
+            try:
+                connection = pika.BlockingConnection(params)
+                channel = connection.channel()
+                channel.queue_declare(queue=queue_name, durable=True)
+                return connection, channel
+            except Exception as exc:
+                print(f"RabbitMQ connect failed: {exc}. retry in {backoff:.1f}s", file=sys.stderr)
+                time.sleep(backoff)
+                if backoff < 10:
+                    backoff *= 2
 
+    connection, channel = _connect()
 
-def insert_event(conn: sqlite3.Connection, ecs: Dict):
-    payload = (json.dumps(ecs, ensure_ascii=False),)
-    for _ in range(5):
+    def publish(payload: Dict):
+        nonlocal connection, channel
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         try:
-            conn.execute(
-                f"""
-                INSERT INTO {TABLE_NAME} (event_json)
-                VALUES (?)
-                """,
-                payload,
+            if connection.is_closed or channel.is_closed:
+                connection, channel = _connect()
+            channel.basic_publish(
+                exchange="",
+                routing_key=queue_name,
+                body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
             )
-            return
-        except sqlite3.OperationalError as exc:
-            if "locked" not in str(exc).lower():
-                raise
-            time.sleep(0.2)
-    raise sqlite3.OperationalError("database is locked")
+        except Exception:
+            connection, channel = _connect()
+            channel.basic_publish(
+                exchange="",
+                routing_key=queue_name,
+                body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+
+    return publish
 
 
 def main():
@@ -251,15 +268,9 @@ def main():
     else:
         line_iter = sys.stdin
 
-    if args.no_json:
-        if not args.sqlite:
-            print("--no-json requires --sqlite", file=sys.stderr)
-            sys.exit(2)
-    else:
-        if not args.normal or not args.abnormal:
-            print("--normal and --abnormal are required unless --no-json is set", file=sys.stderr)
-            sys.exit(2)
+    if args.normal:
         os.makedirs(os.path.dirname(args.normal) or ".", exist_ok=True)
+    if args.abnormal:
         os.makedirs(os.path.dirname(args.abnormal) or ".", exist_ok=True)
 
     if args.reset:
@@ -268,23 +279,19 @@ def main():
                 os.remove(args.input)
             except FileNotFoundError:
                 pass
-        if not args.no_json:
-            for path in (args.normal, args.abnormal):
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-        if args.sqlite:
-            for suffix in ("", "-wal", "-shm"):
-                try:
-                    os.remove(args.sqlite + suffix)
-                except FileNotFoundError:
-                    pass
+        for path in (args.normal, args.abnormal):
+            if not path:
+                continue
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
 
-    conn = init_db(args.sqlite) if args.sqlite else None
-    pending = 0
-    last_commit = time.monotonic()
-    if args.no_json:
+    publish = build_publisher(args.amqp_url, args.queue)
+
+    normal_f = open(args.normal, "a", encoding="utf-8") if args.normal else None
+    abnormal_f = open(args.abnormal, "a", encoding="utf-8") if args.abnormal else None
+    try:
         for line in line_iter:
             line = line.strip()
             if not line:
@@ -296,45 +303,19 @@ def main():
 
             abnormal = is_abnormal(evt.get("priority", ""), threshold)
             ecs = falco_to_ecs(evt, abnormal)
-            if conn:
-                insert_event(conn, ecs)
-                pending += 1
-                if pending >= 100 or (time.monotonic() - last_commit) >= 2:
-                    conn.commit()
-                    pending = 0
-                    last_commit = time.monotonic()
-    else:
-        with open(args.normal, "a", encoding="utf-8") as normal_f, open(
-            args.abnormal, "a", encoding="utf-8"
-        ) as abnormal_f:
-            for line in line_iter:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    evt = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+            publish(ecs)
 
-                abnormal = is_abnormal(evt.get("priority", ""), threshold)
-                ecs = falco_to_ecs(evt, abnormal)
-                out_f = abnormal_f if abnormal else normal_f
+            out_f = abnormal_f if abnormal else normal_f
+            if out_f:
                 out_f.write(json.dumps(ecs, ensure_ascii=False) + "\n")
                 out_f.flush()
-                if conn:
-                    insert_event(conn, ecs)
-                    pending += 1
-                    if pending >= 100 or (time.monotonic() - last_commit) >= 2:
-                        conn.commit()
-                        pending = 0
-                        last_commit = time.monotonic()
-
-    if conn:
-        conn.commit()
-        conn.close()
+    finally:
+        if normal_f:
+            normal_f.close()
+        if abnormal_f:
+            abnormal_f.close()
 
 
 if __name__ == "__main__":
     main()
-
 

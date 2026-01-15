@@ -15,7 +15,7 @@ set -euo pipefail
 #   - 离线环境部署时预先下载数据
 #
 # 默认输出路径：
-#   backend/app/services/ttp_similarity/cti/enterprise-attack.json
+#   backend/app/services/analyze/ttp_similarity/cti/enterprise-attack.json
 #
 # 自定义输出：
 #   - 方式1：命令行参数传递路径
@@ -57,14 +57,14 @@ set -euo pipefail
 #   URL: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
 #
 # 相关文件：
-#   - backend/app/services/ttp_similarity/service.py: TTP 相似度分析服务
-#   - backend/app/services/ttp_similarity/cti/: CTI 数据存储目录
+#   - backend/app/services/analyze/ttp_similarity/service.py: TTP 相似度分析服务
+#   - backend/app/services/analyze/ttp_similarity/cti/: CTI 数据存储目录
 #
 # ============================================================================
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-DEFAULT_OUT="${ROOT_DIR}/app/services/ttp_similarity/cti/enterprise-attack.json"
+DEFAULT_OUT="${ROOT_DIR}/app/services/analyze/ttp_similarity/cti/enterprise-attack.json"
 FORCE=0
 if [[ "${1:-}" == "--force" || "${1:-}" == "-f" ]]; then
   FORCE=1
@@ -74,6 +74,20 @@ fi
 OUT_PATH="${1:-${ATTACK_CTI_PATH:-${DEFAULT_OUT}}}"
 
 CTI_URL="https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json"
+
+# Normalize output path:
+# - Expand "~/" to "$HOME/"
+# - Treat relative paths as relative to backend root (ROOT_DIR), not $PWD
+# - Accept repo-root style paths like "backend/app/..." by stripping the leading "backend/"
+if [[ "${OUT_PATH}" == "~/"* ]]; then
+  OUT_PATH="${HOME}/${OUT_PATH#~/}"
+fi
+if [[ "${OUT_PATH}" != /* ]]; then
+  if [[ "${OUT_PATH}" == backend/* ]]; then
+    OUT_PATH="${OUT_PATH#backend/}"
+  fi
+  OUT_PATH="${ROOT_DIR}/${OUT_PATH}"
+fi
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "错误: 未找到 curl 命令；请安装 curl（macOS 应该自带）" >&2
