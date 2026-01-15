@@ -203,13 +203,24 @@ def test_killchain_analysis():
     
     注意：这是一个临时测试接口，测试完成后可以删除
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("[TEST] test_killchain_analysis endpoint called")
+    print("[TEST] test_killchain_analysis endpoint called")
+    
     try:
         # 生成一个 killchain UUID
         kc_uuid = str(uuid.uuid4())
+        logger.info(f"[TEST] Generated kc_uuid: {kc_uuid}")
+        print(f"[TEST] Generated kc_uuid: {kc_uuid}")
         
         # 运行 killchain 分析
         # analyze_killchain 内部会调用 load_test_fsa_to_database() 加载测试数据
+        logger.info("[TEST] Calling analyze_killchain...")
+        print("[TEST] Calling analyze_killchain...")
         killchains = analyze_killchain(kc_uuid)
+        logger.info(f"[TEST] analyze_killchain returned {len(killchains)} killchains")
+        print(f"[TEST] analyze_killchain returned {len(killchains)} killchains")
         
         # 格式化返回结果
         result = {

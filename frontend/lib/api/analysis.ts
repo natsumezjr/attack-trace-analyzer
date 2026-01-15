@@ -154,10 +154,12 @@ export type TestKillchainResponse =
     };
 
 export async function testKillchainAnalysis(): Promise<TestKillchainResponse> {
-  const response = await fetch("/api/v1/analysis/killchain/test", {
+  console.log("[TEST] testKillchainAnalysis: calling /api/analysis/killchain/test");
+  const response = await fetch("/api/analysis/killchain/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
+  console.log("[TEST] testKillchainAnalysis: response status:", response.status);
 
   if (!response.ok) {
     try {

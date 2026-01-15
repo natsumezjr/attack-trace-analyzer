@@ -17,10 +17,15 @@ export default function TestKillchainPage() {
     setLoading(true);
     setResult(null);
     
+    console.log("[TEST] Starting killchain analysis test...");
+    
     try {
+      console.log("[TEST] Calling testKillchainAnalysis API...");
       const response = await testKillchainAnalysis();
+      console.log("[TEST] API response received:", response);
       setResult(response);
     } catch (error) {
+      console.error("[TEST] API call failed:", error);
       setResult({
         status: "error",
         error: {
