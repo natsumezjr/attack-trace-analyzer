@@ -8,11 +8,28 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
     import os
     llm_provider = os.getenv("LLM_PROVIDER", "not_set")
     has_api_key = bool(os.getenv("DEEPSEEK_API_KEY"))
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
     print(f"[DEBUG] analyze_killchain: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+    
+    # 强制要求使用真实大模型
+    if llm_provider.lower() == "mock" or not has_api_key:
+        error_msg = (
+            "❌ 错误：killchain 测试必须使用真实大模型！\n"
+            f"当前配置: LLM_PROVIDER={llm_provider}, DEEPSEEK_API_KEY={'已设置' if has_api_key else '未设置'}\n\n"
+            "请设置以下环境变量：\n"
+            "  export LLM_PROVIDER=deepseek\n"
+            "  export DEEPSEEK_API_KEY=your_api_key_here\n\n"
+            "或者在 backend/.env 文件中添加：\n"
+            "  LLM_PROVIDER=deepseek\n"
+            "  DEEPSEEK_API_KEY=your_api_key_here\n\n"
+            "设置后请重启后端服务。"
+        )
+        raise ValueError(error_msg)
     
     try:
         load_test_fsa_to_database()
-        llm_client = create_llm_client()
+        # 强制使用 deepseek provider
+        llm_client = create_llm_client(provider="deepseek", api_key=api_key)
         client_type = type(llm_client).__name__
         print(f"[DEBUG] LLM client created: {client_type}")
         
@@ -22,22 +39,35 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
         else:
             print(f"[DEBUG] WARNING: LLM client does NOT have choose method")
             
-        # 如果是 MockChooser，说明使用了 mock 模式
+        # 如果是 MockChooser，说明配置有问题
         if client_type == "MockChooser":
-            print(f"[DEBUG] Using MockChooser (mock mode)")
+            raise ValueError(
+                "❌ 错误：创建了 MockChooser 而不是真实 LLM！\n"
+                "请检查 DEEPSEEK_API_KEY 是否正确设置。"
+            )
         elif client_type == "LLMChooser":
-            print(f"[DEBUG] Using LLMChooser (real LLM mode)")
+            print(f"[DEBUG] ✓ Using LLMChooser (real LLM mode)")
             # 检查 chat_complete 是否设置
             if hasattr(llm_client, "chat_complete"):
                 if llm_client.chat_complete is None:
-                    print(f"[DEBUG] WARNING: LLMChooser.chat_complete is None")
+                    raise ValueError("LLMChooser.chat_complete is None，无法调用真实LLM")
                 else:
-                    print(f"[DEBUG] LLMChooser.chat_complete is set")
+                    print(f"[DEBUG] ✓ LLMChooser.chat_complete is set，可以调用真实LLM")
+    except ValueError as e:
+        # 重新抛出配置错误
+        raise
     except Exception as e:
-        print(f"[killchain] 无法创建 LLM client: {e}，使用 fallback")
+        error_msg = (
+            f"❌ 无法创建 LLM client: {e}\n\n"
+            "请检查：\n"
+            "1. DEEPSEEK_API_KEY 是否正确\n"
+            "2. 网络连接是否正常\n"
+            "3. 是否安装了 openai 库: uv add openai 或 pip install openai"
+        )
+        print(error_msg)
         import traceback
         traceback.print_exc()
-        llm_client = None
+        raise RuntimeError(error_msg) from e
     
     kcs = run_killchain_pipeline(kc_uuid=kc_uuid, llm_client=llm_client, persist=True)
     return kcs

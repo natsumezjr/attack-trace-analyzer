@@ -209,6 +209,25 @@ def test_killchain_analysis():
     print("[TEST] test_killchain_analysis endpoint called")
     
     try:
+        # 检查 LLM 配置
+        import os
+        llm_provider = os.getenv("LLM_PROVIDER", "not_set")
+        has_api_key = bool(os.getenv("DEEPSEEK_API_KEY"))
+        logger.info(f"[TEST] LLM配置检查: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+        print(f"[TEST] LLM配置检查: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+        
+        if llm_provider.lower() == "mock" or not has_api_key:
+            error_detail = (
+                "killchain 测试必须使用真实大模型。\n"
+                f"当前配置: LLM_PROVIDER={llm_provider}, DEEPSEEK_API_KEY={'已设置' if has_api_key else '未设置'}\n"
+                "请设置环境变量 LLM_PROVIDER=deepseek 和 DEEPSEEK_API_KEY=your_key"
+            )
+            logger.error(f"[TEST] {error_detail}")
+            return JSONResponse(
+                status_code=400,
+                content=err("BAD_REQUEST", error_detail),
+            )
+        
         # 生成一个 killchain UUID
         kc_uuid = str(uuid.uuid4())
         logger.info(f"[TEST] Generated kc_uuid: {kc_uuid}")
