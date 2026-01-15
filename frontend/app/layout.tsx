@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ModeToggle } from "@/components/mode-toggle";
 // 1. 确保引入了你的 Providers 组件
 import Providers from "./providers";
-
+import { Toaster } from "@/components/ui/sonner";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
