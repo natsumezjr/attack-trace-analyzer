@@ -225,3 +225,93 @@ def ingest_from_opensearch(
             total_edges += edge_count
 
     return total_events, total_nodes, total_edges
+
+
+def ingest_from_opensearch_ingested_window(
+    *,
+    start_time: datetime,
+    end_time: datetime,
+    size: int = 5000,
+    include_events: bool = True,
+    include_canonical_findings: bool = True,
+) -> tuple[int, int, int]:
+    """从 OpenSearch 拉取并入图（按 event.ingested 时间窗）
+
+    轮询 tick 内入库/分析写回的文档，其 event.ingested 会被中心机覆盖为“入库时间”。
+    因此，tick 级入图应按 event.ingested 做窗口过滤，避免 canonical 的 @timestamp
+    较早导致“本 tick 生成但没被入图”的遗漏。
+
+    Args:
+        start_time: event.ingested 起始时间（UTC）
+        end_time: event.ingested 结束时间（UTC）
+        size: 每个索引拉取的最大文档数（单次 search）
+        include_events: 是否包含 Telemetry（ecs-events-*）
+        include_canonical_findings: 是否包含 Canonical Findings（canonical-findings-*）
+
+    Returns:
+        tuple[int, int, int]: (总事件数, 总节点数, 总边数)
+    """
+    from app.core.time import format_rfc3339
+    from ..opensearch.client import get_client as get_opensearch_client
+    from ..opensearch.index import INDEX_PATTERNS as OPENSEARCH_INDEX_PATTERNS
+
+    start_rfc3339 = format_rfc3339(start_time)
+    end_rfc3339 = format_rfc3339(end_time)
+
+    def _search_sources(index_pattern: str, *, kind: str, dataset: str | None = None) -> list[dict[str, Any]]:
+        query: dict[str, Any] = {
+            "bool": {
+                "must": [
+                    {"term": {"event.kind": kind}},
+                    {"range": {"event.ingested": {"gte": start_rfc3339, "lte": end_rfc3339}}},
+                ]
+            }
+        }
+        if dataset is not None:
+            query["bool"]["must"].append({"term": {"event.dataset": dataset}})
+
+        client = get_opensearch_client()
+        resp = client.search(
+            index=index_pattern,
+            body={
+                "query": query,
+                "size": min(int(size), 10000),
+                "sort": [{"event.ingested": {"order": "asc"}}],
+            },
+        )
+        hits = (resp or {}).get("hits", {}).get("hits", [])
+        docs: list[dict[str, Any]] = []
+        for hit in hits:
+            src = hit.get("_source")
+            if isinstance(src, dict):
+                docs.append(src)
+        return docs
+
+    total_events = 0
+    total_nodes = 0
+    total_edges = 0
+
+    if include_events:
+        events = _search_sources(
+            f"{OPENSEARCH_INDEX_PATTERNS['ECS_EVENTS']}-*",
+            kind="event",
+        )
+        if events:
+            total_events += len(events)
+            node_count, edge_count = ingest_ecs_events(events)
+            total_nodes += node_count
+            total_edges += edge_count
+
+    if include_canonical_findings:
+        canonical = _search_sources(
+            f"{OPENSEARCH_INDEX_PATTERNS['CANONICAL_FINDINGS']}-*",
+            kind="alert",
+            dataset="finding.canonical",
+        )
+        if canonical:
+            total_events += len(canonical)
+            node_count, edge_count = ingest_ecs_events(canonical)
+            total_nodes += node_count
+            total_edges += edge_count
+
+    return total_events, total_nodes, total_edges

@@ -135,7 +135,7 @@ def _merge_node(tx, node: GraphNode) -> None:
 
 
 def add_edge(edge: GraphEdge) -> None:
-    """写入关系边（按证据追加）
+    """写入关系边（按 event.id 幂等 MERGE）
 
     关键：为 Phase B 的窗口过滤和 GDS 投影，写入数值时间戳 r.ts_float。
 
@@ -164,11 +164,17 @@ def add_edge(edge: GraphEdge) -> None:
 
 
 def _create_edge(tx, edge: GraphEdge) -> None:
-    """CREATE 边事务函数"""
+    """MERGE 边事务函数（按 (src,dst,rtype,event.id) 幂等）"""
     src_label, src_key = parse_uid(edge.src_uid)
     dst_label, dst_key = parse_uid(edge.dst_uid)
 
-    params: Dict[str, Any] = {"props": edge.props}
+    event_id = None
+    if isinstance(getattr(edge, "props", None), dict):
+        event_id = edge.props.get("event.id")
+    if not isinstance(event_id, str) or not event_id:
+        raise ValueError("edge.props['event.id'] is required for idempotent edge writes")
+
+    params: Dict[str, Any] = {"props": edge.props, "event_id": event_id}
 
     src_clause_parts = []
     for k, v in src_key.items():
@@ -187,7 +193,7 @@ def _create_edge(tx, edge: GraphEdge) -> None:
     cypher = (
         f"MERGE (s:{src_label.value} {{{src_clause}}}) "
         f"MERGE (d:{dst_label.value} {{{dst_clause}}}) "
-        f"CREATE (s)-[r:{edge.rtype.value}]->(d) "
+        f"MERGE (s)-[r:{edge.rtype.value} {{{_cypher_prop('event.id')}: $event_id}}]->(d) "
         "SET r += $props"
     )
     tx.run(cypher, **params)
