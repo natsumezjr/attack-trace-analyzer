@@ -1,0 +1,17 @@
+title: Event ID Equals "event"
+id: 25b9c01c-350d-4b95-bed1-836d04a4f324
+status: experimental
+description: Detects events where event.id field equals the string "event"
+author: ''
+date: 2026/01/15
+logsource:
+  product: linux
+references: []
+tags: []
+falsepositives:
+  - Legitimate events with event.id="event"
+level: medium
+detection:
+  selection:
+    - event.id: 'event'
+  condition: selection

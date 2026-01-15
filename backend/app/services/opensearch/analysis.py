@@ -2024,11 +2024,12 @@ def create_privilege_escalation_correlation_rule(
     )
     
     # Query2: 提权后的高权限操作（移除Windows特定路径）
+    # 注意：生成的数据使用 file_read/file_modify/file_create，而不是 file_access
     query2 = (
-        "(event.category:file AND event.action:file_access AND "
+        "(event.category:file AND (event.action:file_read OR event.action:file_modify OR event.action:file_create) AND "
         "(file.path:/etc/* OR file.path:/usr/bin/* OR file.path:/usr/sbin/*)) OR "
         "(event.category:process AND event.action:process_start AND "
-        "(process.name:*service* OR process.name:*systemd*))"
+        "(process.name:*service* OR process.name:*systemd* OR process.command_line:*systemctl*))"
     )
     
     # Query3: 权限滥用行为（移除Windows注册表和Windows路径）
@@ -2544,14 +2545,48 @@ def _query_string_to_dsl(query_string: str) -> Dict[str, Any]:
         direction_value = direction_match.group(1)
         must_clauses.append({"term": {"network.direction": direction_value}})
     
-    # 6. 解析 destination.port 条件（支持 OR 和范围）
-    # 先处理包含OR的端口条件（可能在括号中）
-    # 匹配格式：(... OR destination.port:X OR destination.port:Y) 或 (destination.port:>X OR destination.port:Y)
+    # 6. 先解析 NOT destination.port 条件（必须在解析普通端口条件之前，避免重复添加）
+    not_port_pattern = r'NOT\s+\(([^)]+)\)'
+    not_port_match = re.search(not_port_pattern, query_string)
+    not_port_positions = []
+    if not_port_match:
+        not_clause_content = not_port_match.group(1)
+        not_start = not_port_match.start()
+        not_end = not_port_match.end()
+        not_port_positions.append((not_start, not_end))
+        # 提取所有 destination.port 值
+        port_matches = re.findall(r'destination\.port:(\d+)', not_clause_content)
+        if port_matches:
+            ports_to_exclude = [int(p) for p in port_matches]
+            # 如果有多个端口，使用 should + must_not 组合
+            if len(ports_to_exclude) > 1:
+                should_not_clauses = [{"term": {"destination.port": port}} for port in ports_to_exclude]
+                must_not_clauses.append({
+                    "bool": {
+                        "should": should_not_clauses,
+                        "minimum_should_match": 1
+                    }
+                })
+            else:
+                for port in ports_to_exclude:
+                    must_not_clauses.append({"term": {"destination.port": port}})
+    
+    # 7. 解析 destination.port 条件（支持 OR 和范围，但排除NOT子句中的）
+    # 先处理包含OR的端口条件（可能在括号中，但不在NOT中）
     port_or_with_range_pattern = r'\(destination\.port:(>?\d+)(?:\s+OR\s+destination\.port:(\d+))+\)'
-    port_or_with_range_match = re.search(port_or_with_range_pattern, query_string)
-    if port_or_with_range_match:
+    port_or_matches = list(re.finditer(port_or_with_range_pattern, query_string))
+    for port_or_match in port_or_matches:
+        # 检查是否在NOT子句中
+        is_in_not = False
+        for not_start, not_end in not_port_positions:
+            if not_start <= port_or_match.start() < not_end:
+                is_in_not = True
+                break
+        if is_in_not:
+            continue  # 跳过NOT子句中的端口条件
+        
         # 提取所有端口条件（包括范围查询）
-        port_conditions = re.findall(r'destination\.port:(>?\d+)', port_or_with_range_match.group(0))
+        port_conditions = re.findall(r'destination\.port:(>?\d+)', port_or_match.group(0))
         for port_cond in port_conditions:
             if port_cond.startswith('>'):
                 # 范围查询
@@ -2561,25 +2596,33 @@ def _query_string_to_dsl(query_string: str) -> Dict[str, Any]:
                 # 精确匹配
                 port_value = int(port_cond)
                 should_clauses.append({"term": {"destination.port": port_value}})
-    else:
-        # 处理单独的端口条件（不在 OR 中）
-        # 先处理范围查询
-        port_range_match = re.search(r'(?<!\()destination\.port:>(\d+)(?!\s+OR)', query_string)
-        if port_range_match:
+    
+    # 处理单独的端口条件（不在 OR 中，也不在NOT中）
+    # 先处理范围查询
+    port_range_matches = list(re.finditer(r'(?<!\()destination\.port:>(\d+)(?!\s+OR)', query_string))
+    for port_range_match in port_range_matches:
+        # 检查是否在NOT子句中
+        is_in_not = False
+        for not_start, not_end in not_port_positions:
+            if not_start <= port_range_match.start() < not_end:
+                is_in_not = True
+                break
+        if not is_in_not:
             port_value = int(port_range_match.group(1))
             must_clauses.append({"range": {"destination.port": {"gt": port_value}}})
-        # 处理单独的端口条件（不在 OR 中）
-        standalone_ports = re.findall(r'(?<!\()destination\.port:(\d+)(?!\s+OR)', query_string)
-        for port in standalone_ports:
-            must_clauses.append({"term": {"destination.port": int(port)}})
     
-    # 7. 解析 NOT destination.port 条件
-    not_port_pattern = r'NOT\s+\(destination\.port:(\d+)(?:\s+OR\s+destination\.port:(\d+))*\)'
-    not_port_match = re.search(not_port_pattern, query_string)
-    if not_port_match:
-        ports_to_exclude = [int(p) for p in not_port_match.groups() if p]
-        for port in ports_to_exclude:
-            must_not_clauses.append({"term": {"destination.port": port}})
+    # 处理单独的端口条件（不在 OR 中，也不在NOT中）
+    standalone_port_matches = list(re.finditer(r'(?<!\()destination\.port:(\d+)(?!\s+OR)', query_string))
+    for port_match in standalone_port_matches:
+        # 检查是否在NOT子句中
+        is_in_not = False
+        for not_start, not_end in not_port_positions:
+            if not_start <= port_match.start() < not_end:
+                is_in_not = True
+                break
+        if not is_in_not:
+            port_value = int(port_match.group(1))
+            must_clauses.append({"term": {"destination.port": port_value}})
     
     # 8. 解析 NOT destination.ip 条件（CIDR范围）
     # IP字段是ip类型，不能使用prefix查询，需要使用range查询
@@ -2989,9 +3032,9 @@ def apply_correlation_rule_manually(
                     if dst_ip_2:  # e2 有 destination.ip，说明是跨主机连接
                         # 验证 IP 匹配（如果 host.ip 存在）
                         ip_match = True  # 默认匹配（如果 host.ip 不存在，则放宽条件）
-                        if host_3_ips and dst_ip_2:
-                            # 如果 host.ip 存在，验证 destination.ip 是否在 host.ip 列表中
-                            ip_match = dst_ip_2 in host_3_ips
+                        if host_3_ip and dst_ip_2:
+                            # 如果 host.ip 存在，验证 destination.ip 是否等于 host.ip
+                            ip_match = dst_ip_2 == host_3_ip
                         
                         if not ip_match:
                             continue  # IP 不匹配，跳过

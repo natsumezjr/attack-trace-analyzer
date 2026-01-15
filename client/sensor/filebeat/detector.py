@@ -79,9 +79,12 @@ class SigmaRule:
     def match(self, log_entry: Dict[str, Any]) -> bool:
         """Check if log entry matches this rule"""
         message = log_entry.get('message', '')
-
-        if not message:
-            return False
+        
+        # 获取event.id（支持扁平键和嵌套键）
+        event_id = log_entry.get('event.id') or log_entry.get('event', {}).get('id', '')
+        
+        # 获取event.kind（支持扁平键和嵌套键）
+        event_kind = log_entry.get('event.kind') or log_entry.get('event', {}).get('kind', '')
 
         selection = self.detection.get('selection', [])
 
@@ -89,15 +92,16 @@ class SigmaRule:
             selection = [selection]
 
         for sel in selection:
-            if self._match_selection(message, sel):
+            if self._match_selection(log_entry, message, event_id, event_kind, sel):
                 return True
 
         return False
 
-    def _match_selection(self, message: str, selection: Any) -> bool:
+    def _match_selection(self, log_entry: Dict[str, Any], message: str, event_id: str, event_kind: str, selection: Any) -> bool:
         """Match a single selection criteria"""
         if isinstance(selection, dict):
             for key, value in selection.items():
+                # 支持message字段匹配
                 if key == 'message|contains':
                     if isinstance(value, str):
                         if value.lower() in message.lower():
@@ -109,6 +113,24 @@ class SigmaRule:
                 elif key == 'message|contains|all':
                     if isinstance(value, list):
                         if all(v.lower() in message.lower() for v in value):
+                            return True
+                
+                # 支持event.id字段匹配
+                elif key == 'event.id':
+                    if isinstance(value, str):
+                        if event_id == value:
+                            return True
+                    elif isinstance(value, list):
+                        if event_id in value:
+                            return True
+                
+                # 支持event.kind字段匹配
+                elif key == 'event.kind':
+                    if isinstance(value, str):
+                        if event_kind == value:
+                            return True
+                    elif isinstance(value, list):
+                        if event_kind in value:
                             return True
 
         return False

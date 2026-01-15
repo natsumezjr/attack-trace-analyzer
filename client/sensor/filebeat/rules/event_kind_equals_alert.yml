@@ -1,0 +1,17 @@
+title: Event Kind Equals "alert"
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detects events where event.kind field equals "alert" (Finding/Alert events)
+author: ''
+date: 2026/01/15
+logsource:
+  product: linux
+references: []
+tags: []
+falsepositives:
+  - Legitimate alert/finding events from security tools
+level: medium
+detection:
+  selection:
+    - event.kind: 'alert'
+  condition: selection

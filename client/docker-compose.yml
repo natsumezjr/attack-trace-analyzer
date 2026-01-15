@@ -31,17 +31,14 @@ services:
       - /etc:/host/etc:ro
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/tracing:/sys/kernel/tracing
-      # Custom telemetry rules (loaded via the default rules_file list).
+      # Custom ATA rules + config (disable default noisy rules).
       - ./sensor/falco/rules.d:/etc/falco/rules.d:ro
+      - ./sensor/falco/config/falco.yaml:/etc/falco/falco.yaml:ro
       - ./data:/data
     command:
       - falco
-      - -o
-      - json_output=true
-      - -o
-      - file_output.enabled=true
-      - -o
-      - file_output.filename=/data/falco.jsonl
+      - -c
+      - /etc/falco/falco.yaml
 
   falco-ecs:
     build:

@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -51,6 +52,57 @@ def to_int(x):
         return int(x)
     except Exception:
         return None
+
+
+def _as_bool(val) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return val != 0
+    if isinstance(val, str):
+        s = val.strip().lower()
+        if s in ("true", "t", "yes", "y", "1"):
+            return True
+        if s in ("false", "f", "no", "n", "0", ""):
+            return False
+    return False
+
+
+_IPV4_PORT_RE = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})")
+_IPV6_BRACKET_PORT_RE = re.compile(r"\[([0-9a-fA-F:]+)\]:(\d{1,5})")
+
+
+def _parse_fd_name_ips(fd_name: str) -> tuple[str | None, int | None, str | None, int | None]:
+    """
+    Best-effort parser for Falco's `fd.name` string.
+
+    Common shapes seen in Falco rules/output:
+      - "10.0.0.1:12345->10.0.0.2:80"
+      - "10.0.0.2:80"
+      - "[2001:db8::1]:12345->[2001:db8::2]:443"
+    """
+    if not isinstance(fd_name, str):
+        return None, None, None, None
+    raw = fd_name.strip()
+    if not raw:
+        return None, None, None, None
+
+    matches: list[tuple[str, int]] = []
+    for ip, port in _IPV6_BRACKET_PORT_RE.findall(raw):
+        matches.append((ip, int(port)))
+    for ip, port in _IPV4_PORT_RE.findall(raw):
+        matches.append((ip, int(port)))
+
+    if not matches:
+        return None, None, None, None
+
+    if len(matches) == 1:
+        dip, dport = matches[0]
+        return None, None, dip, dport
+
+    (sip, sport) = matches[0]
+    (dip, dport) = matches[-1]
+    return sip, sport, dip, dport
 
 
 def priority_rank(priority: str) -> int:
@@ -219,10 +271,46 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
     if evt_type:
         event_obj["action"] = evt_type
 
-    src_ip = out_fields.get("fd.sip") or out_fields.get("source.ip")
-    src_port = out_fields.get("fd.sport") or out_fields.get("source.port")
-    dst_ip = out_fields.get("fd.dip") or out_fields.get("destination.ip")
-    dst_port = out_fields.get("fd.dport") or out_fields.get("destination.port")
+    # Falco network field naming is not ECS-native; different event types can expose different fd.* keys.
+    # We normalize best-effort into ECS `source.*` / `destination.*` fields for graph ingestion.
+    fd_name = out_fields.get("fd.name")
+    parsed_sip, parsed_sport, parsed_dip, parsed_dport = _parse_fd_name_ips(
+        fd_name if isinstance(fd_name, str) else ""
+    )
+
+    # Source-side (optional for graph), prefer explicit fd.* first.
+    src_ip = (
+        out_fields.get("fd.cip")
+        or out_fields.get("fd.lip")
+        or out_fields.get("fd.sip")
+        or out_fields.get("source.ip")
+        or parsed_sip
+    )
+    src_port = (
+        out_fields.get("fd.cport")
+        or out_fields.get("fd.lport")
+        or out_fields.get("fd.sport")
+        or out_fields.get("source.port")
+        or parsed_sport
+    )
+
+    # Destination-side: connect() semantics typically target the server side.
+    dst_ip = (
+        out_fields.get("fd.dip")
+        or out_fields.get("fd.rip")
+        or out_fields.get("fd.ip")
+        or out_fields.get("fd.sip")
+        or out_fields.get("destination.ip")
+        or parsed_dip
+    )
+    dst_port = (
+        out_fields.get("fd.dport")
+        or out_fields.get("fd.rport")
+        or out_fields.get("fd.port")
+        or out_fields.get("fd.sport")
+        or out_fields.get("destination.port")
+        or parsed_dport
+    )
     l4proto = out_fields.get("fd.l4proto") or out_fields.get("network.transport")
     if src_ip:
         ecs.setdefault("source", {})["ip"] = src_ip
@@ -335,6 +423,12 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
                 event_obj["action"] = "file_delete"
             elif evt_type0.startswith("rename"):
                 event_obj["action"] = "file_write"
+            elif evt_type0 in ("open", "openat", "openat2"):
+                # Use Falco boolean hints when available; otherwise default to read.
+                if _as_bool(out_fields.get("evt.is_open_write")):
+                    event_obj["action"] = "file_write"
+                else:
+                    event_obj["action"] = "file_read"
             else:
                 # open/openat/openat2 and other fallbacks: treat as read
                 event_obj["action"] = "file_read"

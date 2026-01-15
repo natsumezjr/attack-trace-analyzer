@@ -86,13 +86,15 @@ def create_base_event(
     timestamp_str = to_rfc3339(timestamp)
     
     # 根据category确定dataset
+    # 注意：根据ECS规范，网络事件应使用netflow.*，而不是hostlog.network
     if not dataset:
         if event_category and "process" in event_category:
             dataset = "hostlog.process"
         elif event_category and "network" in event_category:
-            dataset = "hostlog.network"
+            # 根据ECS规范，网络事件使用netflow.flow
+            dataset = "netflow.flow"
         elif event_category and "file" in event_category:
-            dataset = "hostlog.file"
+            dataset = "hostlog.file_registry"  # 使用规范中的名称
         elif event_category and "authentication" in event_category:
             dataset = "hostlog.auth"
         else:
@@ -185,7 +187,7 @@ def create_network_event(
         event_category=["network"],
         event_type=["connection"],
         event_action="network_connection",
-        dataset="hostlog.network",
+        dataset="netflow.flow",  # 使用规范中的dataset名称
         message=message
     )
     
@@ -217,7 +219,7 @@ def create_file_event(
         event_category=["file"],
         event_type=["access"],
         event_action=f"file_{action}",
-        dataset="hostlog.file",
+        dataset="hostlog.file_registry",  # 使用规范中的dataset名称
         message=message
     )
     
@@ -347,22 +349,42 @@ def generate_privilege_escalation_events(base_time: datetime, count: int = 30) -
             events.append(event1)
         
         timestamp2 = timestamp + timedelta(seconds=3)
-        for file_path in random.sample(SENSITIVE_FILES, random.randint(2, 3)):
+        # 生成Query 2匹配的文件访问事件（/etc/*, /usr/bin/*, /usr/sbin/*）
+        query2_paths = [
+            "/etc/passwd", "/etc/shadow", "/etc/sudoers",
+            "/usr/bin/sudo", "/usr/bin/su",
+            "/usr/sbin/useradd", "/usr/sbin/usermod"
+        ]
+        for file_path in random.sample(query2_paths, random.randint(2, 3)):
             event2 = create_file_event(
                 host, user, file_path,
                 "read", timestamp2 + timedelta(seconds=random.randint(0, 1))
             )
             events.append(event2)
         
+        # 生成systemd/service进程，匹配Query 2
+        timestamp2_5 = timestamp2 + timedelta(seconds=1)
+        event2_5 = create_process_event(
+            host, user, "systemd", "systemctl status sshd", timestamp2_5, parent_name="bash"
+        )
+        events.append(event2_5)
+        
         timestamp3 = timestamp2 + timedelta(seconds=2)
+        # Query 3匹配：file_modify事件
         event3 = create_file_event(host, user, "/etc/passwd", "modify", timestamp3)
         events.append(event3)
         
+        # Query 3匹配：chmod/chown/sudo命令
         timestamp4 = timestamp3 + timedelta(seconds=1)
         for k in range(random.randint(2, 3)):
+            cmd_choice = random.choice([
+                f"chmod 777 {random.choice(SENSITIVE_FILES)}",
+                f"chown root {random.choice(SENSITIVE_FILES)}",
+                f"sudo {random.choice(SUSPICIOUS_COMMANDS)}"
+            ])
             event4 = create_process_event(
-                host, user, random.choice(["su", "sudo", "runuser"]),
-                f"{random.choice(['su', 'sudo', 'runuser'])} - root -c '{random.choice(SUSPICIOUS_COMMANDS)}'",
+                host, user, random.choice(["chmod", "chown", "sudo"]),
+                cmd_choice,
                 timestamp4 + timedelta(seconds=k),
                 parent_name="bash"
             )
@@ -430,8 +452,13 @@ def generate_persistence_events(base_time: datetime, count: int = 10) -> list:
         events.append(event2)
         
         timestamp3 = timestamp2 + timedelta(seconds=1)
-        event3 = create_process_event(host, user, "systemctl", "systemctl enable backdoor.service", timestamp3, parent_name="bash")
+        # 生成systemd相关进程，以便匹配Query 2
+        event3 = create_process_event(host, user, "systemd", "systemctl enable backdoor.service", timestamp3, parent_name="bash")
         events.append(event3)
+        
+        # 也生成一个service进程
+        event4 = create_process_event(host, user, "service", "service backdoor start", timestamp3 + timedelta(seconds=1), parent_name="bash")
+        events.append(event4)
     return events
 
 
@@ -724,21 +751,51 @@ def main():
         print(f"  生成correlation测试数据: {args.count} 个场景")
         all_events.extend(generate_correlation_test_data(base_time, args.count))
     elif args.type == 'lateral-movement':
-        print(f"  横向移动: {args.count} 个场景")
-        all_events.extend(generate_lateral_movement_events(base_time, args.count))
+        # 横向移动：每个场景平均生成约11个事件（2-4个process + 2-3个network + 1个auth + 3-6个process）
+        avg_events_per_scenario = 11
+        scenario_count = max(1, args.count // avg_events_per_scenario)
+        print(f"  横向移动: {scenario_count} 个场景（目标: {args.count} 个事件）")
+        all_events.extend(generate_lateral_movement_events(base_time, scenario_count))
+        # 如果生成的事件太多，截断到目标数量
+        if len(all_events) > args.count:
+            all_events = all_events[:args.count]
+            print(f"  [INFO] 已截断到 {len(all_events)} 个事件")
     elif args.type == 'port-scanning':
-        print(f"  端口扫描: {args.count} 个场景")
-        all_events.extend(generate_port_scanning_events(base_time, args.count))
+        # 端口扫描：每个场景平均生成约5个事件（1个process + 3-5个network）
+        avg_events_per_scenario = 5
+        scenario_count = max(1, args.count // avg_events_per_scenario)
+        print(f"  端口扫描: {scenario_count} 个场景（目标: {args.count} 个事件）")
+        all_events.extend(generate_port_scanning_events(base_time, scenario_count))
+        # 如果生成的事件太多，截断到目标数量
+        if len(all_events) > args.count:
+            all_events = all_events[:args.count]
+            print(f"  [INFO] 已截断到 {len(all_events)} 个事件")
     elif args.type == 'privilege-escalation':
-        print(f"  权限提升: {args.count} 个场景")
-        all_events.extend(generate_privilege_escalation_events(base_time, args.count))
+        # 权限提升：每个场景平均生成约8个事件（2-4个process + 2-3个file + 1个file + 2-3个process）
+        avg_events_per_scenario = 8
+        scenario_count = max(1, args.count // avg_events_per_scenario)
+        print(f"  权限提升: {scenario_count} 个场景（目标: {args.count} 个事件）")
+        all_events.extend(generate_privilege_escalation_events(base_time, scenario_count))
+        # 如果生成的事件太多，截断到目标数量
+        if len(all_events) > args.count:
+            all_events = all_events[:args.count]
+            print(f"  [INFO] 已截断到 {len(all_events)} 个事件")
     else:
         # 生成所有类型
-        total_target = max(args.count, 200)
-        per_type = max(25, total_target // 7)
-        lateral_count = per_type * 2
-        port_scan_count = per_type * 2
-        privilege_count = per_type * 2
+        # 注意：每个场景会生成多个事件（平均约10个），所以场景数 = count / 10
+        # 但为了确保有足够的数据，设置最小场景数
+        avg_events_per_scenario = 10  # 平均每个场景生成的事件数
+        total_scenarios = max(args.count // avg_events_per_scenario, 10)  # 至少10个场景
+        
+        # 8种类型：横向移动、权限提升、端口扫描各占2倍权重，其他5种各占1倍权重
+        # 总权重 = 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 = 11
+        weight_total = 11
+        per_type_base = max(1, total_scenarios // weight_total)  # 每种基础类型至少1个场景
+        
+        lateral_count = per_type_base * 2
+        port_scan_count = per_type_base * 2
+        privilege_count = per_type_base * 2
+        other_count = per_type_base
         
         print(f"  横向移动: {lateral_count} 个场景")
         all_events.extend(generate_lateral_movement_events(base_time, lateral_count))
@@ -749,20 +806,22 @@ def main():
         print(f"  端口扫描: {port_scan_count} 个场景")
         all_events.extend(generate_port_scanning_events(base_time, port_scan_count))
         
-        print(f"  数据泄露: {per_type} 个场景")
-        all_events.extend(generate_data_exfiltration_events(base_time, per_type))
+        print(f"  数据泄露: {other_count} 个场景")
+        all_events.extend(generate_data_exfiltration_events(base_time, other_count))
         
-        print(f"  持久化: {per_type} 个场景")
-        all_events.extend(generate_persistence_events(base_time, per_type))
+        print(f"  持久化: {other_count} 个场景")
+        all_events.extend(generate_persistence_events(base_time, other_count))
         
-        print(f"  命令与控制: {per_type} 个场景")
-        all_events.extend(generate_c2_events(base_time, per_type))
+        print(f"  命令与控制: {other_count} 个场景")
+        all_events.extend(generate_c2_events(base_time, other_count))
         
-        print(f"  防御规避: {per_type} 个场景")
-        all_events.extend(generate_defense_evasion_events(base_time, per_type))
+        print(f"  防御规避: {other_count} 个场景")
+        all_events.extend(generate_defense_evasion_events(base_time, other_count))
         
-        print(f"  其他威胁: {per_type} 个场景")
-        all_events.extend(generate_misc_threat_events(base_time, per_type))
+        print(f"  其他威胁: {other_count} 个场景")
+        all_events.extend(generate_misc_threat_events(base_time, other_count))
+        
+        print(f"\n[INFO] 预计生成约 {len(all_events)} 个事件（目标: {args.count} 个）")
     
     print(f"\n[5] 总共生成了 {len(all_events)} 个events")
     
