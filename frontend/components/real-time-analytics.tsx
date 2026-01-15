@@ -2,9 +2,11 @@
 
 import type React from "react";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { getThroughputKb } from "@/lib/api/throughput";
 
 interface DataPoint {
+  index: number;
   time: number;
   value: number;
 }
@@ -13,6 +15,8 @@ export function Component() {
   const [data, setData] = useState<DataPoint[]>([]);
   const [hoveredPoint, setHoveredPoint] = useState<DataPoint | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const plotRef = useRef<HTMLDivElement>(null);
+  const indexRef = useRef(0);
 
   const maxPoints = 30;
   const width = 800;
@@ -20,51 +24,63 @@ export function Component() {
   const padding = { top: 20, right: 20, bottom: 40, left: 50 };
 
   useEffect(() => {
-    // Initialize with some data
-    const initial: DataPoint[] = [];
-    for (let i = 0; i < 20; i++) {
-      initial.push({
-        time: Date.now() - (20 - i) * 1000,
-        value: 30 + Math.random() * 40,
-      });
-    }
-    setData(initial);
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { kb, serverTime } = await getThroughputKb();
+        if (cancelled) return;
+        const parsedTime = Date.parse(serverTime);
+        setData((prev) => {
+          const nextIndex = indexRef.current + 1;
+          indexRef.current = nextIndex;
+          const time = Number.isFinite(parsedTime) && parsedTime > 0
+            ? parsedTime
+            : Date.now();
+          const updated = [...prev, { index: nextIndex, time, value: kb }];
+          return updated.slice(-maxPoints);
+        });
+      } catch {
+        // Ignore transient errors for now.
+      }
+    };
 
-    // Add new data points every second
-    const interval = setInterval(() => {
-      setData((prev) => {
-        const newPoint: DataPoint = {
-          time: Date.now(),
-          value: Math.max(
-            10,
-            Math.min(
-              90,
-              prev[prev.length - 1]?.value + (Math.random() - 0.5) * 20 || 50
-            )
-          ),
-        };
-        const updated = [...prev, newPoint];
-        return updated.slice(-maxPoints);
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
+    tick();
+    const interval = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
-  const getX = (time: number) => {
+  const valueDomain = useMemo(() => {
+    if (data.length === 0) return { min: 0, max: 1 };
+    const values = data.map((point) => point.value);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const span = rawMax - rawMin || 1;
+    const paddingValue = span * 0.1;
+    const min = Math.max(0, rawMin - paddingValue);
+    const max = rawMax + paddingValue;
+    return { min, max };
+  }, [data]);
+
+  const getX = (index: number) => {
     if (data.length < 2) return padding.left;
-    const minTime = data[0]?.time || 0;
-    const maxTime = data[data.length - 1]?.time || 1;
-    const range = maxTime - minTime || 1;
+    const minIndex = data[0]?.index ?? 0;
+    const maxIndex = data[data.length - 1]?.index ?? 1;
+    const range = maxIndex - minIndex || 1;
     return (
       padding.left +
-      ((time - minTime) / range) * (width - padding.left - padding.right)
+      ((index - minIndex) / range) * (width - padding.left - padding.right)
     );
   };
 
   const getY = (value: number) => {
+    const range = valueDomain.max - valueDomain.min || 1;
+    const normalized = (value - valueDomain.min) / range;
     return (
-      padding.top + (1 - value / 100) * (height - padding.top - padding.bottom)
+      padding.top +
+      (1 - normalized) * (height - padding.top - padding.bottom)
     );
   };
 
@@ -72,7 +88,7 @@ export function Component() {
     if (data.length < 2) return "";
     return data
       .map((point, i) => {
-        const x = getX(point.time);
+        const x = getX(point.index);
         const y = getY(point.value);
         return `${i === 0 ? "M" : "L"} ${x},${y}`;
       })
@@ -82,22 +98,22 @@ export function Component() {
   const getAreaPath = () => {
     if (data.length < 2) return "";
     const linePath = getPath();
-    const lastX = getX(data[data.length - 1].time);
-    const firstX = getX(data[0].time);
+    const lastX = getX(data[data.length - 1].index);
+    const firstX = getX(data[0].index);
     const bottomY = height - padding.bottom;
     return `${linePath} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * width;
+    const svgPoint = getSvgPointFromClient(e.clientX, e.clientY);
+    if (!svgPoint) return;
+    const x = svgPoint.x;
 
     // Find closest point
     let closest: DataPoint | null = null;
     let minDist = Number.POSITIVE_INFINITY;
     data.forEach((point) => {
-      const px = getX(point.time);
+      const px = getX(point.index);
       const dist = Math.abs(px - x);
       if (dist < minDist && dist < 30) {
         minDist = dist;
@@ -108,15 +124,41 @@ export function Component() {
   };
 
   const currentValue = data[data.length - 1]?.value || 0;
-  const getScaledX = (time: number) => {
-    if (!svgRef.current) return getX(time);
-    const rect = svgRef.current.getBoundingClientRect();
-    return (getX(time) / width) * rect.width;
+  const getSvgPointFromClient = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    return point.matrixTransform(ctm.inverse());
   };
-  const getScaledY = (value: number) => {
-    if (!svgRef.current) return getY(value);
-    const rect = svgRef.current.getBoundingClientRect();
-    return (getY(value) / height) * rect.height;
+
+  const getClientPointFromSvg = (x: number, y: number) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const point = svg.createSVGPoint();
+    point.x = x;
+    point.y = y;
+    return point.matrixTransform(ctm);
+  };
+
+  const getTooltipPosition = (point: DataPoint) => {
+    const plotRect = plotRef.current?.getBoundingClientRect();
+    const clientPoint = getClientPointFromSvg(
+      getX(point.index),
+      getY(point.value)
+    );
+    if (!plotRect || !clientPoint) {
+      return { left: getX(point.index), top: getY(point.value) };
+    }
+    return {
+      left: clientPoint.x - plotRect.left,
+      top: clientPoint.y - plotRect.top,
+    };
   };
 
   return (
@@ -171,12 +213,15 @@ export function Component() {
             />
             <span className="text-sm text-muted-foreground">Live</span>
             <span className="ml-2 text-2xl font-bold text-foreground">
-              {currentValue.toFixed(1)}%
+              {currentValue.toFixed(2)} Kb
             </span>
           </div>
         </div>
 
-        <div className="relative rounded-2xl border border-border bg-card p-6">
+        <div
+          ref={plotRef}
+          className="relative rounded-2xl border border-border bg-card p-6"
+        >
           <svg
             ref={svgRef}
             width="100%"
@@ -219,7 +264,11 @@ export function Component() {
             </defs>
 
             {/* Grid lines */}
-            {[0, 25, 50, 75, 100].map((val) => (
+            {Array.from({ length: 5 }).map((_, i) => {
+              const step =
+                (valueDomain.max - valueDomain.min) / 4 || 1;
+              const val = valueDomain.min + step * i;
+              return (
               <g key={val}>
                 <line
                   x1={padding.left}
@@ -237,10 +286,11 @@ export function Component() {
                   textAnchor="end"
                   dominantBaseline="middle"
                 >
-                  {val}%
+                  {val.toFixed(1)}
                 </text>
               </g>
-            ))}
+              );
+            })}
 
             {/* Area fill */}
             <path d={getAreaPath()} fill="url(#areaGradient)" />
@@ -259,9 +309,9 @@ export function Component() {
             {/* Data points */}
             {data.map((point, i) => (
               <circle
-                key={point.time}
+                key={point.index}
                 className={i === data.length - 1 ? "data-dot" : ""}
-                cx={getX(point.time)}
+                cx={getX(point.index)}
                 cy={getY(point.value)}
                 r={i === data.length - 1 ? 6 : 3}
                 fill={
@@ -278,16 +328,16 @@ export function Component() {
             {hoveredPoint && (
               <>
                 <line
-                  x1={getX(hoveredPoint.time)}
+                  x1={getX(hoveredPoint.index)}
                   y1={padding.top}
-                  x2={getX(hoveredPoint.time)}
+                  x2={getX(hoveredPoint.index)}
                   y2={height - padding.bottom}
                   stroke="var(--chart-1)"
                   strokeDasharray="4 4"
                   opacity="0.5"
                 />
                 <circle
-                  cx={getX(hoveredPoint.time)}
+                  cx={getX(hoveredPoint.index)}
                   cy={getY(hoveredPoint.value)}
                   r="8"
                   fill="none"
@@ -304,13 +354,13 @@ export function Component() {
               className="pointer-events-none z-10 rounded-lg border border-border bg-popover px-3 py-2 text-popover-foreground"
               style={{
                 position: "absolute",
-                left: getScaledX(hoveredPoint.time),
-                top: getScaledY(hoveredPoint.value) - 60,
+                left: getTooltipPosition(hoveredPoint).left,
+                top: getTooltipPosition(hoveredPoint).top - 60,
                 transform: "translateX(-50%)",
               }}
             >
               <div className="text-sm font-semibold text-popover-foreground">
-                {hoveredPoint.value.toFixed(1)}%
+                {hoveredPoint.value.toFixed(2)} Kb
               </div>
               <div className="text-xs text-muted-foreground">
                 {new Date(hoveredPoint.time).toLocaleTimeString()}
@@ -325,13 +375,13 @@ export function Component() {
               label: "Average",
               value: (
                 data.reduce((a, b) => a + b.value, 0) / data.length || 0
-              ).toFixed(1),
-              unit: "%",
+              ).toFixed(2),
+              unit: " Kb",
             },
             {
               label: "Peak",
-              value: Math.max(...data.map((d) => d.value), 0).toFixed(1),
-              unit: "%",
+              value: Math.max(...data.map((d) => d.value), 0).toFixed(2),
+              unit: " Kb",
             },
             { label: "Data Points", value: data.length.toString(), unit: "" },
           ].map((stat) => (

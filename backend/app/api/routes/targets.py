@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.utils import err, ok, utc_now_rfc3339
 from app.dto.targets import RegisterTargetRequest
+from app.services.client_poller import get_last_poll_throughput
 from app.services.opensearch.client import ensure_index, index_document
 from app.services.opensearch.internal import INDEX_PATTERNS, get_client
 from app.services.opensearch.mappings import client_registry_mapping
@@ -75,3 +76,13 @@ def list_online_targets():
             targets.append(cid)
 
     return ok(targets=targets, server_time=utc_now_rfc3339())
+
+
+@router.get("/api/v1/targets/throughput")
+def get_poll_throughput():
+    throughput_bytes, last_poll_time = get_last_poll_throughput()
+    return ok(
+        throughput_bytes=throughput_bytes,
+        last_poll_time=last_poll_time,
+        server_time=utc_now_rfc3339(),
+    )
