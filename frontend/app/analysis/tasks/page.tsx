@@ -17,6 +17,11 @@ export default function AnalysisTasksPage() {
     queryFn: () => fetchAnalysisTasks(),
   });
 
+  const items =
+    analysisTasks?.status === "ok" && Array.isArray(analysisTasks.items)
+      ? analysisTasks.items
+      : [];
+
   return (
     <div className="flex h-[calc(100vh-96px)] flex-col gap-4 p-6">
       <h1 className="text-2xl font-semibold text-foreground">溯源任务</h1>
@@ -31,8 +36,8 @@ export default function AnalysisTasksPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {analysisTasks?.items?.length ? (
-              analysisTasks.items.map((task: AnalysisTaskItem) => {
+            {items.length ? (
+              items.map((task: AnalysisTaskItem) => {
                 const progress = Math.min(
                   100,
                   Math.max(0, task["task.progress"] ?? 0)
