@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from threading import Lock
 from typing import Any
 
 import httpx
-from urllib.parse import urlsplit
 
-from app.core.time import utc_now_rfc3339
+from app.core.time import utc_now, utc_now_rfc3339
+from app.services.neo4j.ingest import ingest_from_opensearch_ingested_window
 from app.services.opensearch import run_data_analysis, store_events
-from app.services.neo4j.ingest import ingest_from_opensearch
 from app.services.opensearch.internal import INDEX_PATTERNS, get_client
 
 
@@ -54,7 +54,7 @@ def _poll_timeout() -> httpx.Timeout:
     return httpx.Timeout(value, connect=min(2.0, value))
 
 
-def _list_registered_targets(limit: int = 2000) -> list[str]:
+def _list_registered_clients(limit: int = 2000) -> list[dict[str, Any]]:
     try:
         client = get_client()
         resp = client.search(
@@ -70,33 +70,34 @@ def _list_registered_targets(limit: int = 2000) -> list[str]:
         return []
 
     hits = (resp or {}).get("hits", {}).get("hits", [])
-    targets: list[str] = []
+    docs: list[dict[str, Any]] = []
     for hit in hits:
         src = hit.get("_source")
         if isinstance(src, dict):
-            client_obj = src.get("client") if isinstance(src.get("client"), dict) else {}
-            client_id = client_obj.get("id") if isinstance(client_obj.get("id"), str) else None
-            if not client_id:
-                host_obj = src.get("host") if isinstance(src.get("host"), dict) else {}
-                host_id = host_obj.get("id") if isinstance(host_obj.get("id"), str) else None
-                host_name = host_obj.get("name") if isinstance(host_obj.get("name"), str) else None
-                client_id = host_id or host_name
-            if client_id:
-                targets.append(client_id)
-    return list(dict.fromkeys(targets))
+            docs.append(src)
+    return docs
 
 
-def _poll_url(target_ip: str, route: str) -> str:
-    raw = target_ip.strip()
-    if "://" in raw:
-        parts = urlsplit(raw)
-        host = parts.hostname or parts.netloc
-    else:
-        host = raw
-    if not host:
-        host = raw
-    host = host.split("/")[0].split(":")[0]
-    return f"http://{host}:8888/{route.lstrip('/')}"
+def _extract_client_info(doc: dict[str, Any]) -> tuple[str | None, str | None, dict[str, bool]]:
+    client_obj = doc.get("client") if isinstance(doc.get("client"), dict) else {}
+    client_id = client_obj.get("id") if isinstance(client_obj.get("id"), str) else None
+    listen_url = (
+        client_obj.get("listen_url") if isinstance(client_obj.get("listen_url"), str) else None
+    )
+    caps_obj = (
+        client_obj.get("capabilities") if isinstance(client_obj.get("capabilities"), dict) else {}
+    )
+
+    caps = {
+        "falco": bool(caps_obj.get("falco")),
+        "suricata": bool(caps_obj.get("suricata")),
+        "filebeat": bool(caps_obj.get("filebeat")),
+    }
+    return client_id, listen_url, caps
+
+
+def _poll_url(listen_url: str, route: str) -> str:
+    return f"{listen_url.rstrip('/')}/{route.lstrip('/')}"
 
 
 def _update_poll_status(client_id: str, *, status: str, last_error: str | None) -> None:
@@ -120,13 +121,6 @@ def _update_poll_status(client_id: str, *, status: str, last_error: str | None) 
 
 async def _fetch_events(http: httpx.AsyncClient, url: str) -> tuple[list[dict[str, Any]], int]:
     resp = await http.get(url)
-    _LOGGER.info(
-        "poll response url=%s status=%s headers=%s body=%s",
-        url,
-        resp.status_code,
-        dict(resp.headers),
-        resp.text,
-    )
     resp.raise_for_status()
     payload_size = len(resp.content or b"")
     payload = resp.json()
@@ -138,96 +132,86 @@ async def _fetch_events(http: httpx.AsyncClient, url: str) -> tuple[list[dict[st
     return [item for item in data if isinstance(item, dict)], payload_size
 
 
-async def _poll_client(http: httpx.AsyncClient, target_ip: str) -> tuple[list[dict[str, Any]], int]:
-    routes = ["falco", "suricata", "filebeat"]
+async def _poll_client(
+    http: httpx.AsyncClient,
+    client_id: str,
+    listen_url: str,
+    caps: dict[str, bool],
+) -> tuple[list[dict[str, Any]], int]:
+    routes = [name for name, enabled in caps.items() if enabled]
+    if not routes:
+        routes = ["falco", "suricata", "filebeat"]
 
     all_events: list[dict[str, Any]] = []
     last_error: str | None = None
-    ok_routes: list[str] = []
-    failed_routes: list[str] = []
     total_bytes = 0
     for route in routes:
-        url = _poll_url(target_ip, route)
-        _LOGGER.info("poll request ip=%s url=%s", target_ip, url)
+        url = _poll_url(listen_url, route)
         try:
             events, payload_size = await _fetch_events(http, url)
             total_bytes += payload_size
             all_events.extend(events)
-            ok_routes.append(route)
-            _LOGGER.info("poll ok ip=%s route=%s bytes=%s", target_ip, route, payload_size)
         except Exception as exc:
             last_error = f"{route}: {exc}"
-            _LOGGER.exception(
-                "poll failed ip=%s route=%s url=%s error_type=%s error=%s",
-                target_ip,
-                route,
-                url,
-                type(exc).__name__,
-                repr(exc),
-            )
-            failed_routes.append(route)
-            _LOGGER.warning("poll failed ip=%s route=%s error=%s", target_ip, route, exc)
+            _LOGGER.debug("poll %s failed: %s", url, exc)
             continue
 
-    if failed_routes and not ok_routes:
-        status = "error"
-    elif failed_routes:
-        status = "partial"
-    else:
-        status = "ok"
-    _update_poll_status(target_ip, status=status, last_error=last_error)
-    if status == "ok":
-        _LOGGER.info(
-            "poll ok ip=%s routes=%s bytes=%s",
-            target_ip,
-            ",".join(ok_routes),
-            total_bytes,
-        )
-    else:
-        _LOGGER.warning(
-            "poll %s ip=%s ok=%s failed=%s last_error=%s",
-            status,
-            target_ip,
-            ",".join(ok_routes) or "-",
-            ",".join(failed_routes) or "-",
-            last_error or "-",
-        )
+    _update_poll_status(client_id, status="ok" if last_error is None else "partial", last_error=last_error)
     return all_events, total_bytes
 
 
 async def _poll_loop(stop_event: asyncio.Event) -> None:
     async with httpx.AsyncClient(timeout=_poll_timeout()) as http:
         while not stop_event.is_set():
+            tick_start_at = utc_now()
+            tick_start_monotonic = time.monotonic()
+
             tick_bytes = 0
             tick_events: list[dict[str, Any]] = []
-            for target_ip in _list_registered_targets():
-                if not target_ip:
+            for doc in _list_registered_clients():
+                client_id, listen_url, caps = _extract_client_info(doc)
+                if not client_id or not listen_url:
                     continue
                 try:
-                    events, total_bytes = await _poll_client(http, target_ip)
-                    if events:
-                        tick_events.extend(events)
-                    tick_bytes += total_bytes
+                    events, client_bytes = await _poll_client(http, client_id, listen_url, caps)
+                    tick_bytes += client_bytes
+                    tick_events.extend(events)
                 except httpx.TimeoutException:
-                    _update_poll_status(target_ip, status="timeout", last_error="timeout")
+                    _update_poll_status(client_id, status="timeout", last_error="timeout")
                 except Exception as exc:
-                    _update_poll_status(target_ip, status="error", last_error=str(exc))
-            _set_last_poll_bytes(tick_bytes)
+                    _update_poll_status(client_id, status="error", last_error=str(exc))
+
+            # Step 2: write tick events to OpenSearch.
             if tick_events:
-                _LOGGER.info("poll tick store events count=%s", len(tick_events))
                 store_result = await asyncio.to_thread(store_events, tick_events)
                 _LOGGER.info("poll tick store events done result=%s", store_result)
-                analysis_result = await asyncio.to_thread(run_data_analysis, True, False)
-                _LOGGER.info("poll tick analysis done result=%s", analysis_result)
-                total_events, node_count, edge_count = await asyncio.to_thread(ingest_from_opensearch)
-                _LOGGER.info(
-                    "poll tick ingest done events=%s nodes=%s edges=%s",
-                    total_events,
-                    node_count,
-                    edge_count,
-                )
+
+            # Step 3: OpenSearch processing (correlation + raw→canonical fusion).
+            analysis_result = await asyncio.to_thread(run_data_analysis)
+            _LOGGER.info("poll tick analysis done result=%s", analysis_result)
+
+            # Step 4: ingest the documents produced in this tick into Neo4j.
+            tick_end_at = utc_now()
+            total_events, node_count, edge_count = await asyncio.to_thread(
+                ingest_from_opensearch_ingested_window,
+                start_time=tick_start_at,
+                end_time=tick_end_at,
+                include_events=True,
+                include_canonical_findings=True,
+            )
+            _LOGGER.info(
+                "poll tick ingest done events=%s nodes=%s edges=%s",
+                total_events,
+                node_count,
+                edge_count,
+            )
+
+            _set_last_poll_bytes(tick_bytes)
             try:
-                await asyncio.wait_for(stop_event.wait(), timeout=_poll_interval_seconds())
+                poll_interval = _poll_interval_seconds()
+                elapsed = time.monotonic() - tick_start_monotonic
+                remaining = max(0.0, float(poll_interval) - elapsed)
+                await asyncio.wait_for(stop_event.wait(), timeout=remaining)
             except asyncio.TimeoutError:
                 continue
 
@@ -238,6 +222,20 @@ async def start_polling() -> None:
         return
     _stop_event = asyncio.Event()
     _poll_task = asyncio.create_task(_poll_loop(_stop_event))
+    _poll_task.add_done_callback(_fatal_on_poll_task_failure)
+
+
+def _fatal_on_poll_task_failure(task: asyncio.Task[None]) -> None:
+    if task.cancelled():
+        return
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        return
+    if exc is None:
+        return
+    _LOGGER.exception("client poller crashed (fatal): %s", exc)
+    os._exit(1)
 
 
 async def stop_polling() -> None:

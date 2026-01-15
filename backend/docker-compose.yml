@@ -73,12 +73,18 @@ services:
       - "7687:7687" # bolt
     environment:
       - NEO4J_AUTH=${NEO4J_AUTH:-neo4j/password}
+      # Enable Graph Data Science (GDS) so the backend can run shortest-path / projection queries (CALL gds.*).
+      # It will be downloaded automatically by the official Neo4j image entrypoint.
+      - NEO4J_PLUGINS=${NEO4J_PLUGINS:-["graph-data-science"]}
+      - NEO4J_dbms_security_procedures_unrestricted=${NEO4J_dbms_security_procedures_unrestricted:-gds.*}
+      - NEO4J_dbms_security_procedures_allowlist=${NEO4J_dbms_security_procedures_allowlist:-gds.*}
       - NEO4J_server_memory_pagecache_size=${NEO4J_server_memory_pagecache_size:-1G}
       - NEO4J_server_memory_heap_initial__size=${NEO4J_server_memory_heap_initial__size:-1G}
       - NEO4J_server_memory_heap_max__size=${NEO4J_server_memory_heap_max__size:-1G}
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
       interval: 30s
@@ -122,6 +128,7 @@ volumes:
   opensearch-data:
   neo4j_data:
   neo4j_logs:
+  neo4j_plugins:
 
 networks:
   backend-net:

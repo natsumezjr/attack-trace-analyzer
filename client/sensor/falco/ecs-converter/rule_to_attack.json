@@ -1,0 +1,148 @@
+{
+  "Directory traversal monitored file read": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1555",
+    "technique_name": "Credentials from Password Stores"
+  },
+  "Read sensitive file trusted after startup": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1555",
+    "technique_name": "Credentials from Password Stores"
+  },
+  "Read sensitive file untrusted": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1555",
+    "technique_name": "Credentials from Password Stores"
+  },
+  "Run shell untrusted": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059.004",
+    "technique_name": "Unix Shell"
+  },
+  "System user interactive": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059",
+    "technique_name": "Command and Scripting Interpreter"
+  },
+  "Terminal shell in container": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059",
+    "technique_name": "Command and Scripting Interpreter"
+  },
+  "Contact K8S API Server From Container": {
+    "tactic_id": "TA0007",
+    "tactic_name": "Discovery",
+    "technique_id": "T1565",
+    "technique_name": "Data Manipulation"
+  },
+  "Search Private Keys or Passwords": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1552.001",
+    "technique_name": "Credentials In Files"
+  },
+  "Clear Log Activities": {
+    "tactic_id": "TA0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "T1070",
+    "technique_name": "Indicator Removal"
+  },
+  "Remove Bulk Data from Disk": {
+    "tactic_id": "TA0040",
+    "tactic_name": "Impact",
+    "technique_id": "T1485",
+    "technique_name": "Data Destruction"
+  },
+  "Create Hardlink Over Sensitive Files": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1555",
+    "technique_name": "Credentials from Password Stores"
+  },
+  "Packet socket created in container": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1557.002",
+    "technique_name": "ARP Cache Poisoning"
+  },
+  "Redirect STDOUT/STDIN to Network Connection in Container": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059",
+    "technique_name": "Command and Scripting Interpreter"
+  },
+  "Linux Kernel Module Injection Detected": {
+    "tactic_id": "TA0003",
+    "tactic_name": "Persistence"
+  },
+  "Detect release_agent File Container Escapes": {
+    "tactic_id": "TA0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "T1611",
+    "technique_name": "Escape to Host"
+  },
+  "PTRACE attached to process": {
+    "tactic_id": "TA0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "T1055.008",
+    "technique_name": "Ptrace System Calls"
+  },
+  "Find AWS Credentials": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1552",
+    "technique_name": "Unsecured Credentials"
+  },
+  "Drop and execute new binary in container": {
+    "tactic_id": "TA0003",
+    "tactic_name": "Persistence"
+  },
+  "Disallowed SSH Connection Non Standard Port": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059",
+    "technique_name": "Command and Scripting Interpreter"
+  },
+  "Netcat Remote Code Execution in Container": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059",
+    "technique_name": "Command and Scripting Interpreter"
+  },
+  "Create Symlink Over Sensitive Files": {
+    "tactic_id": "TA0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "T1555",
+    "technique_name": "Credentials from Password Stores"
+  },
+  "Debugfs Launched in Privileged Container": {
+    "tactic_id": "TA0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "T1611",
+    "technique_name": "Escape to Host"
+  },
+  "PTRACE anti-debug attempt": {
+    "tactic_id": "TA0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "T1622",
+    "technique_name": "Debugger Evasion"
+  },
+  "Execution from /dev/shm": {
+    "tactic_id": "TA0002",
+    "tactic_name": "Execution",
+    "technique_id": "T1059.004",
+    "technique_name": "Unix Shell"
+  },
+  "Fileless execution via memfd_create": {
+    "tactic_id": "TA0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "T1620",
+    "technique_name": "Reflective Code Loading"
+  }
+}
