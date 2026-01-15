@@ -40,7 +40,7 @@
 
 ```bash
 cd backend
-docker compose up -d
+docker-compose up -d
 ```
 
 启动后端：
@@ -81,7 +81,7 @@ npm run dev
 ```bash
 cd client
 cp .env.example .env
-docker compose up -d --build
+docker-compose up -d --build
 ```
 
 客户机与中心机的完整部署方式、环境变量与靶场网络规划见：`new-docs/80-规范/89-环境变量与配置规范.md`、`new-docs/90-运维与靶场/`。
