@@ -205,13 +205,19 @@ fi
 
 sleep 2
 
-# 3. 停止 4 套客户机采集栈
+# 3. 停止 4 套客户机采集栈（并清空卷和数据）
 if should_stop "client"; then
-    log_info "步骤 3/$TOTAL_STEPS: 停止客户机..."
+    log_info "步骤 3/$TOTAL_STEPS: 停止客户机并清空数据..."
     for i in 01 02 03 04; do
         if [ -d "$BASE"/run/client-$i ]; then
             cd "$BASE"/run/client-$i
-            docker-compose -p client-$i down 2>/dev/null && log_info "client-$i 已停止" || log_warn "client-$i 停止失败"
+            # 停止并删除卷（-v 参数会删除命名卷）
+            docker-compose -p client-$i down -v 2>/dev/null && log_info "client-$i 已停止（卷已删除）" || log_warn "client-$i 停止失败"
+            
+            # 清空数据目录（bind mount 的数据）
+            if [ -d "$BASE"/run/client-$i/data ]; then
+                rm -rf "$BASE"/run/client-$i/data/* 2>/dev/null && log_info "client-$i 数据目录已清空" || log_warn "client-$i 数据目录清空失败"
+            fi
         else
             log_warn "client-$i 目录不存在"
         fi
