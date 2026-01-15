@@ -34,7 +34,7 @@ from .utils import (
 # 用于批量写入时生成 MERGE 语句的键条件
 _NODE_TYPE_TO_KEY_FIELDS: dict[NodeType, list[str]] = {
     NodeType.HOST: ["host.id"],
-    # NOTE: User 节点的唯一键是“按数据选择”的（见 new-docs/80-规范/84-Neo4j实体图谱规范.md）：
+    # NOTE: User 节点的唯一键是"按数据选择"的（见 docs/80-规范/84-Neo4j实体图谱规范.md）：
     # - 有 user.id 时：Key = user.id
     # - 缺失 user.id 时：Key = (host.id, user.name)
     # 批量写入时不能对同一 NodeType 混用不同键字段，所以 USER 会在 _merge_nodes_in_batch() 内再分桶处理。
