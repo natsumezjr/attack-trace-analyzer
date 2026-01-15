@@ -35,13 +35,15 @@
   - `process.command_line:*runas*`
   - `process.command_line:*sudo*`
   - `process.command_line:*su *`
-- **父进程是可疑进程**（新增）：
-  - `process.parent.name:chrome.exe` - Chrome 浏览器
-  - `process.parent.name:firefox.exe` - Firefox 浏览器
-  - `process.parent.name:edge.exe` - Edge 浏览器
-  - `process.parent.name:iexplore.exe` - Internet Explorer
-  - `process.parent.name:outlook.exe` - Outlook 邮件客户端
-  - `process.parent.name:thunderbird.exe` - Thunderbird 邮件客户端
+- **父进程是可疑进程**（Linux/Unix 版本）：
+  - `process.parent.name:chrome` - Chrome 浏览器（Linux）
+  - `process.parent.name:firefox` - Firefox 浏览器（Linux）
+  - `process.parent.name:chromium` - Chromium 浏览器（Linux）
+  - `process.parent.name:thunderbird` - Thunderbird 邮件客户端（Linux）
+  - `process.parent.name:evolution` - Evolution 邮件客户端（Linux）
+  - `process.parent.name:geary` - Geary 邮件客户端（Linux）
+  
+  **注意**：已移除 Windows 进程名（.exe 后缀），因为系统现在只支持 Linux/Unix 环境。
 
 ### Query1 查询条件
 
@@ -54,12 +56,12 @@
   process.command_line:*runas* OR 
   process.command_line:*sudo* OR 
   process.command_line:*su * OR 
-  process.parent.name:chrome.exe OR 
-  process.parent.name:firefox.exe OR 
-  process.parent.name:edge.exe OR 
-  process.parent.name:iexplore.exe OR 
-  process.parent.name:outlook.exe OR 
-  process.parent.name:thunderbird.exe
+  process.parent.name:chrome OR 
+  process.parent.name:firefox OR 
+  process.parent.name:chromium OR 
+  process.parent.name:thunderbird OR 
+  process.parent.name:evolution OR 
+  process.parent.name:geary
 ) AND _exists_:host.name"""
 ```
 
@@ -168,12 +170,12 @@
   process.command_line:*runas* OR 
   process.command_line:*sudo* OR 
   process.command_line:*su * OR 
-  process.parent.name:chrome.exe OR 
-  process.parent.name:firefox.exe OR 
-  process.parent.name:edge.exe OR 
-  process.parent.name:iexplore.exe OR 
-  process.parent.name:outlook.exe OR 
-  process.parent.name:thunderbird.exe
+  process.parent.name:chrome OR 
+  process.parent.name:firefox OR 
+  process.parent.name:chromium OR 
+  process.parent.name:thunderbird OR 
+  process.parent.name:evolution OR 
+  process.parent.name:geary
 )) OR (event.category:authentication AND event.action:user_login) AND _exists_:host.name"""
 ```
 
@@ -185,12 +187,14 @@
 
 | 父进程名 | 类型 | 说明 |
 |---------|------|------|
-| `chrome.exe` | 浏览器 | Chrome 浏览器 |
-| `firefox.exe` | 浏览器 | Firefox 浏览器 |
-| `edge.exe` | 浏览器 | Edge 浏览器 |
-| `iexplore.exe` | 浏览器 | Internet Explorer |
-| `outlook.exe` | 邮件客户端 | Outlook 邮件客户端 |
-| `thunderbird.exe` | 邮件客户端 | Thunderbird 邮件客户端 |
+| `chrome` | 浏览器 | Chrome 浏览器（Linux） |
+| `firefox` | 浏览器 | Firefox 浏览器（Linux） |
+| `chromium` | 浏览器 | Chromium 浏览器（Linux） |
+| `thunderbird` | 邮件客户端 | Thunderbird 邮件客户端（Linux） |
+| `evolution` | 邮件客户端 | Evolution 邮件客户端（Linux） |
+| `geary` | 邮件客户端 | Geary 邮件客户端（Linux） |
+
+**注意**：已移除 Windows 进程名（`.exe` 后缀），因为系统现在只支持 Linux/Unix 环境。
 
 ### 为什么这些父进程被认为是可疑的？
 
@@ -203,15 +207,16 @@
   - 用户打开恶意邮件附件 → 邮件客户端执行 → 提权工具启动
   - 这是钓鱼攻击的常见模式
 
-#### 2. 异常行为模式
+#### 2. 异常行为模式（Linux/Unix）
 - **正常情况**：提权工具通常由以下进程启动：
-  - `explorer.exe` - 用户双击运行
-  - `cmd.exe` - 命令行执行
-  - `powershell.exe` - PowerShell 执行
-  - `services.exe` - 系统服务启动
+  - `bash` / `sh` - Shell 执行
+  - `systemd` - 系统服务启动
+  - `cron` - 定时任务执行
+  - `sshd` - SSH 会话执行
   
 - **异常情况**：从浏览器/邮件客户端启动提权工具
   - 浏览器不应该直接启动提权工具
+  - 这通常表示通过网页/恶意链接触发的攻击
   - 邮件客户端不应该直接启动提权工具
   - 这通常表示恶意代码注入或用户交互式攻击
 

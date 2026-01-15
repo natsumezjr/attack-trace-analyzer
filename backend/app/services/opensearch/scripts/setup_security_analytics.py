@@ -629,13 +629,13 @@ def create_multiple_detectors() -> dict:
                 "name": detector_name,
                 "rules": rules_count
             })
-            print(f"✅ {dt} detector 创建成功 (ID: {detector_id}, 规则: {rules_count} 个)")
+            print(f"[OK] {dt} detector 创建成功 (ID: {detector_id}, 规则: {rules_count} 个)")
         else:
             failed_detectors.append({
                 "type": dt,
                 "reason": result.get("message", "未知错误")
             })
-            print(f"❌ {dt} detector 创建失败: {result.get('message')}")
+            print(f"[FAIL] {dt} detector 创建失败: {result.get('message')}")
     
     return {
         "success": len(created_detectors) > 0,

@@ -348,7 +348,8 @@ def classify_privilege_escalation_level(event: Dict[str, Any]) -> tuple[int, flo
     
     # Level 2: 可疑提权行为（提权尝试 + 父进程异常）
     # 父进程异常：从非正常父进程启动（如从浏览器、邮件客户端启动提权工具）
-    suspicious_parents = ['chrome.exe', 'firefox.exe', 'outlook.exe', 'thunderbird.exe', 'iexplore.exe', 'edge.exe']
+    # Linux/Unix 可疑父进程列表（已移除 Windows 进程名）
+    suspicious_parents = ['chrome', 'firefox', 'chromium', 'thunderbird', 'evolution', 'geary']
     if parent_name:
         parent_lower = parent_name.lower()
         if any(sp in parent_lower for sp in suspicious_parents):
@@ -764,11 +765,11 @@ def _execute_monitors(
             
             if ok:
                 executed += 1
-                print(f"  [{i}/{len(monitor_ids)}] ✓ {monitor_id[:50]}... (OK)")
+                print(f"  [{i}/{len(monitor_ids)}] [OK] {monitor_id[:50]}... (OK)")
             else:
                 failed += 1
                 error_text = str(response)[:300] if isinstance(response, (dict, str)) else ""
-                print(f"  [{i}/{len(monitor_ids)}] ✗ {monitor_id[:50]}... (FAIL {status_code})")
+                print(f"  [{i}/{len(monitor_ids)}] [FAIL] {monitor_id[:50]}... (FAIL {status_code})")
                 if error_text:
                     print(f"      错误: {error_text}")
             
@@ -781,7 +782,7 @@ def _execute_monitors(
         except Exception as e:
             failed += 1
             error_msg = str(e)
-            print(f"  [{i}/{len(monitor_ids)}] ✗ {monitor_id[:50]}... (ERROR: {error_msg[:100]})")
+            print(f"  [{i}/{len(monitor_ids)}] [ERROR] {monitor_id[:50]}... (ERROR: {error_msg[:100]})")
             results.append({
                 "monitor_id": monitor_id,
                 "success": False,
@@ -1635,6 +1636,89 @@ def run_security_analytics(
 
 # ========== Correlation Rules 管理 ==========
 
+def _ensure_http_line_length_setting(client: Any, length: str = "16kb") -> None:
+    """
+    确保 OpenSearch HTTP 行长度限制设置足够大
+    
+    这个函数会在查询 correlation 之前自动调用，确保不会因为 URL 过长而报错。
+    
+    参数：
+    - client: OpenSearch 客户端
+    - length: HTTP 行长度限制（默认 16kb）
+    """
+    try:
+        # 检查当前设置
+        response = client.cluster.get_settings(
+            include_defaults=False,
+            filter_path="*.http.max_initial_line_length"
+        )
+        
+        # 提取当前值
+        persistent = response.get("persistent", {}).get("network", {}).get("http", {}).get("max_initial_line_length")
+        transient = response.get("transient", {}).get("network", {}).get("http", {}).get("max_initial_line_length")
+        current = transient or persistent
+        
+        # 如果当前值小于目标值，则设置
+        if not current or _parse_size(current) < _parse_size(length):
+            try:
+                client.cluster.put_settings(
+                    body={
+                        "persistent": {
+                            "http.max_initial_line_length": length
+                        }
+                    }
+                )
+                print(f"[INFO] 已设置 http.max_initial_line_length = {length}（避免 URL 过长错误）")
+            except Exception as e:
+                # 如果 persistent 失败，尝试 transient
+                try:
+                    client.cluster.put_settings(
+                        body={
+                            "transient": {
+                                "http.max_initial_line_length": length
+                            }
+                        }
+                    )
+                    print(f"[INFO] 已设置 http.max_initial_line_length = {length}（transient，避免 URL 过长错误）")
+                except Exception as e2:
+                    print(f"[WARNING] 无法设置 http.max_initial_line_length: {e2}")
+    except Exception as e:
+        # 如果查询设置失败，尝试直接设置
+        try:
+            client.cluster.put_settings(
+                body={
+                    "persistent": {
+                        "http.max_initial_line_length": length
+                    }
+                }
+            )
+            print(f"[INFO] 已设置 http.max_initial_line_length = {length}")
+        except Exception as e2:
+            print(f"[WARNING] 设置 http.max_initial_line_length 失败: {e2}")
+
+
+def _parse_size(size_str: str) -> int:
+    """
+    解析大小字符串（如 "16kb", "4kb"）为字节数
+    
+    参数：
+    - size_str: 大小字符串，如 "16kb", "4kb", "16384b" 等
+    
+    返回: 字节数
+    """
+    size_str = size_str.lower().strip()
+    
+    if size_str.endswith("kb"):
+        return int(size_str[:-2]) * 1024
+    elif size_str.endswith("mb"):
+        return int(size_str[:-2]) * 1024 * 1024
+    elif size_str.endswith("b"):
+        return int(size_str[:-1])
+    else:
+        # 假设是字节数
+        return int(size_str)
+
+
 def create_lateral_movement_correlation_rule(
     rule_name: str = "Lateral Movement Detection",
     time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES,
@@ -1676,14 +1760,15 @@ def create_lateral_movement_correlation_rule(
     # - Level 2: 可疑提权行为（提权尝试 + 父进程异常）- 置信度 0.5-0.7
     # - Level 3: 提权成功（提权尝试 + 后续高权限操作）- 置信度 0.8-1.0（需要多事件关联）
     
-    # 可疑父进程列表（浏览器、邮件客户端）
+    # 可疑父进程列表（浏览器、邮件客户端）- Linux/Unix 版本
+    # 注意：已移除 Windows 进程名（.exe），只保留 Linux/Unix 进程名
     suspicious_parent_processes = [
-        "chrome.exe",
-        "firefox.exe",
-        "edge.exe",
-        "iexplore.exe",
-        "outlook.exe",
-        "thunderbird.exe"
+        "chrome",           # Chrome 浏览器（Linux）
+        "firefox",          # Firefox 浏览器（Linux）
+        "chromium",         # Chromium 浏览器（Linux）
+        "thunderbird",      # Thunderbird 邮件客户端（Linux）
+        "evolution",        # Evolution 邮件客户端（Linux）
+        "geary"             # Geary 邮件客户端（Linux）
     ]
     
     # 构建提权检测查询条件（进程特征 + 父进程特征）
@@ -2049,10 +2134,10 @@ def create_persistence_correlation_rule(
         "tags:attack.persistence OR tags:attack.t1543 OR tags:attack.t1547"
     )
     
-    # Query2: 启动项修改（移除Windows注册表，只保留Linux/Unix启动项）
+    # Query2: 启动项修改（只保留Linux/Unix启动项，移除Windows路径避免查询解析错误）
     query2 = (
         "(event.category:file AND event.action:file_create AND "
-        "(file.path:*\\autostart\\* OR file.path:*\\rc.local* OR file.path:*/.config/autostart* OR "
+        "(file.path:*rc.local* OR file.path:*/.config/autostart* OR "
         "file.path:/etc/systemd/system/*.service OR file.path:/etc/init.d/*))"
     )
     
@@ -2211,7 +2296,16 @@ def create_all_correlation_rules(
     time_window_minutes: int = CORRELATION_TIME_WINDOW_MINUTES
 ) -> dict[str, Any]:
     """
-    批量创建所有预定义的 Correlation Rules
+    批量创建所有预定义的 Correlation Rules（仅保留最重要的规则）
+    
+    重要规则列表：
+    1. Lateral Movement Detection（横向移动）- 必须保留，绝对不能改
+    2. Privilege Escalation Detection（权限提升）- 重要
+    3. Data Exfiltration Detection（数据泄露）- 重要
+    
+    已移除的规则：
+    - Port Scanning Detection（端口扫描）- 相对不重要
+    - Persistence Detection（持久化）- 相对不重要
     
     参数：
     - time_window_minutes: 关联时间窗口（分钟）
@@ -2224,15 +2318,11 @@ def create_all_correlation_rules(
         "failed": int
     }
     """
+    # 只保留最重要的规则
     rules_to_create = [
         {
             "name": "Lateral Movement Detection",
             "func": create_lateral_movement_correlation_rule,
-            "params": {"time_window_minutes": time_window_minutes}
-        },
-        {
-            "name": "Port Scanning Detection",
-            "func": create_port_scanning_correlation_rule,
             "params": {"time_window_minutes": time_window_minutes}
         },
         {
@@ -2243,11 +2333,6 @@ def create_all_correlation_rules(
         {
             "name": "Data Exfiltration Detection",
             "func": create_data_exfiltration_correlation_rule,
-            "params": {"time_window_minutes": time_window_minutes}
-        },
-        {
-            "name": "Persistence Detection",
-            "func": create_persistence_correlation_rule,
             "params": {"time_window_minutes": time_window_minutes}
         }
     ]
@@ -2347,14 +2432,29 @@ def apply_correlation_rule_manually(
         print(f"[DEBUG] Query {i+1} 时间范围: {to_rfc3339(start_time)} 到 {to_rfc3339(end_time)}")
         
         # 将 query string 转换为 DSL query（添加时间范围）
-        # query string 格式：如 "event.category:process AND _exists_:host.name"
-        # 需要转换为 DSL 并添加时间范围
+        # 重要：event.category 是数组字段 ['process']，query_string 无法正确匹配数组字段
+        # 解决方案：将 query_string 转换为 DSL 查询，使用 term 查询匹配数组字段
+        
+        # 转义查询字符串中的特殊字符（避免解析错误）
+        escaped_query = query_string.replace('\\', '/')  # 将反斜杠替换为正斜杠（统一路径格式）
+        
+        # 修复数组字段匹配问题：
+        # 将 event.category:xxx 替换为 event.category.keyword:xxx（用于匹配数组字段）
+        fixed_query = escaped_query.replace('event.category:', 'event.category.keyword:')
+        fixed_query = fixed_query.replace('event.type:', 'event.type.keyword:')
+        
+        # 使用 query_string 查询，但添加 lenient=True 和 default_field 设置
+        # 如果 query_string 仍然无法匹配，可以考虑完全改用 DSL 查询
         dsl_query = {
             "bool": {
                 "must": [
                     {
                         "query_string": {
-                            "query": query_string
+                            "query": fixed_query,
+                            "default_operator": "AND",
+                            "analyze_wildcard": True,
+                            "lenient": True,  # 允许部分字段不存在，避免查询失败
+                            "default_field": "*"  # 默认在所有字段中搜索
                         }
                     },
                     {
@@ -2737,26 +2837,51 @@ def query_correlation_results(
     """
     client = get_client()
     
+    # 确保 HTTP 行长度限制足够大（避免 URL 过长错误）
+    _ensure_http_line_length_setting(client)
+    
     if end_time is None:
         end_time = datetime.now(timezone.utc)
     if start_time is None:
         start_time = end_time - timedelta(minutes=CORRELATION_TIME_WINDOW_MINUTES)
     
-    # 方式1: 使用 OpenSearch Security Analytics API（GET with query parameters）
+    # 方式1: 使用 OpenSearch Security Analytics API（POST with body to avoid URL length limit）
     if use_opensearch_api:
         try:
             # 转换为毫秒时间戳（epoch milliseconds）
             start_timestamp_ms = int(start_time.timestamp() * 1000)
             end_timestamp_ms = int(end_time.timestamp() * 1000)
             
-            # 构建 URL（使用 query parameters）
-            # 注意：OpenSearch API 不支持 rule_id 参数，只支持时间范围
-            url = f"{CORRELATION_RESULTS_API}?start_timestamp={start_timestamp_ms}&end_timestamp={end_timestamp_ms}"
+            # 使用 POST 请求，将参数放在 body 中，避免 URL 过长（超过 4096 字节）
+            # 这样可以避免 "too_long_http_line_exception" 错误
+            request_body = {
+                "start_timestamp": start_timestamp_ms,
+                "end_timestamp": end_timestamp_ms
+            }
             
-            response = client.transport.perform_request(
-                'GET',
-                url
-            )
+            # 如果指定了 rule_id，添加到 body 中
+            if rule_id:
+                request_body["rule_id"] = rule_id
+            
+            # 尝试 POST 请求（避免 URL 过长）
+            try:
+                response = client.transport.perform_request(
+                    'POST',
+                    CORRELATION_RESULTS_API,
+                    body=request_body
+                )
+            except Exception as post_error:
+                # 如果 POST 不支持，回退到 GET（但限制参数长度）
+                print(f"[WARNING] POST 请求失败，尝试 GET: {post_error}")
+                # 构建 URL（使用 query parameters，但限制长度）
+                url = f"{CORRELATION_RESULTS_API}?start_timestamp={start_timestamp_ms}&end_timestamp={end_timestamp_ms}"
+                if rule_id and len(url) + len(rule_id) < 3000:  # 确保URL不会太长
+                    url += f"&rule_id={rule_id}"
+                
+                response = client.transport.perform_request(
+                    'GET',
+                    url
+                )
             
             # 调试：打印原始响应结构
             print(f"[DEBUG] OpenSearch API 原始响应类型: {type(response)}")
@@ -3287,13 +3412,11 @@ def run_correlation_analysis(
                 )
                 print(f"[INFO] Correlation Rules 创建完成: {rules_created_result.get('successful', 0)}/{rules_created_result.get('total', 0)} 成功")
             elif rule_name:
-                # 创建单个指定规则
+                # 创建单个指定规则（只保留最重要的规则）
                 rule_func_map = {
-                    "Lateral Movement Detection": create_lateral_movement_correlation_rule,
-                    "Port Scanning Detection": create_port_scanning_correlation_rule,
-                    "Privilege Escalation Detection": create_privilege_escalation_correlation_rule,
-                    "Data Exfiltration Detection": create_data_exfiltration_correlation_rule,
-                    "Persistence Detection": create_persistence_correlation_rule,
+                    "Lateral Movement Detection": create_lateral_movement_correlation_rule,  # 必须保留
+                    "Privilege Escalation Detection": create_privilege_escalation_correlation_rule,  # 重要
+                    "Data Exfiltration Detection": create_data_exfiltration_correlation_rule,  # 重要
                 }
                 
                 if rule_name in rule_func_map:
@@ -3320,7 +3443,10 @@ def run_correlation_analysis(
         # Step 5: 查询 Correlation 结果
         # 优先使用 OpenSearch Security Analytics API，如果不支持则回退到手动应用
         end_time = datetime.now(timezone.utc)
-        start_time = end_time - timedelta(minutes=time_window_minutes)
+        # 增加时间窗口，确保能匹配到最近生成的events（默认30分钟可能不够）
+        # 如果events是最近1小时内生成的，使用60分钟窗口
+        effective_time_window = max(time_window_minutes, 60)  # 至少60分钟
+        start_time = end_time - timedelta(minutes=effective_time_window)
         
         # 收集所有成功创建的规则ID
         rule_ids_to_query = []

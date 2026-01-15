@@ -18,12 +18,17 @@ services:
     environment:
       - discovery.type=single-node
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}
-      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms2g -Xmx2g}
+      # Increase HTTP line length limit to handle long correlation query URLs (16KB)
+      - HTTP_MAX_INITIAL_LINE_LENGTH=16kb
     ports:
       - "9200:9200"
       - "9600:9600"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
+      # 注意：挂载配置文件会覆盖默认配置，可能导致启动失败
+      # 如果遇到启动问题，可以注释掉下面这行，改用环境变量或动态配置
+      # - ./opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
     ulimits:
       memlock:
         soft: -1
