@@ -137,6 +137,7 @@ def base_event(event: Dict[str, Any], raw_line: str, kind: str, dataset: str) ->
         "agent.name": AGENT_NAME,
         "agent.version": AGENT_VERSION,
         "event.original": raw_line.strip(),
+        "message": raw_line.strip(),
     }
 
     src_ip = event.get("src_ip")
