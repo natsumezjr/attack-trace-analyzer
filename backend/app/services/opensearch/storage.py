@@ -9,6 +9,102 @@ from app.core.time import parse_datetime, to_rfc3339, utc_now_rfc3339
 from .client import bulk_index, get_document, refresh_index
 from .index import INDEX_PATTERNS, get_index_name
 
+# ATT&CK Tactic 映射表（从 analysis.py 导入，用于标签转换）
+try:
+    from .analysis import (
+        TACTIC_NAME_TO_ID_MAP,
+        TACTIC_ID_TO_NAME_MAP,
+        TECHNIQUE_TO_TACTIC_MAP,
+        _get_tactic_id_from_name,
+        _get_tactic_name,
+        _get_tactic_from_technique,
+    )
+except ImportError:
+    # 如果导入失败，定义基本映射（避免循环导入）
+    TACTIC_NAME_TO_ID_MAP = {
+        "initial_access": "TA0001",
+        "execution": "TA0002",
+        "persistence": "TA0003",
+        "privilege_escalation": "TA0004",
+        "defense_evasion": "TA0005",
+        "credential_access": "TA0006",
+        "discovery": "TA0007",
+        "lateral_movement": "TA0008",
+        "collection": "TA0009",
+        "command_and_control": "TA0011",
+        "exfiltration": "TA0010",
+        "impact": "TA0040",
+    }
+    
+    TACTIC_ID_TO_NAME_MAP = {
+        "TA0001": "Initial Access",
+        "TA0002": "Execution",
+        "TA0003": "Persistence",
+        "TA0004": "Privilege Escalation",
+        "TA0005": "Defense Evasion",
+        "TA0006": "Credential Access",
+        "TA0007": "Discovery",
+        "TA0008": "Lateral Movement",
+        "TA0009": "Collection",
+        "TA0010": "Exfiltration",
+        "TA0011": "Command and Control",
+        "TA0040": "Impact",
+    }
+    
+    TECHNIQUE_TO_TACTIC_MAP = {
+        # Initial Access (TA0001)
+        "T1078": "TA0001",  # Valid Accounts
+        "T1190": "TA0001",  # Exploit Public-Facing Application
+        # Execution (TA0002)
+        "T1059": "TA0002",  # Command and Scripting Interpreter
+        "T1106": "TA0002",  # Native API
+        # Persistence (TA0003)
+        "T1546": "TA0003",  # Event Triggered Execution
+        "T1547": "TA0003",  # Boot or Logon Autostart Execution
+        "T1133": "TA0003",  # External Remote Services
+        # Privilege Escalation (TA0004)
+        "T1055": "TA0004",  # Process Injection
+        "T1548": "TA0004",  # Abuse Elevation Control Mechanism
+        # Defense Evasion (TA0005)
+        "T1562": "TA0005",  # Impair Defenses
+        "T1070": "TA0005",  # Indicator Removal on Host
+        # Credential Access (TA0006)
+        "T1003": "TA0006",  # OS Credential Dumping
+        "T1110": "TA0006",  # Brute Force
+        # Discovery (TA0007)
+        "T1083": "TA0007",  # File and Directory Discovery
+        "T1018": "TA0007",  # Remote System Discovery
+        # Lateral Movement (TA0008)
+        "T1021": "TA0008",  # Remote Services
+        "T1072": "TA0008",  # Software Deployment Tools
+        # Collection (TA0009)
+        "T1074": "TA0009",  # Data Staged
+        "T1005": "TA0009",  # Data from Local System
+        # Exfiltration (TA0010)
+        "T1041": "TA0010",  # Exfiltration Over C2 Channel
+        "T1020": "TA0010",  # Automated Exfiltration
+        "T1048": "TA0010",  # Exfiltration Over Alternative Protocol
+        # Command and Control (TA0011)
+        "T1071": "TA0011",  # Application Layer Protocol
+        "T1095": "TA0011",  # Non-Application Layer Protocol
+        # Impact (TA0040)
+        "T1531": "TA0040",  # Account Access Removal
+        "T1565": "TA0040",  # Data Manipulation
+        "T1489": "TA0040",  # Service Stop
+    }
+    
+    def _get_tactic_id_from_name(tactic_name: str) -> str:
+        return TACTIC_NAME_TO_ID_MAP.get(tactic_name.lower(), "TA0000")
+    
+    def _get_tactic_name(tactic_id: str) -> str:
+        return TACTIC_ID_TO_NAME_MAP.get(tactic_id, "Unknown")
+    
+    def _get_tactic_from_technique(technique_id: str) -> str:
+        if technique_id in TECHNIQUE_TO_TACTIC_MAP:
+            return TECHNIQUE_TO_TACTIC_MAP[technique_id]
+        base_id = technique_id.split('.')[0] if '.' in technique_id else technique_id
+        return TECHNIQUE_TO_TACTIC_MAP.get(base_id, "TA0000")
+
 
 def _to_rfc3339(value: Any) -> str | None:
     return to_rfc3339(value)
@@ -235,18 +331,106 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
             threat_obj = {}
             doc["threat"] = threat_obj
         threat_obj.setdefault("framework", "MITRE ATT&CK")
+        
+        # 从 tags 字段提取 ATT&CK 标签并转换为 threat 信息
+        tactic_id = None
+        tactic_name = None
+        technique_id = None
+        
+        # 收集所有标签（从文档的 tags 字段和 anomaly.matched_rules[].tags 字段）
+        all_tags = []
+        
+        # 方法1: 从文档顶层的 tags 字段提取（filebeat 格式）
+        tags = doc.get('tags', [])
+        if isinstance(tags, list):
+            all_tags.extend(tags)
+        
+        # 方法2: 从 anomaly.matched_rules[].tags 字段提取（filebeat 格式）
+        anomaly_obj = doc.get('anomaly', {})
+        if isinstance(anomaly_obj, dict):
+            matched_rules = anomaly_obj.get('matched_rules', [])
+            if isinstance(matched_rules, list):
+                for rule in matched_rules:
+                    if isinstance(rule, dict):
+                        rule_tags = rule.get('tags', [])
+                        if isinstance(rule_tags, list):
+                            all_tags.extend(rule_tags)
+        
+        # 解析 attack.* 标签
+        tactic_name_tags = []
+        technique_tags = []
+        
+        for tag in all_tags:
+            if isinstance(tag, str) and tag.startswith('attack.'):
+                parts = tag.split('.')
+                if len(parts) >= 2:
+                    tag_value = parts[1]
+                    # 检查是否是 technique ID（如 attack.t1562.001）
+                    if tag_value.startswith('t') and len(tag_value) > 1:
+                        # 提取完整的 technique ID（包括子技术，如 t1562.001）
+                        if len(parts) > 2:
+                            technique_tags.append(f"{tag_value}.{'.'.join(parts[2:])}")
+                        else:
+                            technique_tags.append(tag_value)
+                    # 检查是否是 tactic ID（如 attack.ta0005）- 跳过，因为我们需要从名称映射
+                    elif tag_value.startswith('ta') and len(tag_value) > 2:
+                        continue
+                    # 否则是 tactic name（如 attack.defense_evasion）
+                    else:
+                        tactic_name_tags.append(tag_value)
+        
+        # 优先使用 tactic name 标签（如果存在）
+        if tactic_name_tags:
+            for tag_value in tactic_name_tags:
+                tactic_id_candidate = _get_tactic_id_from_name(tag_value)
+                if tactic_id_candidate and tactic_id_candidate != "TA0000":
+                    tactic_id = tactic_id_candidate
+                    tactic_name = _get_tactic_name(tactic_id)
+                    break
+        
+        # 提取 technique ID（无论是否已找到 tactic）
+        if technique_tags:
+            # 取第一个 technique 标签
+            tag_value = technique_tags[0]
+            # 转换为完整的 technique ID（如 t1562.001 -> T1562.001）
+            if tag_value[0] == 't':
+                technique_id_candidate = 'T' + tag_value[1:]
+            else:
+                technique_id_candidate = tag_value.upper()
+            technique_id = technique_id_candidate
+            
+            # 如果没有找到 tactic，从 technique 推断
+            if not tactic_id:
+                tactic_id_candidate = _get_tactic_from_technique(technique_id_candidate)
+                if tactic_id_candidate and tactic_id_candidate != "TA0000":
+                    tactic_id = tactic_id_candidate
+                    tactic_name = _get_tactic_name(tactic_id)
+        
+        # 设置 threat 信息（如果找到了标签，使用标签；否则使用默认值）
         tactic_obj = threat_obj.get("tactic")
         if not isinstance(tactic_obj, dict):
             tactic_obj = {}
             threat_obj["tactic"] = tactic_obj
-        tactic_obj.setdefault("id", "TA0000")
-        tactic_obj.setdefault("name", "Unknown")
+        
+        if tactic_id:
+            tactic_obj["id"] = tactic_id
+            tactic_obj["name"] = tactic_name
+        else:
+            tactic_obj.setdefault("id", "TA0000")
+            tactic_obj.setdefault("name", "Unknown")
+        
         technique_obj = threat_obj.get("technique")
         if not isinstance(technique_obj, dict):
             technique_obj = {}
             threat_obj["technique"] = technique_obj
-        technique_obj.setdefault("id", "T0000")
-        technique_obj.setdefault("name", "Unknown")
+        
+        if technique_id:
+            technique_obj["id"] = technique_id
+            # 如果有 technique ID，尝试获取名称（可以从映射表或保持默认）
+            technique_obj.setdefault("name", "Security Analytics Detection")
+        else:
+            technique_obj.setdefault("id", "T0000")
+            technique_obj.setdefault("name", "Unknown")
 
     # Telemetry dataset-specific IDs
     dataset0 = event_obj.get("dataset") if isinstance(event_obj.get("dataset"), str) else ""

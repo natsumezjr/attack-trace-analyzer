@@ -1,0 +1,219 @@
+{
+  "data": [
+    {
+      "@timestamp": "2026-01-15T05:26:23.147Z",
+      "@metadata": {
+        "beat": "filebeat",
+        "type": "_doc",
+        "version": "8.11.0"
+      },
+      "input": {
+        "type": "log"
+      },
+      "ecs": {
+        "version": "9.2.0"
+      },
+      "host": {
+        "os": {
+          "kernel": "6.8.0-90-generic",
+          "codename": "jammy",
+          "type": "linux",
+          "platform": "ubuntu",
+          "version": "22.04.3 LTS (Jammy Jellyfish)",
+          "family": "debian",
+          "name": "Ubuntu"
+        },
+        "containerized": false,
+        "hostname": "b3a5f8794497",
+        "name": "b3a5f8794497",
+        "architecture": "x86_64"
+      },
+      "agent": {
+        "id": "9d28f25f-7e8b-4327-a27e-5a21c123eae5",
+        "name": "b3a5f8794497",
+        "type": "filebeat",
+        "version": "8.11.0",
+        "ephemeral_id": "5b8dc5dd-bb1a-400e-a712-98f70f36de4c"
+      },
+      "log": {
+        "offset": 5330646,
+        "file": {},
+        "origin": {
+          "file": {
+            "path": "/var/log/host/kern.log"
+          }
+        }
+      },
+      "message": "Jan 15 13:26:22 U2204 kernel: [ 9692.631419] audit: type=1400 audit(1768454782.346:241): apparmor=\"DENIED\" operation=\"open\" class=\"file\" profile=\"snap.firefox.firefox\" name=\"/proc/pressure/memory\" pid=3382 comm=\"MemoryPoller\" requested_mask=\"r\" denied_mask=\"r\" fsuid=1000 ouid=0",
+      "log_type": "kernel",
+      "event": {
+        "ingested": "2026-01-15T05:26:25.050226Z",
+        "kind": "alert",
+        "category": [
+          "intrusion_detection"
+        ],
+        "type": [
+          "indicator"
+        ],
+        "severity": 90,
+        "dataset": "finding.raw"
+      },
+      "rule": {
+        "id": "d3456789-012a-bcde-f012-3456789abcde",
+        "name": "SELinux or AppArmor Disabled",
+        "ruleset": "sigma"
+      },
+      "risk": {
+        "score": 90
+      },
+      "tags": [
+        "attack.defense_evasion",
+        "attack.t1562.001"
+      ],
+      "custom": {
+        "finding": {
+          "stage": "raw",
+          "providers": [
+            "sigma-detector"
+          ],
+          "fingerprint": "fp-d3456789-012a-bcde-f012-3456789abcde-unknown"
+        },
+        "evidence": {
+          "event_ids": [
+            "unknown"
+          ]
+        }
+      },
+      "anomaly": {
+        "detected": true,
+        "detection_timestamp": "2026-01-15T05:26:25.050382Z",
+        "matched_rules": [
+          {
+            "rule_id": "d3456789-012a-bcde-f012-3456789abcde",
+            "rule_name": "SELinux or AppArmor Disabled",
+            "severity": "critical",
+            "severity_num": 90,
+            "tags": [
+              "attack.defense_evasion",
+              "attack.t1562.001"
+            ],
+            "description": "Detects disabling of security modules (SELinux, AppArmor)",
+            "technique_id": null,
+            "technique_name": null,
+            "tactic_id": null,
+            "tactic_name": null
+          }
+        ],
+        "rule_count": 1
+      }
+    },
+    {
+      "@timestamp": "2026-01-15T05:26:23.231Z",
+      "@metadata": {
+        "beat": "filebeat",
+        "type": "_doc",
+        "version": "8.11.0"
+      },
+      "input": {
+        "type": "log"
+      },
+      "log_type": "syslog",
+      "agent": {
+        "ephemeral_id": "5b8dc5dd-bb1a-400e-a712-98f70f36de4c",
+        "id": "9d28f25f-7e8b-4327-a27e-5a21c123eae5",
+        "name": "b3a5f8794497",
+        "type": "filebeat",
+        "version": "8.11.0"
+      },
+      "ecs": {
+        "version": "9.2.0"
+      },
+      "host": {
+        "name": "b3a5f8794497",
+        "hostname": "b3a5f8794497",
+        "architecture": "x86_64",
+        "os": {
+          "codename": "jammy",
+          "type": "linux",
+          "platform": "ubuntu",
+          "version": "22.04.3 LTS (Jammy Jellyfish)",
+          "family": "debian",
+          "name": "Ubuntu",
+          "kernel": "6.8.0-90-generic"
+        },
+        "containerized": false
+      },
+      "message": "Jan 15 13:26:22 U2204 kernel: [ 9692.631419] audit: type=1400 audit(1768454782.346:241): apparmor=\"DENIED\" operation=\"open\" class=\"file\" profile=\"snap.firefox.firefox\" name=\"/proc/pressure/memory\" pid=3382 comm=\"MemoryPoller\" requested_mask=\"r\" denied_mask=\"r\" fsuid=1000 ouid=0",
+      "log": {
+        "offset": 10352119,
+        "file": {},
+        "origin": {
+          "file": {
+            "path": "/var/log/host/syslog"
+          }
+        }
+      },
+      "event": {
+        "ingested": "2026-01-15T05:26:25.051096Z",
+        "kind": "alert",
+        "category": [
+          "intrusion_detection"
+        ],
+        "type": [
+          "indicator"
+        ],
+        "severity": 90,
+        "dataset": "finding.raw"
+      },
+      "rule": {
+        "id": "d3456789-012a-bcde-f012-3456789abcde",
+        "name": "SELinux or AppArmor Disabled",
+        "ruleset": "sigma"
+      },
+      "risk": {
+        "score": 90
+      },
+      "tags": [
+        "attack.defense_evasion",
+        "attack.t1562.001"
+      ],
+      "custom": {
+        "finding": {
+          "stage": "raw",
+          "providers": [
+            "sigma-detector"
+          ],
+          "fingerprint": "fp-d3456789-012a-bcde-f012-3456789abcde-unknown"
+        },
+        "evidence": {
+          "event_ids": [
+            "unknown"
+          ]
+        }
+      },
+      "anomaly": {
+        "detected": true,
+        "detection_timestamp": "2026-01-15T05:26:25.051227Z",
+        "matched_rules": [
+          {
+            "rule_id": "d3456789-012a-bcde-f012-3456789abcde",
+            "rule_name": "SELinux or AppArmor Disabled",
+            "severity": "critical",
+            "severity_num": 90,
+            "tags": [
+              "attack.defense_evasion",
+              "attack.t1562.001"
+            ],
+            "description": "Detects disabling of security modules (SELinux, AppArmor)",
+            "technique_id": null,
+            "technique_name": null,
+            "tactic_id": null,
+            "tactic_name": null
+          }
+        ],
+        "rule_count": 1
+      }
+    }
+  ],
+  "total": 2
+}
