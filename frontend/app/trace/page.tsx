@@ -27,6 +27,7 @@ import {
   fetchAnalysisTask,
   type AnalysisTaskItem,
 } from "@/lib/api/analysis";
+import { KillChainPanel } from "@/components/killchain/killchain-panel";
 
 type GraphNode = {
   id: string;
@@ -291,6 +292,7 @@ export default function TracePage() {
     computeRecentWindow(recentMinutes)
   );
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [killChainPathIds, setKillChainPathIds] = useState<Set<string>>(new Set());
 
   const graphQueryRequest = useMemo<GraphQueryRequest | null>(() => {
     if (viewMode === "alarm") {
@@ -509,39 +511,115 @@ export default function TracePage() {
         style: {
           stroke: (datum) => {
             const link = datum as GraphLink;
+            // KillChain highlighting (highest priority)
+            const kcData = activeTask?.["task.result.killchain"];
+            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+              const selectedPaths = Array.isArray(kcData.selected_paths)
+                ? kcData.selected_paths
+                : [];
+
+              const hasKillChainEdge = link.records.some((edge) => {
+                const edgeId = edge.props?.["event.id"];
+                if (!edgeId || typeof edgeId !== "string") return false;
+
+                return Array.from(killChainPathIds).some((pathId) => {
+                  const path = selectedPaths.find((p: any) =>
+                    p && typeof p === "object" && p.path_id === pathId
+                  );
+                  if (!path || !Array.isArray(path.edge_ids)) return false;
+                  return path.edge_ids.includes(edgeId);
+                });
+              });
+              if (hasKillChainEdge) return "#FF6B6B";
+            }
+            // Path edge
             const hasPathEdge = link.records.some(
               (edge) => edge.props?.["analysis.is_path_edge"] === true
             );
             if (hasPathEdge) return "#2563EB";
+            // Alarm edge
             const hasAlarmEdge = link.records.some(
               (edge) => edge.props?.["is_alarm"] === true
             );
             if (hasAlarmEdge) return "#EF4444";
+            // Default
             return "#64748B";
           },
           lineWidth: (datum) => {
             const link = datum as GraphLink;
+            // KillChain highlighting (highest priority)
+            const kcData = activeTask?.["task.result.killchain"];
+            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+              const hasKillChainEdge = link.records.some((edge) => {
+                const edgeId = edge.props?.["event.id"];
+                return edgeId && Array.from(killChainPathIds).some((pathId) => {
+                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
+                    (p: any) => p.path_id === pathId
+                  );
+                  return path?.edge_ids?.includes(edgeId);
+                });
+              });
+              if (hasKillChainEdge) return 3;
+            }
+            // Path edge
             const hasPathEdge = link.records.some(
               (edge) => edge.props?.["analysis.is_path_edge"] === true
             );
             if (hasPathEdge) return 4;
+            // Alarm edge
             const hasAlarmEdge = link.records.some(
               (edge) => edge.props?.["is_alarm"] === true
             );
             if (hasAlarmEdge) return 3;
+            // Default
             return Math.min(10, 1 + (link.count ?? 1) * 0.4);
           },
           opacity: (datum) => {
             const link = datum as GraphLink;
+            // KillChain highlighting (highest priority)
+            const kcData = activeTask?.["task.result.killchain"];
+            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+              const hasKillChainEdge = link.records.some((edge) => {
+                const edgeId = edge.props?.["event.id"];
+                return edgeId && Array.from(killChainPathIds).some((pathId) => {
+                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
+                    (p: any) => p.path_id === pathId
+                  );
+                  return path?.edge_ids?.includes(edgeId);
+                });
+              });
+              if (hasKillChainEdge) return 0.95;
+            }
+            // Path edge
             const hasPathEdge = link.records.some(
               (edge) => edge.props?.["analysis.is_path_edge"] === true
             );
             if (hasPathEdge) return 0.9;
+            // Alarm edge
             const hasAlarmEdge = link.records.some(
               (edge) => edge.props?.["is_alarm"] === true
             );
             if (hasAlarmEdge) return 0.85;
+            // Default
             return 0.55;
+          },
+          lineDash: (datum) => {
+            const link = datum as GraphLink;
+            // KillChain highlighting (highest priority)
+            const kcData = activeTask?.["task.result.killchain"];
+            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+              const hasKillChainEdge = link.records.some((edge) => {
+                const edgeId = edge.props?.["event.id"];
+                return edgeId && Array.from(killChainPathIds).some((pathId) => {
+                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
+                    (p: any) => p.path_id === pathId
+                  );
+                  return path?.edge_ids?.includes(edgeId);
+                });
+              });
+              if (hasKillChainEdge) return [5, 5];
+            }
+            return undefined;
           },
           labelText: (datum) => {
             const count = (datum as GraphLink).count ?? 0;
@@ -784,6 +862,16 @@ export default function TracePage() {
                       </div>
                     </div>
                   ) : null}
+                  {/* KillChain Panel */}
+                  {activeTask?.["task.result.killchain_uuid"] && (
+                    <div className="mt-3">
+                      <KillChainPanel
+                        task={activeTask}
+                        onHighlightPath={setKillChainPathIds}
+                        killChainPathIds={killChainPathIds}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
