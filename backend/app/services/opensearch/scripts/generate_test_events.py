@@ -114,13 +114,15 @@ def create_base_event(
     timestamp_str = to_rfc3339(timestamp)
     
     # 根据category确定dataset
+    # 注意：根据ECS规范，网络事件应使用netflow.*，而不是hostlog.network
     if not dataset:
         if event_category and "process" in event_category:
             dataset = "hostlog.process"
         elif event_category and "network" in event_category:
-            dataset = "hostlog.network"
+            # 根据ECS规范，网络事件使用netflow.flow
+            dataset = "netflow.flow"
         elif event_category and "file" in event_category:
-            dataset = "hostlog.file"
+            dataset = "hostlog.file_registry"  # 使用规范中的名称
         elif event_category and "authentication" in event_category:
             dataset = "hostlog.auth"
         else:
@@ -232,7 +234,7 @@ def create_network_event(
         event_category=["network"],
         event_type=[event_type],
         event_action=event_action,
-        dataset="hostlog.network",
+        dataset="netflow.flow",  # 使用规范中的dataset名称
         message=message
     )
     
@@ -299,7 +301,7 @@ def create_dns_event(
     content_str = f"{host['id']}|{query_name}|{timestamp.isoformat()}"
     event_id = generate_unique_event_id("event-dns", content_str)
     message = f"DNS query: {query_name}"
-    # DNS events应该使用dns相关的dataset，但如果没有，使用network也可以
+    # DNS events应该使用netflow.dns dataset（根据ECS规范）
     # 关键是要有dns字段
     # 注意：Security Analytics的DNS detector可能需要event.category为dns
     event = create_base_event(
@@ -307,7 +309,7 @@ def create_dns_event(
         event_category=["dns"],  # 改为dns category，以便匹配DNS detector
         event_type=["info"],
         event_action="dns_query",
-        dataset="hostlog.dns",  # 尝试使用dns dataset
+        dataset="netflow.dns",  # 使用规范中的dataset名称
         message=message
     )
     
