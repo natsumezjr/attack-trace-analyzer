@@ -2,7 +2,7 @@
 import React from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { LayoutDashboard, ClipboardList, FishingHook } from "lucide-react";
-import { House } from "lucide-react";
+import { House, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -36,6 +36,13 @@ export function SidebarDemo({ children }: { children?: React.ReactNode }) {
       href: "/analysis/tasks",
       icon: (
         <ClipboardList className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
+      ),
+    },
+    {
+      label: "KillChain 测试",
+      href: "/analysis/test-killchain",
+      icon: (
+        <GitBranch className="text-sidebar-foreground/70 h-6 w-6 flex-shrink-0" />
       ),
     },
   ];

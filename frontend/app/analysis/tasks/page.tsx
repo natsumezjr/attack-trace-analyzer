@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { fetchAnalysisTasks, type AnalysisTaskItem } from "@/lib/api/analysis";
+import Link from "next/link";
 
 export default function AnalysisTasksPage() {
   const { data: analysisTasks } = useQuery({
@@ -43,26 +44,51 @@ export default function AnalysisTasksPage() {
                   Math.max(0, task["task.progress"] ?? 0)
                 );
                 return (
-                  <TableRow key={task["task.id"]}>
+                  <TableRow
+                    key={task["task.id"]}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                     <TableCell className="font-medium">
-                      {task["task.id"]}
-                    </TableCell>
-                    <TableCell>{task["task.status"]}</TableCell>
-                    <TableCell className="max-w-[320px] truncate">
-                      {task["task.target.node_uid"]}
+                      <Link
+                        href={`/analysis/tasks/${task["task.id"]}`}
+                        className="block w-full"
+                      >
+                        {task["task.id"]}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-2 w-full max-w-[180px] overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
+                      <Link
+                        href={`/analysis/tasks/${task["task.id"]}`}
+                        className="block w-full"
+                      >
+                        {task["task.status"]}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="max-w-[320px] truncate">
+                      <Link
+                        href={`/analysis/tasks/${task["task.id"]}`}
+                        className="block w-full"
+                      >
+                        {task["task.target.node_uid"]}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/analysis/tasks/${task["task.id"]}`}
+                        className="block w-full"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-full max-w-[180px] overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {progress}%
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {progress}%
-                        </span>
-                      </div>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 );
