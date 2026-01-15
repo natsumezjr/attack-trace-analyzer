@@ -234,8 +234,13 @@ def _fatal_on_poll_task_failure(task: asyncio.Task[None]) -> None:
         return
     if exc is None:
         return
-    _LOGGER.exception("client poller crashed (fatal): %s", exc)
-    os._exit(1)
+    _LOGGER.exception("client poller crashed: %s", exc)
+    # NOTE: Do NOT hard-exit the whole FastAPI process here.
+    # Poller is a background task; crashing the web server makes debugging and recovery harder.
+    # Keeping the process alive also avoids the "server appears stuck" failure mode under some runners.
+    global _stop_event, _poll_task
+    _stop_event = None
+    _poll_task = None
 
 
 async def stop_polling() -> None:

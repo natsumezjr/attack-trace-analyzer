@@ -89,6 +89,46 @@ class TestBatchMergeCypher:
         assert "SET n += node.props" in cypher
 
 
+class TestBatchMergeNodeKeySelection:
+    """确保批量写入时按 key scheme 分桶（尤其是 User）"""
+
+    def test_merge_nodes_in_batch_splits_user_by_key_scheme(self):
+        class _FakeTx:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, dict[str, object]]] = []
+
+            def run(self, cypher: str, **kwargs):  # type: ignore[no-untyped-def]
+                self.calls.append((cypher, kwargs))
+
+        tx = _FakeTx()
+        nodes = [
+            models.user_node(user_id="u-001", user_name="alice", host_id="h-001"),
+            models.user_node(user_name="bob", host_id="h-001"),
+        ]
+
+        count = db._merge_nodes_in_batch(tx, nodes)
+        assert count == 2
+        assert len(tx.calls) == 2
+
+        cyphers = [cypher for cypher, _ in tx.calls]
+        assert any("MERGE (n:User" in cypher and "`user.id`" in cypher for cypher in cyphers)
+        assert any(
+            "MERGE (n:User" in cypher and "`host.id`" in cypher and "`user.name`" in cypher
+            for cypher in cyphers
+        )
+
+        # 参数结构也应匹配对应的 key 形态
+        params = [kwargs for _, kwargs in tx.calls]
+        assert any(isinstance(p.get("nodes"), list) and p["nodes"] and "key_val" in p["nodes"][0] for p in params)
+        assert any(
+            isinstance(p.get("nodes"), list)
+            and p["nodes"]
+            and "key_0" in p["nodes"][0]
+            and "key_1" in p["nodes"][0]
+            for p in params
+        )
+
+
 class TestBatchWriteIdempotency:
     """测试批量写入幂等性"""
 
