@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from threading import Lock
 from typing import Any
 
 import httpx
@@ -16,6 +17,21 @@ _LOGGER = logging.getLogger(__name__)
 
 _stop_event: asyncio.Event | None = None
 _poll_task: asyncio.Task[None] | None = None
+_last_poll_lock = Lock()
+_last_poll_bytes = 0
+_last_poll_at: str | None = None
+
+
+def _set_last_poll_bytes(value: int) -> None:
+    global _last_poll_bytes, _last_poll_at
+    with _last_poll_lock:
+        _last_poll_bytes = value
+        _last_poll_at = utc_now_rfc3339()
+
+
+def get_last_poll_throughput() -> tuple[int, str | None]:
+    with _last_poll_lock:
+        return _last_poll_bytes, _last_poll_at
 
 
 def _poll_interval_seconds() -> int:
@@ -99,29 +115,38 @@ def _update_poll_status(client_id: str, *, status: str, last_error: str | None) 
         _LOGGER.debug("update poll status failed (%s): %s", client_id, exc)
 
 
-async def _fetch_events(http: httpx.AsyncClient, url: str) -> list[dict[str, Any]]:
+async def _fetch_events(http: httpx.AsyncClient, url: str) -> tuple[list[dict[str, Any]], int]:
     resp = await http.get(url)
     resp.raise_for_status()
+    payload_size = len(resp.content or b"")
     payload = resp.json()
     if not isinstance(payload, dict):
-        return []
+        return [], payload_size
     data = payload.get("data")
     if not isinstance(data, list):
-        return []
-    return [item for item in data if isinstance(item, dict)]
+        return [], payload_size
+    return [item for item in data if isinstance(item, dict)], payload_size
 
 
-async def _poll_client(http: httpx.AsyncClient, client_id: str, listen_url: str, caps: dict[str, bool]) -> None:
+async def _poll_client(
+    http: httpx.AsyncClient,
+    client_id: str,
+    listen_url: str,
+    caps: dict[str, bool],
+) -> int:
     routes = [name for name, enabled in caps.items() if enabled]
     if not routes:
         routes = ["falco", "suricata", "filebeat"]
 
     all_events: list[dict[str, Any]] = []
     last_error: str | None = None
+    total_bytes = 0
     for route in routes:
         url = _poll_url(listen_url, route)
         try:
-            all_events.extend(await _fetch_events(http, url))
+            events, payload_size = await _fetch_events(http, url)
+            total_bytes += payload_size
+            all_events.extend(events)
         except Exception as exc:
             last_error = f"{route}: {exc}"
             _LOGGER.debug("poll %s failed: %s", url, exc)
@@ -134,21 +159,24 @@ async def _poll_client(http: httpx.AsyncClient, client_id: str, listen_url: str,
         await asyncio.to_thread(run_data_analysis, True, False)
 
     _update_poll_status(client_id, status="ok" if last_error is None else "partial", last_error=last_error)
+    return total_bytes
 
 
 async def _poll_loop(stop_event: asyncio.Event) -> None:
     async with httpx.AsyncClient(timeout=_poll_timeout()) as http:
         while not stop_event.is_set():
+            tick_bytes = 0
             for doc in _list_registered_clients():
                 client_id, listen_url, caps = _extract_client_info(doc)
                 if not client_id or not listen_url:
                     continue
                 try:
-                    await _poll_client(http, client_id, listen_url, caps)
+                    tick_bytes += await _poll_client(http, client_id, listen_url, caps)
                 except httpx.TimeoutException:
                     _update_poll_status(client_id, status="timeout", last_error="timeout")
                 except Exception as exc:
                     _update_poll_status(client_id, status="error", last_error=str(exc))
+            _set_last_poll_bytes(tick_bytes)
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=_poll_interval_seconds())
             except asyncio.TimeoutError:
