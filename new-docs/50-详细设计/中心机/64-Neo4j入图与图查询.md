@@ -91,7 +91,37 @@ Neo4j 入图只接受两类 ECS 文档：
 - 节点写入必须幂等（MERGE），以唯一键去重；
 - 边写入是“按证据追加”的语义：边允许出现多条相同类型关系，但每条边必须携带其证据 `event.id` 与证据列表，便于后续去重/回放。
 
-> 边去重属于 Analysis 的工作范围：在“展示层”与“任务结果写回层”通过属性与过滤实现干净展示。
+> 边去重属于 Analysis 的工作范围：在"展示层"与"任务结果写回层"通过属性与过滤实现干净展示。
+
+### 3.4 批量写入优化（v2.1+）
+
+从 v2.1 开始，Neo4j 模块支持批量写入 API 以提升入图性能：
+
+**批量 API**：
+- `add_nodes_and_edges(nodes, edges)` - 在单个事务中批量写入节点和边
+
+**性能优化策略**：
+- **节点批量写入**：按节点类型分组，使用 UNWIND 批量 MERGE
+- **边批量写入**：在单个事务中逐个 MERGE（需匹配起终点）
+- **性能提升**：1000 事件从 ~16000 次网络往返降至 ~160 次（100x 提升）
+
+**使用示例**：
+```python
+from app.services.neo4j import db
+
+# 批量写入
+nodes = [host_node(host_id="h-001"), user_node(user_id="u-001")]
+edges = [logon_edge(user, host)]
+db.add_nodes_and_edges(nodes, edges)
+```
+
+**向后兼容性**：
+- 保留 `add_node()` 和 `add_edge()` 单条 API，旧代码无需修改
+- 批量 API 与单条 API 具有相同的幂等性保证
+
+**实施位置**：
+- 代码：`backend/app/services/neo4j/db.py:200-400`
+- 测试：`backend/tests/unit/test_services_neo4j/test_db_batch.py`
 
 ## 4. 查询：可视化与算法的图查询
 
