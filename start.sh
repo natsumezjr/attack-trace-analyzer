@@ -128,7 +128,31 @@ else
 fi
 
 # 4. 启动中心机后端（FastAPI）
-# 在 start.sh 的前端启动部分添加依赖检查
+if should_start "backend"; then
+    log_info "步骤 4/6: 启动后端..."
+    cd "$REPO"/backend
+    export OPENSEARCH_NODE="https://localhost:9200"
+    export OPENSEARCH_USERNAME="admin"
+    export OPENSEARCH_PASSWORD="OpenSearch@2024!Dev"
+    export OPENSEARCH_URL="https://localhost:9200"
+    export OPENSEARCH_USER="admin"
+    export NEO4J_URI="bolt://localhost:7687"
+    export NEO4J_USER="neo4j"
+    export NEO4J_PASSWORD="password"
+
+    if ! pgrep -f "uvicorn main:app" > /dev/null; then
+        nohup uv run uvicorn main:app --host 0.0.0.0 --port 8001 > "$BASE"/run/backend.log 2>&1 &
+        echo $! > "$BASE"/run/backend.pid
+        log_info "后端已启动，PID: $(cat "$BASE"/run/backend.pid)"
+    else
+        log_warn "后端已在运行"
+    fi
+    sleep 3
+else
+    log_warn "跳过: 后端"
+fi
+
+
 # 5. 启动中心机前端（Next.js）
 if should_start "frontend"; then
     log_info "步骤 5/6: 启动前端..."
@@ -142,35 +166,6 @@ if should_start "frontend"; then
         log_info "检测到依赖缺失，正在安装..."
         npm install
     fi
-
-    # 检查 Node.js 版本
-    NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1 || echo "0")
-    if [ "$NODE_VERSION" -lt 20 ]; then
-        log_info "当前 Node.js 版本: $(node --version 2>/dev/null || echo '未知')"
-        log_info "尝试使用 nvm 切换到 Node.js 20..."
-        [ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || log_info "nvm 不可用，使用系统默认 Node.js"
-    fi
-
-    if ! pgrep -f "next-server" > /dev/null; then
-        nohup npm run dev -- -H 0.0.0.0 -p 3000 > "$BASE"/run/frontend.log 2>&1 &
-        echo $! > "$BASE"/run/frontend.pid
-        log_info "前端已启动，PID: $(cat "$BASE"/run/frontend.pid)"
-        log_info "Node.js 版本: $(node --version 2>/dev/null || echo '未知')"
-    else
-        log_warn "前端已在运行"
-    fi
-    sleep 3
-else
-    log_warn "跳过: 前端"
-fi
-
-# 5. 启动中心机前端（Next.js）
-if should_start "frontend"; then
-    log_info "步骤 5/6: 启动前端..."
-    cd "$REPO"/frontend
-
-    # 确保使用 Node.js 20（如果 nvm 可用）
-    [ -s "$NVM_DIR/nvm.sh" ] && nvm use 20 2>/dev/null || true
 
     # 检查 Node.js 版本
     NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1 || echo "0")
