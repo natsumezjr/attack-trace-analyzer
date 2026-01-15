@@ -125,3 +125,52 @@ export async function fetchAnalysisTask(taskId: string): Promise<AnalysisTaskRes
 
   return response.json();
 }
+
+// ============================================
+// 测试接口：直接测试 killchain 分析
+// 注意：这是一个临时测试接口，方便删除
+// ============================================
+export type TestKillchainResponse =
+  | {
+      status: "ok";
+      message?: string;
+      result?: {
+        kc_uuid: string;
+        killchain_count: number;
+        killchains: Array<{
+          kc_uuid: string;
+          confidence: number;
+          explanation: string;
+          segment_count: number;
+          selected_path_count: number;
+        }>;
+      };
+      server_time?: string;
+    }
+  | {
+      status: "error";
+      error: { code: string; message: string };
+      server_time?: string;
+    };
+
+export async function testKillchainAnalysis(): Promise<TestKillchainResponse> {
+  const response = await fetch("/api/v1/analysis/killchain/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    try {
+      const data = await response.json();
+      return data;
+    } catch {
+      const text = await response.text();
+      return {
+        status: "error",
+        error: { code: "HTTP_ERROR", message: text || "Failed to test killchain analysis" },
+      };
+    }
+  }
+
+  return response.json();
+}

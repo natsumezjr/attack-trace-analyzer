@@ -12,6 +12,8 @@ from app.core.time import format_rfc3339, parse_datetime
 from app.services.analyze.pipeline import new_task_id
 from app.services.analyze.runner import enqueue_analysis_task
 from app.services.opensearch.internal import get_client
+from app.services.analyze import analyze_killchain
+import uuid
 
 
 router = APIRouter()
@@ -183,4 +185,59 @@ def get_analysis_task(task_id: str):
                 doc[k] = format_rfc3339(dt)
 
     return ok(task=doc, server_time=utc_now_rfc3339())
+
+
+# ============================================
+# 测试接口：直接测试 killchain 分析
+# 注意：这是一个临时测试接口，方便删除
+# ============================================
+@router.post("/api/v1/analysis/killchain/test")
+def test_killchain_analysis():
+    """
+    测试接口：直接运行 killchain 分析
+    
+    此接口会：
+    1. 自动加载测试数据到数据库（如果数据库为空）
+    2. 运行完整的 killchain 分析流水线
+    3. 返回分析结果
+    
+    注意：这是一个临时测试接口，测试完成后可以删除
+    """
+    try:
+        # 生成一个 killchain UUID
+        kc_uuid = str(uuid.uuid4())
+        
+        # 运行 killchain 分析
+        # analyze_killchain 内部会调用 load_test_fsa_to_database() 加载测试数据
+        killchains = analyze_killchain(kc_uuid)
+        
+        # 格式化返回结果
+        result = {
+            "kc_uuid": kc_uuid,
+            "killchain_count": len(killchains),
+            "killchains": []
+        }
+        
+        for kc in killchains:
+            kc_info = {
+                "kc_uuid": kc.kc_uuid,
+                "confidence": kc.confidence,
+                "explanation": kc.explanation,
+                "segment_count": len(kc.segments) if kc.segments else 0,
+                "selected_path_count": len(kc.selected_paths) if kc.selected_paths else 0,
+            }
+            result["killchains"].append(kc_info)
+        
+        return ok(
+            message="Killchain 分析完成",
+            result=result,
+            server_time=utc_now_rfc3339(),
+        )
+    except Exception as error:
+        import traceback
+        error_trace = traceback.format_exc()
+        return JSONResponse(
+            status_code=500,
+            content=err("INTERNAL_ERROR", f"killchain 分析失败: {str(error)}\n{error_trace}"),
+        )
 
