@@ -1,8 +1,8 @@
 import { ChartAreaDefault } from "@/components/chart-area-default";
-import { MiniChart } from "@/components/mini-chart";
+import { ChartBarDefault } from "@/components/chart-bar-default";
+import { ChartRadialText } from "@/components/chart-radial-text";
 import { Card, CardContent } from "@/components/card/card2";
 import DonutChartDemo from "@/components/card/card3";
-import { AttackStatsGrid } from "@/components/card/attack-stats-grid";
 
 export default function DashboardPage() {
   return (
@@ -17,16 +17,12 @@ export default function DashboardPage() {
             <DonutChartDemo />
           </CardContent>
         </Card>
-        <Card className="lg:col-start-1 lg:row-start-2">
-          <CardContent className="h-full p-4">
-            <AttackStatsGrid />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-start-2 lg:col-span-2 lg:row-start-2">
-          <CardContent className="p-0">
-            <MiniChart />
-          </CardContent>
-        </Card>
+        <div className="lg:col-start-1 lg:row-start-2">
+          <ChartRadialText />
+        </div>
+        <div className="lg:col-start-2 lg:col-span-2 lg:row-start-2">
+          <ChartBarDefault />
+        </div>
       </div>
     </div>
   );

@@ -40,11 +40,14 @@ export function ChartAreaDefault({ className }: { className?: string }) {
     let cancelled = false;
     const tick = async () => {
       try {
-        const { kb } = await getThroughputKb();
+        const { kb, lastPollTime, serverTime } = await getThroughputKb();
         if (cancelled) return;
         const nextIndex = indexRef.current + 1;
         indexRef.current = nextIndex;
-        const timeLabel = new Date().toLocaleTimeString();
+        const timeSource = lastPollTime || serverTime;
+        const timeLabel = timeSource
+          ? new Date(timeSource).toLocaleTimeString()
+          : new Date().toLocaleTimeString();
         setData((prev) => {
           const updated = [
             ...prev,
@@ -77,9 +80,15 @@ export function ChartAreaDefault({ className }: { className?: string }) {
 
   return (
     <Card className={cardClassName}>
-      <CardHeader>
-        <CardTitle>实时流量吞吐</CardTitle>
-        <CardDescription>每 5 秒更新，展示最近 10 个点</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>实时流量吞吐</CardTitle>
+          <CardDescription>每 5 秒更新</CardDescription>
+        </div>
+        <div className="flex flex-col text-sm text-primary">
+          <span>当前: {currentValue.toFixed(2)} Kb</span>
+          <span>均值: {averageValue.toFixed(2)} Kb</span>
+        </div>
       </CardHeader>
       <CardContent className="flex-1">
         <ChartContainer
@@ -115,10 +124,6 @@ export function ChartAreaDefault({ className }: { className?: string }) {
           </AreaChart>
         </ChartContainer>
       </CardContent>
-      <div className="flex items-center justify-between px-6 pb-6 text-sm text-muted-foreground">
-        <span>当前: {currentValue.toFixed(2)} Kb</span>
-        <span>均值: {averageValue.toFixed(2)} Kb</span>
-      </div>
     </Card>
   );
 }

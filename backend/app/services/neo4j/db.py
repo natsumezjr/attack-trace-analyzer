@@ -1,6 +1,7 @@
 # Neo4j 数据库操作模块
 from __future__ import annotations
 
+import math
 import os
 import uuid
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -483,6 +484,113 @@ def _fetch_edges_in_window(
         "labels(endNode(r)) AS dst_labels, properties(endNode(r)) AS dst_props"
     )
     return list(tx.run(cypher, **params))
+
+
+def get_graph_for_frontend(
+    *,
+    node_size: int = 36,
+    node_spacing: int = 160,
+) -> Dict[str, Any]:
+    """返回前端绘图用的全量图数据（nodes + edges）。
+
+    节点与边信息来自 Neo4j 全量查询，坐标为简单网格布局。
+    """
+    ensure_schema()
+    with _get_session() as session:
+        node_rows = _execute_read(session, _fetch_all_nodes)
+        edge_rows = _execute_read(session, _fetch_all_edges)
+
+    nodes_by_uid: Dict[str, GraphNode] = {}
+    for row in node_rows:
+        uid = _node_uid_from_record(row["labels"], row["props"])
+        if uid is None or uid in nodes_by_uid:
+            continue
+        ntype, key = parse_uid(uid)
+        node_props = dict(row["props"])
+        for k in key:
+            node_props.pop(k, None)
+        nodes_by_uid[uid] = GraphNode(ntype=ntype, key=key, props=node_props)
+
+    edges: List[GraphEdge] = []
+    for row in edge_rows:
+        src_uid = _node_uid_from_record(row["src_labels"], row["src_props"])
+        dst_uid = _node_uid_from_record(row["dst_labels"], row["dst_props"])
+        if src_uid is None or dst_uid is None:
+            continue
+        try:
+            rtype = RelType(row["rtype"])
+        except ValueError:
+            continue
+        edges.append(GraphEdge(src_uid=src_uid, dst_uid=dst_uid, rtype=rtype, props=dict(row["rprops"])))
+
+    nodes_list = list(nodes_by_uid.values())
+    total_nodes = len(nodes_list)
+    cols = max(1, int(math.sqrt(total_nodes)))
+
+    def _icon_key(ntype: NodeType) -> str:
+        mapping = {
+            NodeType.HOST: "host",
+            NodeType.USER: "user",
+            NodeType.PROCESS: "process",
+            NodeType.FILE: "file",
+            NodeType.IP: "ip",
+            NodeType.DOMAIN: "domain",
+        }
+        return mapping.get(ntype, "node")
+
+    frontend_nodes: List[Dict[str, Any]] = []
+    for idx, node in enumerate(nodes_list):
+        x = (idx % cols) * node_spacing + node_spacing // 2
+        y = (idx // cols) * node_spacing + node_spacing // 2
+        frontend_nodes.append(
+            {
+                "id": node.uid,
+                "ntype": node.ntype.value,
+                "type": "image",
+                "style": {
+                    "x": x,
+                    "y": y,
+                    "size": node_size,
+                    "src": _icon_key(node.ntype),
+                },
+            }
+        )
+
+    frontend_edges: List[Dict[str, Any]] = []
+    for idx, edge in enumerate(edges):
+        frontend_edges.append(
+            {
+                "id": f"edge-{idx + 1}",
+                "type": edge.rtype.value,
+                "source": edge.src_uid,
+                "target": edge.dst_uid,
+            }
+        )
+
+    return {
+        "data": {
+            "nodes": frontend_nodes,
+            "edges": frontend_edges,
+        },
+        "behaviors": ["drag-canvas", "zoom-canvas", "drag-element"],
+    }
+
+
+def _fetch_all_nodes(tx) -> List[Dict[str, Any]]:
+    """查询全部节点的事务函数"""
+    cypher = "MATCH (n) RETURN labels(n) AS labels, properties(n) AS props"
+    return list(tx.run(cypher))
+
+
+def _fetch_all_edges(tx) -> List[Dict[str, Any]]:
+    """查询全部边的事务函数"""
+    cypher = (
+        "MATCH (s)-[r]->(t) "
+        "RETURN type(r) AS rtype, properties(r) AS rprops, "
+        "labels(s) AS src_labels, properties(s) AS src_props, "
+        "labels(t) AS dst_labels, properties(t) AS dst_props"
+    )
+    return list(tx.run(cypher))
 
 
 # =============================================================================

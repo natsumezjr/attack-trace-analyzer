@@ -140,6 +140,9 @@ class AnomalyDetector:
         queue_name = os.getenv('RABBITMQ_QUEUE', 'data.filebeat')
         self.publisher = RabbitPublisher(amqp_url, queue_name)
 
+    _ATTACK_TECHNIQUE_TAG_RE = re.compile(r"^attack\.t(\d{4})(?:\.(\d{3}))?$", re.IGNORECASE)
+    _ATTACK_TACTIC_TAG_RE = re.compile(r"^attack\.ta(\d{4})$", re.IGNORECASE)
+
     def load_rules(self):
         """Load all Sigma rules from rules directory"""
         print(f"Loading Sigma rules from {self.rules_dir}...")
@@ -247,12 +250,21 @@ class AnomalyDetector:
                 tactic_name = None
 
                 for tag in rule.tags:
-                    if tag.startswith('attack.t') and '.' not in tag[8:]:
-                        # 如 attack.t1110
-                        technique_id = tag[7:].upper()  # T1110
-                    elif tag.startswith('attack.ta'):
-                        # 如 attack.ta0005
-                        tactic_id = tag[7:].upper()  # TA0005
+                    tag_raw = tag.strip() if isinstance(tag, str) else ""
+                    if not tag_raw:
+                        continue
+
+                    tech_match = self._ATTACK_TECHNIQUE_TAG_RE.match(tag_raw)
+                    if tech_match:
+                        base = tech_match.group(1)
+                        sub = tech_match.group(2)
+                        technique_id = f"T{base}.{sub}" if sub else f"T{base}"
+                        continue
+
+                    tactic_match = self._ATTACK_TACTIC_TAG_RE.match(tag_raw)
+                    if tactic_match:
+                        tactic_id = f"TA{tactic_match.group(1)}"
+                        continue
 
                 # 映射技术名称（简化示例）
                 technique_names = {
@@ -270,7 +282,8 @@ class AnomalyDetector:
                 }
 
                 if technique_id:
-                    technique_name = technique_names.get(technique_id, 'Unknown Technique')
+                    base_id = technique_id.split(".", 1)[0]
+                    technique_name = technique_names.get(base_id, 'Unknown Technique')
                 if tactic_id:
                     tactic_name = tactic_names.get(tactic_id, 'Unknown Tactic')
 
@@ -321,18 +334,21 @@ class AnomalyDetector:
             log_entry['tags'] = matched_rules[0]['tags']
 
             # 添加threat字段（MITRE ATT&CK映射，ECS要求）
-            if matched_rules[0]['technique_id'] and matched_rules[0]['tactic_id']:
-                log_entry['threat'] = {
-                    'framework': 'MITRE ATT&CK',
-                    'tactic': {
-                        'id': matched_rules[0]['tactic_id'],
+            technique_id0 = matched_rules[0]['technique_id']
+            tactic_id0 = matched_rules[0]['tactic_id']
+            if technique_id0 or tactic_id0:
+                threat: Dict[str, Any] = {'framework': 'MITRE ATT&CK'}
+                if tactic_id0:
+                    threat['tactic'] = {
+                        'id': tactic_id0,
                         'name': matched_rules[0]['tactic_name']
-                    },
-                    'technique': {
-                        'id': matched_rules[0]['technique_id'],
+                    }
+                if technique_id0:
+                    threat['technique'] = {
+                        'id': technique_id0,
                         'name': matched_rules[0]['technique_name']
                     }
-                }
+                log_entry['threat'] = threat
 
             # 添加custom字段（ECS扩展，用于告警融合）
             log_entry['custom'] = {
