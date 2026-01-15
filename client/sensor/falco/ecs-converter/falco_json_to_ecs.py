@@ -126,7 +126,8 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
         iso_utc(evt.get("time"))
         or datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     )
-    ecs["ecs"] = {"version": "8.11.0"}
+    # Align with docs/81-ECS字段规范.md (ECS 子集 v1.0).
+    ecs["ecs"] = {"version": "9.2.0"}
     event_obj = ecs.setdefault("event", {})
     # Default dataset kept for abnormal findings (raw Falco alerts). Telemetry dataset
     # is selected later based on extracted fields.
@@ -312,6 +313,9 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
         # Dataset selection (after best-effort entity_id generation)
         telemetry_dataset = "hostbehavior.syscall"
         telemetry_category = ["host"]
+        if evt_type0 == "connect":
+            # For connect() telemetry, prefer "network" categorization to match graph/detection semantics.
+            telemetry_category = ["network"]
 
         if is_exec:
             proc_pid = process_obj.get("pid") if isinstance(process_obj, dict) else None
@@ -323,15 +327,17 @@ def falco_to_ecs(evt: Dict, abnormal: bool) -> Dict:
                 event_obj["action"] = "process_start"
         elif has_file:
             telemetry_category = ["file"]
-            # Map common syscall names to the v1.0 ECS subset actions when possible.
-            if evt_type0 in ("open", "openat", "openat2"):
-                event_obj["action"] = "file_read"
-            elif "write" in evt_type0 or evt_type0 in ("creat", "pwrite", "pwrite64"):
-                event_obj["action"] = "file_write"
-            elif "unlink" in evt_type0 or "delete" in evt_type0:
+            # Map syscall names to the ECS subset actions required by docs/81:
+            # allowed: file_read / file_write / file_create / file_delete
+            if evt_type0 in ("creat",):
+                event_obj["action"] = "file_create"
+            elif evt_type0 in ("unlink", "unlinkat"):
                 event_obj["action"] = "file_delete"
-            elif "exec" in evt_type0:
-                event_obj["action"] = "file_execute"
+            elif evt_type0.startswith("rename"):
+                event_obj["action"] = "file_write"
+            else:
+                # open/openat/openat2 and other fallbacks: treat as read
+                event_obj["action"] = "file_read"
 
             has_entity_id = (
                 isinstance(process_obj, dict)

@@ -71,6 +71,7 @@
 | `event.category` | `keyword` |
 | `event.type` | `keyword` |
 | `event.action` | `keyword` |
+| `event.outcome` | `keyword` |
 | `event.module` | `keyword` |
 | `event.dataset` | `keyword` |
 | `event.created` | `date` |
@@ -82,7 +83,11 @@
 | `user.name` | `keyword` |
 | `process.entity_id` | `keyword` |
 | `process.pid` | `long` |
+| `process.executable` | `keyword` |
 | `process.parent.pid` | `long` |
+| `process.parent.entity_id` | `keyword` |
+| `process.parent.executable` | `keyword` |
+| `process.parent.name` | `keyword` |
 | `process.name` | `keyword` |
 | `process.command_line` | `text`（带 `keyword` 子字段） |
 | `source.ip` | `ip` |
@@ -92,6 +97,8 @@
 | `network.transport` | `keyword` |
 | `network.direction` | `keyword` |
 | `dns.question.name` | `text`（带 `keyword` 子字段） |
+| `dns.answers.data` | `keyword` |
+| `dns.answers.type` | `keyword` |
 | `file.path` | `keyword` |
 | `file.hash.sha256` | `keyword` |
 | `session.id` | `keyword` |
@@ -121,6 +128,7 @@
 | `threat.technique.id` | `keyword` |
 | `threat.technique.name` | `keyword` |
 | `custom.finding.stage` | `keyword` |
+| `custom.finding.detector_id` | `keyword` |
 | `custom.finding.providers` | `keyword` |
 | `custom.finding.fingerprint` | `keyword` |
 | `custom.confidence` | `float` |

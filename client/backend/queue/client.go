@@ -101,10 +101,13 @@ func (c *Client) FetchAll(queueName string) ([]json.RawMessage, error) {
 		if !ok {
 			break
 		}
-		if json.Valid(msg.Body) {
+		if !json.Valid(msg.Body) {
+			c.log.Printf("rabbitmq message dropped: invalid json payload queue=%s bytes=%d", queueName, len(msg.Body))
+		} else {
 			withID, err := ensureEventID(msg.Body)
 			if err != nil {
-				out = append(out, msg.Body)
+				// Ensure we only return valid JSON objects (dict) per docs/87; bad payloads are logged then dropped.
+				c.log.Printf("rabbitmq message dropped: ensure event.id failed queue=%s err=%v", queueName, err)
 			} else {
 				out = append(out, withID)
 			}

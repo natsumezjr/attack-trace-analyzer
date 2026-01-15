@@ -180,6 +180,157 @@
 | `destination.ip` | ip | 必须存在 |
 | `dns.question.name` | keyword | 必须存在 |
 
+### 2.5 `hostlog.file_registry`
+
+用途：文件与注册表相关事件；在本项目中主要用于**文件访问事件的降级承载**（当无法获得 `process.entity_id` 时仍能入图）。
+
+必须字段：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `hostlog.file_registry` |
+| `event.category[]` | keyword[] | 必须包含 `file` |
+| `event.action` | keyword | 取值为 `file_read` / `file_write` / `file_create` / `file_delete` |
+| `file.path` | keyword | 必须存在 |
+
+可选字段（建议尽可能写入，不影响入库）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `process.entity_id` | keyword | 可选；存在时可用于 `Process → File` 的 `FILE_ACCESS` 边 |
+| `file.hash.sha256` | keyword | 可选；存在时必须写入（用于文件证据与去重） |
+
+### 2.6 `hostbehavior.syscall`（connect 子集）
+
+用途：主机系统调用层面的行为；在本项目中主要用于 `connect()` 事实事件（补齐 “进程→网络连接”）。
+
+必须字段（connect 子集）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `hostbehavior.syscall` |
+| `event.category[]` | keyword[] | connect 事件必须包含 `network` |
+| `event.action` | keyword | 固定为 `connect`（或包含 `connect` 字符串，便于抽取） |
+| `network.transport` | keyword | 必须存在（如 `tcp` / `udp`） |
+| `destination.ip` | ip | 必须存在 |
+
+可选字段（建议写入）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `destination.port` | long | 可选 |
+| `source.ip` | ip | 可选 |
+| `source.port` | long | 可选 |
+| `process.entity_id` | keyword | 可选；存在时抽取为 `Process → IP` 的 `NET_CONNECT` 边，否则降级为 `Host → IP` |
+
+### 2.7 `netflow.flow`
+
+用途：网络五元组流量事实事件（可用于横向连接、C2 线索与证据回溯）。
+
+必须字段：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `netflow.flow` |
+| `event.category[]` | keyword[] | 必须包含 `network` |
+| `event.type[]` | keyword[] | 取值为 `start` / `end` |
+| `event.action` | keyword | 取值为 `flow_start` / `flow_end` |
+| `network.transport` | keyword | 必须存在 |
+| `source.ip` | ip | 必须存在 |
+| `destination.ip` | ip | 必须存在 |
+
+可选字段（建议写入）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `source.port` | long | 可选（TCP/UDP 场景通常存在） |
+| `destination.port` | long | 可选（TCP/UDP 场景通常存在） |
+| `network.protocol` | keyword | 可选（如 `dns` / `http` / `tls` 等应用层协议） |
+| `flow.id` | keyword | 可选 |
+| `network.community_id` | keyword | 可选 |
+| `network.bytes` | long | 可选 |
+| `network.packets` | long | 可选 |
+
+### 2.8 `netflow.http`
+
+用途：HTTP 请求/响应线索（用于 URL/域名基础设施关联）。
+
+必须字段：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `netflow.http` |
+| `event.category[]` | keyword[] | 必须包含 `network` |
+| `event.type[]` | keyword[] | 固定为 `protocol` |
+| `event.action` | keyword | 固定为 `http_request` |
+| `network.protocol` | keyword | 固定为 `http` |
+| `network.transport` | keyword | 必须存在 |
+| `source.ip` | ip | 必须存在 |
+| `destination.ip` | ip | 必须存在 |
+
+可选字段（建议写入）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `url.full` | keyword | 可选 |
+| `url.domain` | keyword | 可选 |
+| `http.request.method` | keyword | 可选 |
+| `http.response.status_code` | integer | 可选 |
+| `user_agent.original` | text | 可选 |
+
+### 2.9 `netflow.tls`
+
+用途：TLS 握手与 SNI 线索（用于域名基础设施关联）。
+
+必须字段：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `netflow.tls` |
+| `event.category[]` | keyword[] | 必须包含 `network` |
+| `event.type[]` | keyword[] | 固定为 `protocol` |
+| `event.action` | keyword | 固定为 `tls_handshake` |
+| `network.protocol` | keyword | 固定为 `tls` |
+| `network.transport` | keyword | 必须存在 |
+| `source.ip` | ip | 必须存在 |
+| `destination.ip` | ip | 必须存在 |
+
+可选字段（建议写入）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `tls.client.server_name` | keyword | 可选（SNI） |
+| `tls.version` | keyword | 可选 |
+
+### 2.10 `netflow.icmp`
+
+用途：ICMP 网络行为（用于探测、可达性与横向线索）。
+
+必须字段：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `event.kind` | keyword | 固定为 `event` |
+| `event.dataset` | keyword | 固定为 `netflow.icmp` |
+| `event.category[]` | keyword[] | 必须包含 `network` |
+| `event.type[]` | keyword[] | 固定为 `protocol` |
+| `event.action` | keyword | 取值为 `icmp_echo` / `icmp_message` |
+| `network.transport` | keyword | 固定为 `icmp` |
+| `source.ip` | ip | 必须存在 |
+| `destination.ip` | ip | 必须存在 |
+
+可选字段（建议写入）：
+
+| 字段 | 类型 | 规则 |
+|---|---|---|
+| `icmp.type` | integer | 可选 |
+| `icmp.code` | integer | 可选 |
+
 > 其它 `hostbehavior.*` 与 `netflow.*` datasets 的字段口径遵循相同原则：保证可用于实体抽取与证据回溯。字段扩展必须同步更新本文件，并与 `84-Neo4j实体图谱规范.md` 的抽取规则保持一致。
 
 ## 3. Findings datasets（告警/发现）
