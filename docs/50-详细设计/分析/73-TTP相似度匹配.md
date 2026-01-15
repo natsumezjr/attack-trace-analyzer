@@ -99,7 +99,7 @@ HTTP 接口输入字段固定为：
 
 ### 2.3 TF-IDF 权重（固定公式）
 
-系统按 intrusion-set 集合作为“文档集合”计算 IDF：
+系统按 intrusion-set 集合作为"文档集合"计算 IDF：
 
 - 设 intrusion-set 文档数为 `N`；
 - 对任一 technique id，设文档频次为 `df`；
@@ -111,9 +111,53 @@ HTTP 接口输入字段固定为：
 - `group_norm`：technique TF-IDF 向量的 L2 范数；
 - `group_tactic_norm`：tactic TF-IDF 向量的 L2 范数。
 
+#### 2.3.1 向量化示意
+
+TTP 标签到 TF-IDF 向量的转换过程：
+
+```mermaid
+flowchart LR
+    Input1["<b>输入：TTP 标签</b><br/>T1055, T1110, TA0001"] --> Extract["<b>特征提取</b><br/>解析 technique/tactic<br/>去重与标准化"]
+    Extract --> Tokenize["<b>分词</b><br/>T1055 → Process Injection<br/>T1110 → Brute Force<br/>TA0001 → Initial Access"]
+    Tokenize --> ComputeIDF["<b>计算 IDF</b><br/>idf(T1055) 为 1.2<br/>idf(T1110) 为 2.1<br/>idf(TA0001) 为 0.8"]
+    ComputeIDF --> Output1["<b>输出：TF-IDF 向量</b><br/>1.2, 2.1, 0.8"]
+
+    style Input1 fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style Output1 fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    style Extract fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Tokenize fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style ComputeIDF fill:#fff3e0,stroke:#e65100,stroke-width:2px
+```
+
 ## 3. 相似度计算
 
-### 3.1 相似度向量（固定）
+### 3.1 算法流程
+
+TTP 相似度匹配的完整处理流程：
+
+```mermaid
+flowchart TD
+    Input["<b>输入：关键路径边</b><br/>Canonical Findings"] --> Extract["<b>提取特征</b><br/>TTP tags<br/>tactics & techniques"]
+    Extract --> Vectorize["<b>向量化</b><br/>TF-IDF<br/>二值 TF"]
+    Vectorize --> Load["<b>加载 TTP 知识库</b><br/>MITRE ATT&CK<br/>Enterprise CTI"]
+    Load --> Match["<b>相似度匹配</b><br/>cosine similarity<br/>tech + tactic score"]
+    Match --> Filter["<b>过滤候选</b><br/>score > 0.0"]
+    Filter --> Rank["<b>排序</b><br/>Top3 APTs"]
+    Rank --> Explain["<b>生成解释</b><br/>Top5 techniques<br/>Top5 tactics"]
+    Explain --> Output["<b>输出匹配结果</b><br/>similar_apts 数组"]
+
+    style Input fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style Output fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    style Extract fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Vectorize fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Load fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Match fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Filter fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Rank fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Explain fill:#fff3e0,stroke:#e65100,stroke-width:2px
+```
+
+### 3.2 相似度向量（固定）
 
 系统使用二值 TF（出现记 1，不出现记 0）的 TF-IDF 向量，并使用余弦相似度。
 
@@ -123,7 +167,7 @@ HTTP 接口输入字段固定为：
 
 实现绑定点：`backend/app/services/analyze/ttp_similarity/service.py:_cosine_from_intersection_weights()`。
 
-### 3.2 综合分数（固定）
+### 3.3 综合分数（固定）
 
 每个 intrusion-set 的综合相似度分数固定由两部分组成：
 
@@ -166,6 +210,66 @@ HTTP 接口输入字段固定为：
 - `attack_tactics[]`（排序后输出）
 - `attack_techniques[]`（过滤后输出）
 - `similar_apts[]`（最多 3 项）
+
+#### 4.2.1 Top3 输出示例
+
+```json
+{
+  "host_id": "i-0abc123def456",
+  "start_ts": "2024-01-01T00:00:00Z",
+  "end_ts": "2024-01-01T23:59:59Z",
+  "attack_tactics": [
+    {"id": "TA0001", "name": "Initial Access"},
+    {"id": "TA0006", "name": "Credential Access"}
+  ],
+  "attack_techniques": [
+    {"id": "T1078", "name": "Valid Accounts"},
+    {"id": "T1110", "name": "Brute Force"},
+    {"id": "T1021", "name": "Remote Services"}
+  ],
+  "similar_apts": [
+    {
+      "intrusion_set": {
+        "id": "G0016",
+        "name": "APT28"
+      },
+      "similarity_score": 0.85,
+      "top_techniques": [
+        {"technique_id": "T1078", "technique_idf": 2.1},
+        {"technique_id": "T1110", "technique_idf": 1.8}
+      ],
+      "top_tactics": [
+        {"tactic_id": "TA0001", "tactic_idf": 1.2},
+        {"tactic_id": "TA0006", "tactic_idf": 0.9}
+      ]
+    },
+    {
+      "intrusion_set": {
+        "id": "G0015",
+        "name": "APT29"
+      },
+      "similarity_score": 0.72,
+      "top_techniques": [
+        {"technique_id": "T1078", "technique_idf": 2.1}
+      ],
+      "top_tactics": [
+        {"tactic_id": "TA0001", "tactic_idf": 1.2}
+      ]
+    },
+    {
+      "intrusion_set": {
+        "id": "G0035",
+        "name": "Lazarus Group"
+      },
+      "similarity_score": 0.65,
+      "top_techniques": [
+        {"technique_id": "T1021", "technique_idf": 1.5}
+      ],
+      "top_tactics": []
+    }
+  ]
+}
+```
 
 字段结构的权威口径见：
 

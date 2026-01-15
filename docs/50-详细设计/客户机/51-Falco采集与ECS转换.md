@@ -22,6 +22,38 @@
 | Falco 引擎 | `client/docker-compose.yml` 的 `falco` 服务 | Falco 输出 JSONL 到共享卷 |
 | ECS 转换器 | `client/sensor/falco/ecs-converter/falco_json_to_ecs.py` | 读取 JSONL，转换为 ECS JSON，发布到 RabbitMQ |
 
+### 1.1 Falco 组件架构
+
+```mermaid
+flowchart LR
+    subgraph Host["宿主机"]
+        Kernel[内核钩子<br/>systemcalls<br/>file access]
+    end
+
+    subgraph FalcoContainer["Falco 容器"]
+        FalcoEngine[Falco 引擎<br/>0.42.1<br/>读取 /data/falco.jsonl]
+        Rules[规则目录<br/>/etc/falco/rules.d<br/>ata_telemetry_rules.yaml]
+    end
+
+    subgraph Converter["falco-ecs 容器"]
+        JSONLReader[JSONL 读取器<br/>/data/falco.jsonl<br/>tail -f 模式]
+        ECSConverter[ECS 转换器<br/>falco_json_to_ecs.py<br/>event.dataset 判断<br/>host.id/name 补齐]
+        RabbitPublisher[RabbitMQ 发布器<br/>队列: data.falco]
+    end
+
+    Kernel -->|系统调用| FalcoEngine
+    Rules -->|加载规则| FalcoEngine
+    FalcoEngine -->|JSONL 输出| JSONLReader
+    JSONLReader -->|逐行解析| ECSConverter
+    ECSConverter -->|ECS JSON| RabbitPublisher
+
+    classDef sensorStyle fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef converterStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class FalcoEngine,Rules sensorStyle
+    class JSONLReader,ECSConverter,RabbitPublisher converterStyle
+```
+
 ## 2. 采集输入
 
 ### 2.1 Falco 输出文件
@@ -127,6 +159,52 @@ Falco 转换器基于 `priority` 与阈值判断是否异常：
 - 异常行为：`event.kind="alert"`
 
 阈值参数由转换器启动参数 `--abnormal-priority` 决定，默认值为 `WARNING`。
+
+### 3.4 转换逻辑示例
+
+以下代码展示 Falco 事件到 ECS 的核心转换逻辑：
+
+```python
+def falco_to_ecs(falco_event: dict) -> dict:
+    """将 Falco JSONL 事件转换为 ECS 格式"""
+    ecs_event = {
+        "ecs": {"version": "9.2.0"},
+        "event": {
+            "kind": determine_event_kind(falco_event),  # 基于 priority 判断
+            "dataset": map_dataset(falco_event),       # hostlog.process 等
+        },
+        "host": {
+            "name": os.getenv("HOST_NAME", falco_event.get("host_name")),
+            "id": get_or_generate_host_id()
+        },
+        "process": {
+            "pid": falco_event.get("proc.pid"),
+            "executable": falco_event.get("proc.exe"),
+            "command": falco_event.get("proc.cmdline")
+        },
+        "message": falco_event.get("output", ""),
+        "falco": falco_event  # 保留原始事件用于审计
+    }
+    return ecs_event
+
+def determine_event_kind(falco_event: dict) -> str:
+    """基于 priority 判断事件类型"""
+    priority = falco_event.get("priority", "")
+    if priority in ["WARNING", "ERROR", "CRITICAL"]:
+        return "alert"
+    return "event"
+
+def map_dataset(falco_event: dict) -> str:
+    """映射 event.dataset"""
+    evt_type = falco_event.get("event_type", "")
+    if evt_type == "execve":
+        return "hostlog.process"
+    elif evt_type in ["open", "openat"]:
+        return "hostlog.file_registry"
+    elif evt_type == "connect":
+        return "hostbehavior.syscall"
+    return "hostbehavior.default"
+```
 
 ## 4. eventid 生成与幂等
 
