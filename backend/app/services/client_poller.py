@@ -184,6 +184,11 @@ async def _poll_loop(stop_event: asyncio.Event) -> None:
                     _update_poll_status(client_id, status="error", last_error=str(exc))
 
             # Step 2: write tick events to OpenSearch.
+            # #region agent log
+            if tick_events:
+                sample_event = tick_events[0] if tick_events and isinstance(tick_events[0], dict) else None
+                print(f"[DEBUG] before store_events: tick_events_count={len(tick_events)}, sample_keys={list(sample_event.keys())[:20] if sample_event else None}")
+            # #endregion
             if tick_events:
                 store_result = await asyncio.to_thread(store_events, tick_events)
                 _LOGGER.info("poll tick store events done result=%s", store_result)

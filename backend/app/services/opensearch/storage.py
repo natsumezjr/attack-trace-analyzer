@@ -595,6 +595,9 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             }
         }
     """
+    # #region agent log
+    print(f"[DEBUG] store_events called with {len(events)} events")
+    # #endregion
     if len(events) == 0:
         return {"total": 0, "success": 0, "failed": 0, "duplicated": 0, "dropped": 0, "details": {}}
 
@@ -603,24 +606,59 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     total_duplicated = 0
     total_dropped = 0
     ingested_now = utc_now_rfc3339()
+    drop_reasons = {"not_dict": 0, "no_timestamp": 0, "no_required_fields": 0, "no_event_id": 0, "invalid_kind": 0}
 
-    for event in events:
+    for idx, event in enumerate(events):
+        # #region agent log
+        if idx < 3:  # 只打印前3个事件的详细信息
+            print(f"[DEBUG] Event {idx}: type={type(event)}, is_dict={isinstance(event, dict)}, keys={list(event.keys())[:10] if isinstance(event, dict) else None}")
+        # #endregion
         if not isinstance(event, dict):
+            drop_reasons["not_dict"] += 1
             total_dropped += 1
             continue
 
         _dotted_to_nested(event)
+        # #region agent log
+        if idx < 3:
+            ts_before = _extract_timestamp(event.copy())
+            print(f"[DEBUG] Event {idx} after normalize: has_timestamp={ts_before is not None}, timestamp={ts_before}")
+        # #endregion
         if _normalize_three_timestamps(event, ingested_now=ingested_now) is None:
+            drop_reasons["no_timestamp"] += 1
             total_dropped += 1
+            # #region agent log
+            if idx < 3:
+                print(f"[DEBUG] Event {idx} DROPPED: no timestamp (hypothesis A)")
+            # #endregion
             continue
+        # #region agent log
+        if idx < 3:
+            event_obj_before = event.get("event", {})
+            print(f"[DEBUG] Event {idx} before ensure_required_fields: event.kind={event_obj_before.get('kind') if isinstance(event_obj_before, dict) else None}, has_host={'host' in event}")
+        # #endregion
         if _ensure_required_fields(event) is None:
+            drop_reasons["no_required_fields"] += 1
             total_dropped += 1
+            # #region agent log
+            if idx < 3:
+                print(f"[DEBUG] Event {idx} DROPPED: missing required fields (hypothesis B)")
+            # #endregion
             continue
 
         # Enforce docs/51-ECS字段规范.md: event.id is the idempotency key.
         event_id = _get_event_id(event)
+        # #region agent log
+        if idx < 3:
+            print(f"[DEBUG] Event {idx} checking event.id: event_id={event_id}, has_event_id={event_id is not None}")
+        # #endregion
         if not event_id:
+            drop_reasons["no_event_id"] += 1
             total_dropped += 1
+            # #region agent log
+            if idx < 3:
+                print(f"[DEBUG] Event {idx} DROPPED: no event.id (hypothesis C)")
+            # #endregion
             continue
 
         # Enforce docs/51-ECS字段规范.md: only "event" (Telemetry) and "alert" (Findings) are valid.
@@ -629,8 +667,17 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             (event_obj.get("kind") if isinstance(event_obj, dict) else None)
             or event.get("event.kind")
         )
+        # #region agent log
+        if idx < 3:
+            print(f"[DEBUG] Event {idx} checking event.kind: kind={kind}, is_valid={kind in ('event', 'alert')}")
+        # #endregion
         if kind not in ("event", "alert"):
+            drop_reasons["invalid_kind"] += 1
             total_dropped += 1
+            # #region agent log
+            if idx < 3:
+                print(f"[DEBUG] Event {idx} DROPPED: invalid event.kind={kind} (hypothesis D)")
+            # #endregion
             continue
 
         index_name = route_to_index(event)
@@ -674,7 +721,7 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             }
             total_failed += len(documents)
 
-    return {
+    result = {
         "total": len(events),
         "success": total_success,
         "failed": total_failed,
@@ -682,3 +729,8 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "dropped": total_dropped,
         "details": details,
     }
+    # #region agent log
+    print(f"[DEBUG] store_events result: {result}")
+    print(f"[DEBUG] drop_reasons breakdown: {drop_reasons}")
+    # #endregion
+    return result
