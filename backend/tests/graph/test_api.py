@@ -109,3 +109,59 @@ def test_get_edges_in_window_forwards_filters(monkeypatch: pytest.MonkeyPatch) -
     assert captured["allowed"] == ["NET_CONNECT"]
     assert captured["only_alarm"] is True
     assert len(edges) == len(rows)
+
+
+def test_get_graph_for_frontend_returns_nodes_and_edges(monkeypatch: pytest.MonkeyPatch) -> None:
+    node_rows = [
+        {"labels": ["Host"], "props": {"host.id": "h-001", "host.name": "alpha"}},
+        {"labels": ["Process"], "props": {"process.entity_id": "p-001", "process.name": "proc"}},
+    ]
+    edge_rows = [
+        {
+            "rtype": "RUNS_ON",
+            "rprops": {"event.id": "evt-001"},
+            "src_labels": ["Process"],
+            "src_props": {"process.entity_id": "p-001"},
+            "dst_labels": ["Host"],
+            "dst_props": {"host.id": "h-001"},
+        }
+    ]
+
+    def fake_execute_read(session, func, *args, **kwargs):
+        if func == graph_db._fetch_all_nodes:
+            return node_rows
+        if func == graph_db._fetch_all_edges:
+            return edge_rows
+        raise AssertionError("unexpected query function")
+
+    monkeypatch.setattr(graph_db, "ensure_schema", lambda: None)
+    monkeypatch.setattr(graph_db, "_get_session", lambda: _dummy_session())
+    monkeypatch.setattr(graph_db, "_execute_read", fake_execute_read)
+
+    payload = graph_db.get_graph_for_frontend()
+
+    assert "data" in payload
+    assert payload["behaviors"] == ["drag-canvas", "zoom-canvas", "drag-element"]
+
+    nodes = payload["data"]["nodes"]
+    edges = payload["data"]["edges"]
+
+    assert len(nodes) == 2
+    assert len(edges) == 1
+
+    host_node = next(node for node in nodes if node["ntype"] == "Host")
+    process_node = next(node for node in nodes if node["ntype"] == "Process")
+
+    assert host_node["id"] == "Host:host.id=h-001"
+    assert host_node["type"] == "image"
+    assert host_node["style"]["src"] == "host"
+
+    assert process_node["id"] == "Process:process.entity_id=p-001"
+    assert process_node["type"] == "image"
+    assert process_node["style"]["src"] == "process"
+
+    edge = edges[0]
+    assert edge["id"] == "edge-1"
+    assert edge["type"] == "RUNS_ON"
+    assert edge["source"] == process_node["id"]
+    assert edge["target"] == host_node["id"]

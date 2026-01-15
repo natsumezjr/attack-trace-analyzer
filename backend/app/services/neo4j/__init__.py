@@ -15,10 +15,11 @@ Neo4j 统一对外接口
 """
 
 from .ingest import ingest_ecs_events
-from .db import get_edges_in_window, get_graph_by_attack_id
+from .db import get_edges_in_window, get_graph_by_attack_id, get_graph_for_frontend
 
 __all__ = [
     "ingest_ecs_events",
     "get_edges_in_window",
     "get_graph_by_attack_id",
+    "get_graph_for_frontend",
 ]
