@@ -66,8 +66,19 @@ def load_test_fsa_to_database() -> tuple[int, int]:
     
     # 2. 加载测试数据
     print("[加载测试数据] 加载测试数据...")
-    backend_dir = Path(__file__).resolve().parent.parent.parent
+    # 从 backend/app/services/analyze/__init__.py 向上4层到 backend 目录
+    # __file__ = backend/app/services/analyze/__init__.py
+    # parents[0] = backend/app/services/analyze/
+    # parents[1] = backend/app/services/
+    # parents[2] = backend/app/
+    # parents[3] = backend/
+    current_file = Path(__file__).resolve()
+    backend_dir = current_file.parents[3]  # 使用 parents[3] 更可靠
     fixture_path = backend_dir / "tests" / "fixtures" / "graph" / "testFSA.json"
+    print(f"[DEBUG] 当前文件: {current_file}")
+    print(f"[DEBUG] backend_dir: {backend_dir}")
+    print(f"[DEBUG] 查找测试数据文件: {fixture_path}")
+    print(f"[DEBUG] 文件是否存在: {fixture_path.exists()}")
     
     if not fixture_path.exists():
         raise FileNotFoundError(f"测试数据文件不存在: {fixture_path}")
