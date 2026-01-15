@@ -18,6 +18,9 @@ from app.services.opensearch.client import ensure_index, index_document
 from app.services.opensearch.index import INDEX_PATTERNS, get_index_name
 from app.services.opensearch.mappings import analysis_tasks_mapping
 
+# Import analyze_killchain for KillChain analysis integration
+from app.services.analyze import analyze_killchain
+
 
 _TASK_ID_RE = re.compile(r"^trace-[0-9a-fA-F-]{36}$")
 
@@ -220,6 +223,64 @@ async def run_analysis_task(
             task_id=task_id,
             updated_at=updated_at,
         )
+
+        # ========== KillChain 分析 ==========
+        # 调用已存在的 analyze_killchain 函数（不修改该函数）
+        # 该函数包含完整的 LLM 调用、错误处理和配置检查
+        try:
+            kcs = await asyncio.to_thread(analyze_killchain, kc_uuid=task_id)
+
+            # 提取最佳 KillChain（按置信度排序）
+            if kcs and len(kcs) > 0:
+                best_kc = max(kcs, key=lambda kc: kc.confidence)
+
+                # 写入 killchain_uuid（保持向后兼容）
+                task_doc["task.result.killchain_uuid"] = best_kc.kc_uuid
+
+                # 写入完整的 killchain 数据（供前端使用）
+                task_doc["task.result.killchain"] = {
+                    "kc_uuid": best_kc.kc_uuid,
+                    "confidence": best_kc.confidence,
+                    "explanation": best_kc.explanation,
+                    "segments": [
+                        {
+                            "seg_idx": s.seg_idx,
+                            "state": s.state,
+                            "t_start": s.t_start,
+                            "t_end": s.t_end,
+                            "anchor_in_uid": s.anchor_in_uid,
+                            "anchor_out_uid": s.anchor_out_uid,
+                            "abnormal_edge_count": len(s.abnormal_edge_summaries),
+                        }
+                        for s in best_kc.segments
+                    ],
+                    "selected_paths": [
+                        {
+                            "path_id": p.path_id,
+                            "src_anchor": p.src_anchor,
+                            "dst_anchor": p.dst_anchor,
+                            "hop_count": len(p.edges),
+                            "edge_ids": [e.props.get("event.id") for e in p.edges if e.props.get("event.id")],
+                        }
+                        for p in best_kc.selected_paths
+                    ],
+                }
+
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"KillChain 分析完成: uuid={best_kc.kc_uuid}, confidence={best_kc.confidence:.2f}, segments={len(best_kc.segments)}")
+            else:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"KillChain 分析未生成结果: task_id={task_id}")
+
+        except Exception as e:
+            # KillChain 失败不影响主流程
+            # 错误已在 analyze_killchain 内部处理和记录
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"KillChain 分析跳过或失败（不影响任务完成）: {e}")
+        # ========== KillChain 分析结束 ==========
 
         task_doc["task.progress"] = 95
         task_doc["task.result.trace.updated_edges"] = int(updated_edges)
