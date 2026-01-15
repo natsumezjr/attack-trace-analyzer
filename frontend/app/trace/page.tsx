@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/button/button";
+import { ExportButton } from "@/components/export-button";
 import { Slider } from "@/components/ui/slider";
 import {
   fetchGraphQuery,
@@ -715,14 +716,17 @@ export default function TracePage() {
                   ) : null}
                   {activeTaskStatus === "succeeded" ? (
                     <div className="space-y-3 pt-2">
-                      <div className="rounded-md border border-border/60 p-3">
-                        <div className="text-sm font-semibold text-foreground">
-                          TTP 相似度（Top-3）
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {attackTactics.length ? (
-                            <div>覆盖战术：{attackTactics.join(", ")}</div>
-                          ) : (
+	                      <div className="rounded-md border border-border/60 p-3">
+	                        <div className="flex items-center justify-between gap-3">
+	                          <div className="text-sm font-semibold text-foreground">
+	                            TTP 相似度（Top-3）
+	                          </div>
+	                          <ExportButton taskId={activeTaskId} taskStatus={activeTaskStatus} />
+	                        </div>
+	                        <div className="mt-1 text-xs text-muted-foreground">
+	                          {attackTactics.length ? (
+	                            <div>覆盖战术：{attackTactics.join(", ")}</div>
+	                          ) : (
                             <div>覆盖战术：-</div>
                           )}
                           {attackTechniques.length ? (
