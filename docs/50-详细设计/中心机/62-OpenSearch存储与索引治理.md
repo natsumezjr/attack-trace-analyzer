@@ -49,9 +49,47 @@ OpenSearch 模块负责中心机侧“事实/告警/任务元数据”的权威�
 
 ### 2.2 索引命名规则（必须遵守）
 
-1. 所有按日滚动的索引必须使用连字符日期：`YYYY-MM-DD`。  
-2. 索引名不得出现点号日期（例如 `2026.01.13`），避免 Security Analytics 的 pattern 解析问题。  
+1. 所有按日滚动的索引必须使用连字符日期：`YYYY-MM-DD`。
+2. 索引名不得出现点号日期（例如 `2026.01.13`），避免 Security Analytics 的 pattern 解析问题。
 3. `client-registry` 不按日滚动，索引名固定为 `client-registry`。
+
+### 2.3 索引体系架构
+
+```mermaid
+flowchart LR
+    subgraph Indices["OpenSearch 索引体系"]
+        Telemetry[ecs-events-*<br/>遥测数据<br/>event.kind 为 event]
+        RawFindings[findings-raw-*<br/>原始告警<br/>event.kind 为 alert<br/>dataset 非 canonical]
+        CanonicalFindings[findings-canonical-*<br/>规范告警<br/>event.kind 为 alert<br/>dataset 为 finding.canonical]
+        Tasks[analysis-tasks-*<br/>溯源任务<br/>任务状态与结果]
+    end
+
+    subgraph DataSources["三传感器数据"]
+        Falco[Falco 数据]
+        Filebeat[Filebeat 数据]
+        Suricata[Suricata 数据]
+    end
+
+    Falco -->|Step2 入库| Telemetry
+    Filebeat -->|Step2 入库| Telemetry
+    Suricata -->|Step2 入库| Telemetry
+
+    Telemetry -->|Step3 检测| RawFindings
+    RawFindings -->|Step3 融合| CanonicalFindings
+    CanonicalFindings -->|Step4 入图| Tasks
+
+    classDef sourceStyle fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef indexStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    class Falco,Filebeat,Suricata sourceStyle
+    class Telemetry,RawFindings,CanonicalFindings,Tasks indexStyle
+```
+
+**架构说明**：
+- **Telemetry 索引**（`ecs-events-*`）：接收 Falco、Filebeat、Suricata 三传感器原始事件
+- **Raw Findings 索引**（`findings-raw-*`）：存储 Security Analytics 产出的原始告警
+- **Canonical Findings 索引**（`findings-canonical-*`）：存储融合去重后的规范告警
+- **Tasks 索引**（`analysis-tasks-*`）：存储异步溯源任务的状态与结果
 
 ## 3. 入库路由与字段处理
 
@@ -63,15 +101,134 @@ OpenSearch 模块负责中心机侧“事实/告警/任务元数据”的权威�
 - 当 `event.kind == "alert"` 且 `event.dataset == "finding.canonical"`：写入 `canonical-findings-*`
 - 当 `event.kind == "alert"` 且 `event.dataset != "finding.canonical"`：写入 `raw-findings-*`
 
-### 3.2 三时间字段处理（必须执行）
+### 3.2 数据流向与写入流程
+
+```mermaid
+flowchart TD
+    subgraph Client["客户机"]
+        Sensors[传感器采集]
+        Buffer[本地缓冲区]
+    end
+
+    subgraph Pull["中心机 Step1"]
+        PullTask[拉取任务]
+        HTTP[HTTP POST<br/>批量拉取]
+    end
+
+    subgraph Process["中心机 Step2"]
+        Validate[ECS 校验<br/>+ 字段补齐]
+        TimeProc[三时间处理<br/>timestamp/event.created<br/>event.ingested]
+        Route[路由判断<br/>event.kind]
+    end
+
+    subgraph OS["OpenSearch 集群"]
+        EventsIndex[(ecs-events-*<br/>Telemetry)]
+        RawIndex[(findings-raw-*<br/>Raw Findings)]
+        CanonicalIndex[(findings-canonical-*<br/>Canonical Findings)]
+        TasksIndex[(analysis-tasks-*<br/>任务状态)]
+    end
+
+    subgraph Detect["中心机 Step3"]
+        SA[Security Analytics<br/>检测引擎]
+        Fusion[告警融合<br/>去重逻辑]
+    end
+
+    subgraph Graph["中心机 Step4"]
+        Neo4j[Neo4j 入图]
+        TaskState[任务状态更新]
+    end
+
+    Sensors --> Buffer
+    Buffer -->|"轮询触发<br/>cursor 机制"| PullTask
+    PullTask -->|"批量拉取<br/>1000条/批"| HTTP
+    HTTP --> Validate
+    Validate -->|"通过"| TimeProc
+    Validate -->|"失败<br/>缺失必需字段"| DropInvalid[❌ 丢弃]
+
+    TimeProc --> Route
+    Route -->|"event.kind=event<br/>event.dataset=falco/filebeat/suricata"| EventsIndex
+    Route -->|"event.kind=alert<br/>dataset!=canonical"| RawIndex
+    Route -->|"event.kind=alert<br/>dataset=finding.canonical"| CanonicalIndex
+    Route -->|"task.status"| TasksIndex
+
+    EventsIndex -->|"触发检测"| SA
+    SA -->|"生成告警"| RawIndex
+    RawIndex -->|"融合去重"| Fusion
+    Fusion --> CanonicalIndex
+
+    CanonicalIndex -->|"创建任务"| Neo4j
+    Neo4j -->|"状态变更"| TasksIndex
+
+    classDef clientStyle fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef osStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef detectStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    class Sensors,PullTask,Buffer clientStyle
+    class Validate,TimeProc,Route processStyle
+    class EventsIndex,RawIndex,CanonicalIndex,TasksIndex osStyle
+    class SA,Fusion,Neo4j,TaskState detectStyle
+```
+
+**流程说明**：
+1. **客户机采集**：Falco/Filebeat/Suricata 采集数据并写入本地缓冲区
+2. **中心机拉取**：Step1 通过 cursor 机制批量拉取客户机数据
+3. **字段处理**：Step2 执行 ECS 校验、三时间处理、路由判断
+4. **OpenSearch 写入**：按路由规则写入对应索引，使用 `event.id` 幂等去重
+5. **检测与融合**：Step3 触发 Security Analytics 检测并融合告警
+6. **任务管理**：Step4 创建溯源任务并持续更新任务状态
+
+### 3.3 三时间字段处理（必须执行）
 
 中心机写入 OpenSearch 前必须保证三时间字段满足 `../../80-规范/81-ECS字段规范.md`：
 
 - `@timestamp`：主时间轴。若缺失，必须从 `event.created` 推导；若仍无法得到，中心机必须丢弃该文档。
 - `event.created`：观察时间。若缺失，中心机必须回填为 `@timestamp`。
-- `event.ingested`：入库时间。中心机必须覆盖为“当前入库时间”，不得使用上游携带值。
+- `event.ingested`：入库时间。中心机必须覆盖为"当前入库时间"，不得使用上游携带值。
 
-### 3.3 幂等与去重（必须满足）
+### 3.4 ECS 字段映射与处理
+
+中心机在写入 OpenSearch 前必须对关键字段进行映射和转换，确保符合 ECS 规范：
+
+| ECS 字段 | 数据类型 | 必需 | 处理规则 | 说明 |
+|---|---|---|---|---|
+| `@timestamp` | date | ✅ | 优先使用原始值；缺失时从 `event.created` 推导；仍缺失则丢弃文档 | 主时间轴，用于日志检索和时序分析 |
+| `event.id` | keyword | ✅ | 若缺失则生成 UUID：`{client_id}-{sensor_type}-{timestamp}-{seq}` | 幂等去重的唯一标识 |
+| `event.kind` | keyword | ✅ | 枚举值：`event` / `alert` / `state` | 路由判断的核心字段 |
+| `event.category` | keyword | ❌ | 映射规则：`file` → `file`，`network` → `network`，`process` → `process` | 用于前端分类展示 |
+| `event.dataset` | keyword | ✅ | 格式：`{sensor}.{type}`，如 `falco.syscall`、`finding.canonical` | 区分数据来源和告警类型 |
+| `event.created` | date | ✅ | 缺失时回填为 `@timestamp` | 事件首次被观察到的时间 |
+| `event.ingested` | date | ✅ | 覆盖为当前入库时间（UTC 毫秒时间戳） | 中心机接收时间，用于监控延迟 |
+| `source.ip` | ip | ❌ | 保持原值，支持 IPv4/IPv6 | 源地址，用于关联分析 |
+| `source.port` | long | ❌ | 范围校验：0-65535 | 源端口 |
+| `destination.ip` | ip | ❌ | 保持原值，支持 IPv4/IPv6 | 目标地址 |
+| `destination.port` | long | ❌ | 范围校验：0-65535 | 目标端口 |
+| `process.pid` | long | ❌ | 保持原值 | 进程 ID |
+| `process.executable` | keyword | ❌ | 规范化绝对路径，统一使用 `/` 分隔符 | 进程可执行文件路径 |
+| `file.path` | keyword | ❌ | 规范化绝对路径，统一使用 `/` 分隔符 | 文件路径 |
+| `file.name` | keyword | ❌ | 从 `file.path` 中提取文件名 | 文件名 |
+| `user.name` | keyword | ❌ | 保持原值 | 用户名 |
+| `host.name` | keyword | ✅ | 使用客户机注册表中的 `hostname` | 主机名 |
+| `host.ip` | ip | ❌ | 使用客户机注册表中的 `ip` | 主机 IP |
+| `agent.type` | keyword | ✅ | 固定值：`falco` / `filebeat` / `suricata` | 传感器类型标识 |
+| `agent.ephemeral_id` | keyword | ❌ | 保持原值 | 传感器实例 ID |
+| `alert.severity` | long | ❌ | 范围映射：1-21 低 / 22-59 中 / 60-100 高 | 告警严重级别 |
+| `alert.status` | keyword | ❌ | 枚举值：`active` / `resolved` / `suppressed` | 告警状态 |
+| `threat.framework` | keyword | ❌ | 固定值：`MITRE ATT&CK` | 威胁框架标识 |
+| `threat.tactic.id` | keyword | ❌ | 格式：`TAxxxx`，如 `TA0001` | 战术 ID |
+| `threat.technique.id` | keyword | ❌ | 格式：`Txxxx`，如 `T1059` | 技术 ID |
+| `rule.name` | keyword | ❌ | 保持原值 | 规则名称 |
+| `rule.category` | keyword | ❌ | 映射到 MITRE 战术，如 `Execution` / `Persistence` | 规则分类 |
+| `tags` | keyword | ❌ | 数组格式，自动去重 | 标签数组，用于快速过滤 |
+
+**字段处理注意事项**：
+1. **扁平键兼容**：保留 `_source` 中的扁平字段（如 `proc_name`），但查询时优先使用嵌套 ECS 字段
+2. **类型校验**：写入前校验字段类型，类型不匹配时记录警告并使用默认值或丢弃
+3. **缺失字段**：必需字段缺失时拒绝入库，非必需字段缺失时使用默认值或留空
+4. **数组字段**：`tags`、`threat.tactic.id` 等数组字段必须去重，避免重复标签
+5. **IP 地址**：支持 IPv4 和 IPv6，自动识别并设置正确的 `ip` 类型
+
+### 3.5 幂等与去重（必须满足）
 
 1. 每条文档必须具备 `event.id`。  
 2. 中心机写入必须按 `event.id` 幂等：同一 `event.id` 重复写入不得产生重复文档。  

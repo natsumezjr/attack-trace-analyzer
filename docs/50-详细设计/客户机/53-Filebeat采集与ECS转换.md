@@ -13,7 +13,7 @@
 
 - ECS 字段规范：`../../80-规范/81-ECS字段规范.md`
 - 客户机总体：`50-总体.md`
- - 客户机与中心机接口（拉取结构）：`../../80-规范/87-客户机与中心机接口.md`
+- 客户机与中心机接口（拉取结构）：`../../80-规范/87-客户机与中心机接口.md`
 
 ## 1. 采集输入
 
@@ -46,6 +46,41 @@ Filebeat 采集链路由两个进程组成：
 
 detector 入口为：`client/sensor/filebeat/detector.py`。
 
+### 2.1.1 两段式处理流程
+
+```mermaid
+flowchart LR
+    subgraph Stage1["阶段1：Filebeat 采集"]
+        LogFiles[日志文件<br/>auth.log<br/>syslog<br/>kern.log]
+        Filebeat[Filebeat 容器<br/>filebeat-docker.yml]
+        ECSOutput[ECS JSON 输出<br/>/tmp/filebeat-output/<br/>ecs_logs.json]
+    end
+
+    subgraph Stage2["阶段2：detector 检测"]
+        JSONReader[JSON 读取器<br/>tail -f 模式<br/>监听 ecs_logs.json]
+        SigmaEngine[Sigma 规则引擎<br/>加载规则文件<br/>client/sensor/filebeat/rules.d]
+        AuthParser[认证日志解析器<br/>SSH 登录提取<br/>user.name/source.ip]
+        ECSNormalizer[ECS 字段规范化<br/>host.id/name 补齐<br/>event.dataset 判断]
+    end
+
+    LogFiles --> Filebeat
+    Filebeat --> ECSOutput
+    ECSOutput --> JSONReader
+    JSONReader --> SigmaEngine
+    JSONReader --> AuthParser
+    SigmaEngine --> ECSNormalizer
+    AuthParser --> ECSNormalizer
+    ECSNormalizer --> RabbitQueue[RabbitMQ<br/>队列: data.filebeat]
+
+    classDef stage1Style fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef stage2Style fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef queueStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    class LogFiles,Filebeat,ECSOutput stage1Style
+    class JSONReader,SigmaEngine,AuthParser,ECSNormalizer stage2Style
+    class RabbitQueue queueStyle
+```
+
 ### 2.2 ECS 关键字段补齐
 
 detector 会对每条日志执行以下固定补齐：
@@ -75,6 +110,93 @@ detector 会对每条日志执行以下固定补齐：
 - `event.outcome`：`success` / `failure`
 - `event.type`：`start` / `end` / `info`
 - `user.name`、`source.ip`：必须存在（若无法解析则不强制输出该 Telemetry，避免产生不符合 `81-ECS字段规范.md` 的无效事件）
+
+### 2.2.1 Sigma 规则检测流程
+
+```mermaid
+flowchart TD
+    LogEntry[日志条目<br/>auth.log 行] --> ParseField[解析关键字段<br/>process/ssh/sudo]
+
+    ParseField --> LoadRules[加载 Sigma 规则<br/>client/sensor/filebeat/rules.d]
+
+    LoadRules --> Match{规则匹配?}
+
+    Match -->|命中| Alert[生成告警<br/>event.kind 为 alert<br/>event.dataset 为<br/>finding.raw.filebeat_sigma<br/>补充 rule.* 字段]
+    Match -->|未命中| CheckAuth{是否认证日志?}
+
+    CheckAuth -->|是| AuthTelemetry[生成认证 Telemetry<br/>event.kind 为 event<br/>event.dataset 为 hostlog.auth<br/>提取 user.name/<br/>source.ip/<br/>event.outcome]
+    CheckAuth -->|否| Skip[跳过该日志<br/>不输出到队列]
+
+    Alert --> Publish
+    AuthTelemetry --> Publish[发布到 RabbitMQ<br/>队列: data.filebeat]
+
+    classDef inputStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef outputStyle fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    classDef alertStyle fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+
+    class LogEntry inputStyle
+    class ParseField,LoadRules,Match,CheckAuth processStyle
+    class AuthTelemetry outputStyle
+    class Alert alertStyle
+```
+
+### 2.2.2 Sigma 规则示例
+
+以下是一个 SSH 登录失败检测的 Sigma 规则示例：
+
+```yaml
+title: SSH 登录失败
+id: ssh-login-failed
+description: 检测 SSH 登录失败尝试
+status: experimental
+author: ATA
+date: 2026/01/14
+logsource:
+  service: auth
+detection:
+  keywords:
+    - 'Failed password'
+    - 'authentication failure'
+  condition: keywords
+level: low
+tags:
+  - attack.initial_access
+  - attack.brute_force
+fields:
+  - user.name
+  - source.ip
+  - event.outcome
+falsepositives:
+  - 合法的登录失败
+```
+
+### 2.2.3 认证日志解析示例
+
+以下展示 auth.log 原始行到 ECS 事件的转换：
+
+**原始日志**：
+```
+Jan 14 12:00:00 victim sshd[1234]: Failed password for root from 10.0.0.1 port 12345 ssh2
+```
+
+**转换后的 ECS 事件**：
+```json
+{
+  "event": {
+    "kind": "event",
+    "dataset": "hostlog.auth",
+    "category": ["authentication"],
+    "action": "user_login",
+    "outcome": "failure",
+    "type": "info"
+  },
+  "user": {"name": "root"},
+  "source": {"ip": "10.0.0.1", "port": 12345},
+  "host": {"name": "client-01", "id": "h-1111111111111111"},
+  "message": "Failed password for root from 10.0.0.1 port 12345 ssh2"
+}
+```
 
 ## 3. 会话重建字段
 

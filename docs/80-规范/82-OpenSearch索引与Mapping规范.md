@@ -37,6 +37,43 @@
 - 索引创建：`backend/app/services/opensearch/client.py:ensure_index()`
 - mapping 定义：`backend/app/services/opensearch/mappings.py`
 
+### 1.1.1 索引关系图
+
+```mermaid
+flowchart LR
+    subgraph Ingest["入库流水线"]
+        direction TB
+        Telemetry["ecs-events-*<br/>Telemetry"] -->|"检测"| Raw["raw-findings-*<br/>Raw Finding"]
+        Raw -->|"融合去重"| Canonical["canonical-findings-*<br/>Canonical Finding"]
+    end
+
+    subgraph Graph["图谱与溯源"]
+        direction TB
+        Telemetry -.->|"抽取"| Neo4j["Neo4j<br/>Entity Graph"]
+        Canonical -.->|"抽取"| Neo4j
+        Canonical -->|"输入"| Task["analysis-tasks-*<br/>Trace Task"]
+        Task -.->|"写回"| Neo4j
+    end
+
+    classDef eventStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef findingStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef taskStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef graphStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+
+    class Telemetry eventStyle
+    class Raw,Canonical findingStyle
+    class Task taskStyle
+    class Neo4j graphStyle
+```
+
+**图例说明：**
+- 实线箭头（→）：数据写入/转换
+- 虚线箭头（-.->）：数据读取/抽取
+- Telemetry 和 Canonical 都会抽取到 Neo4j 构建图谱
+- Canonical Finding 是溯源任务的主要输入
+
+---
+
 ### 1.2 命名规则（必须遵守）
 
 1. 所有按日滚动索引统一采用 UTC 日期后缀：`YYYY-MM-DD`。  

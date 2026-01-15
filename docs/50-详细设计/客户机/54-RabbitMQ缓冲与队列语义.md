@@ -26,6 +26,46 @@
 
 实际取值以 `client/docker-compose.yml` 为准。
 
+### 1.1 消息流转架构
+
+```mermaid
+flowchart TD
+    subgraph Producers["数据生产者"]
+        FalcoECS[falco-ecs<br/>发布到 data.falco]
+        FilebeatDetector[filebeat detector<br/>发布到 data.filebeat]
+        SuricataExporter[suricata exporter<br/>发布到 data.suricata]
+    end
+
+    subgraph RabbitMQ["RabbitMQ 服务器"]
+        QFalco[队列: data.falco<br/>durable 为 true]
+        QFilebeat[队列: data.filebeat<br/>durable 为 true]
+        QSuricata[队列: data.suricata<br/>durable 为 true]
+    end
+
+    subgraph Consumer["数据消费者"]
+        Backend[客户机 Backend<br/>Gin API]
+        APIS["<br/>GET /falco<br/>GET /filebeat<br/>GET /suricata"]
+    end
+
+    FalcoECS -->|publish| QFalco
+    FilebeatDetector -->|publish| QFilebeat
+    SuricataExporter -->|publish| QSuricata
+
+    Backend -->|basic.get + ack| QFalco
+    Backend -->|basic.get + ack| QFilebeat
+    Backend -->|basic.get + ack| QSuricata
+
+    Backend --> APIS
+
+    classDef producerStyle fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef queueStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef consumerStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    class FalcoECS,FilebeatDetector,SuricataExporter producerStyle
+    class QFalco,QFilebeat,QSuricata queueStyle
+    class Backend,APIS consumerStyle
+```
+
 ## 2. 消费语义与增量语义
 
 中心机通过客户机拉取接口拉取数据时，客户机 Go 后端会从队列中逐条读取消息并确认：
@@ -35,6 +75,46 @@
 - 当队列为空时，接口返回空数组
 
 因此，增量语义由 RabbitMQ 队列保证，不使用游标机制。
+
+### 2.1 队列消费时序
+
+```mermaid
+sequenceDiagram
+    participant Center as 中心机<br/>轮询器
+    participant Backend as 客户机<br/>Backend API
+    participant Queue as RabbitMQ<br/>队列
+    participant Producer as 数据生产者<br/>falco-ecs/filebeat/suricata
+
+    Note over Producer,Queue: 生产阶段
+    Producer->>Queue: basic_publish(msg1)
+    Producer->>Queue: basic_publish(msg2)
+    Producer->>Queue: basic_publish(msg3)
+
+    Note over Center,Queue: 消费阶段
+    Center->>Backend: GET /falco
+
+    Backend->>Queue: basic_get(queue)
+    Queue-->>Backend: msg1 (delivery_tag=1)
+
+    Backend->>Queue: basic_ack(delivery_tag=1)
+
+    Backend->>Queue: basic_get(queue)
+    Queue-->>Backend: msg2 (delivery_tag=2)
+
+    Backend->>Queue: basic_ack(delivery_tag=2)
+
+    Backend->>Queue: basic_get(queue)
+    Queue-->>Backend: msg3 (delivery_tag=3)
+
+    Backend->>Queue: basic_ack(delivery_tag=3)
+
+    Backend->>Queue: basic_get(queue)
+    Queue-->>Backend: null (队列为空)
+
+    Backend-->>Center: 200 OK<br/>返回 3 条消息
+
+    Note over Queue: 消息已 ack，不再返回
+```
 
 ## 3. 幂等与重复处理
 

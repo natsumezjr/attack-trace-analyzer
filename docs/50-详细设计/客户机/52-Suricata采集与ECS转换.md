@@ -13,7 +13,7 @@
 
 - ECS 字段规范：`../../80-规范/81-ECS字段规范.md`
 - 客户机总体：`50-总体.md`
- - 客户机与中心机接口（拉取结构）：`../../80-规范/87-客户机与中心机接口.md`
+- 客户机与中心机接口（拉取结构）：`../../80-规范/87-客户机与中心机接口.md`
 
 ## 1. 采集输入
 
@@ -36,6 +36,32 @@ Suricata 运行参数由环境变量确定：
 - `SURICATA_HOME_NET`：HOME_NET 地址组
 
 上述变量的取值与运行行为在 `client/sensor/suricata/engine/run-suricata.sh` 中实现。
+
+### 1.3 EVE JSON 示例
+
+以下是一个 DNS 查询事件的 EVE JSON 格式示例：
+
+```json
+{
+  "timestamp": "2026-01-14T12:00:00.000Z",
+  "event_type": "dns",
+  "src_ip": "10.0.0.1",
+  "src_port": 12345,
+  "dest_ip": "8.8.8.8",
+  "dest_port": 53,
+  "proto": "UDP",
+  "dns": {
+    "type": "QUERY",
+    "id": 12345,
+    "query": "example.com",
+    "query_type": "A",
+    "query_class": "IN",
+    "answers": [
+      {"rrname": "example.com", "rrtype": "A", "rdata": "93.184.216.34"}
+    ]
+  }
+}
+```
 
 ## 2. 转换规则
 
@@ -71,6 +97,49 @@ Suricata 导出器根据 `event_type` 映射 dataset，取值固定在以下集�
 此外，Suricata 的 IDS 告警会以 `event.kind="alert"` 输出（导出器侧使用 `event.dataset="netflow.alert"` 表示来源），中心机入库时会规范化为 Raw Finding：
 
 - `finding.raw.suricata`
+
+### 2.4 event_type 与 dataset 映射表
+
+| event_type | event.dataset | event.kind | 说明 |
+|------------|---------------|------------|------|
+| dns | netflow.dns | event | DNS 查询 Telemetry |
+| http | netflow.http | event | HTTP 请求 Telemetry |
+| flow | netflow.flow | event | 网络流 Telemetry |
+| tls | netflow.tls | event | TLS 握手 Telemetry |
+| icmp | netflow.icmp | event | ICMP 流量 Telemetry |
+| alert | finding.raw.suricata | alert | IDS 告警（Raw Finding） |
+
+### 2.5 EVE JSON 到 ECS 转换流程
+
+```mermaid
+flowchart TD
+    EVE[EVE JSON<br/>/data/eve.json] --> Parser[EVE 解析器<br/>识别 event_type]
+
+    Parser --> DNS{event_type?}
+    Parser --> HTTP{event_type?}
+    Parser --> ALERT{event_type?}
+    Parser --> FLOW{event_type?}
+
+    DNS --> D1[netflow.dns<br/>补充 dns.question.name<br/>补充 dns.answers]
+    HTTP --> H1[netflow.http<br/>补充 http.method<br/>补充 http.url]
+    ALERT --> A1[finding.raw.suricata<br/>event.kind 为 alert<br/>补充 alert.* 字段]
+    FLOW --> F1[netflow.flow<br/>补充五元组<br/>补充 flow.id]
+
+    D1 --> HostID[补充 host.id/name<br/>使用 HOST_ID/HOST_NAME<br/>或生成 host.id]
+    H1 --> HostID
+    A1 --> HostID
+    F1 --> HostID
+
+    HostID --> Publish[发布到 RabbitMQ<br/>队列: data.suricata<br/>点号扁平键形态]
+
+    classDef inputStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef outputStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    class EVE inputStyle
+    class Parser,DNS,HTTP,ALERT,FLOW processStyle
+    class D1,H1,A1,F1,HostID,Publish outputStyle
+```
 
 ## 3. 网络字段与证据引用
 

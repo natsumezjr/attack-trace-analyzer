@@ -50,7 +50,41 @@ Neo4j 模块负责“实体关系图（Entity Graph）”的权威存储与图�
 
 > 说明：`User` 与 `File` 的复合键用于避免跨主机误合并；当事件包含 `user.id` 时使用 `user.id` 作为唯一键；当事件不包含 `user.id` 时使用 `host.id + user.name` 作为唯一键。
 
-### 2.2 索引（必须存在）
+### 2.2 图数据模型
+
+```mermaid
+flowchart TB
+    subgraph Nodes["实体节点类型"]
+        Host[Host<br/>host.id<br/>host.name]
+        User[User<br/>user.name<br/>user.domain]
+        Process[Process<br/>process.pid<br/>process.executable]
+        File[File<br/>file.path<br/>file.directory]
+        IP[IP<br/>ip address<br/>version:4/6]
+        Domain[Domain<br/>domain name]
+    end
+
+    subgraph Edges["关系边类型"]
+        EXEC[EXECUTED_BY<br/>Process → User]
+        SPAWNED[SPAWNED<br/>Process → Process]
+        WROTE[WROTE<br/>Process → File]
+        CONNECTED[CONNECTED_TO<br/>Process → IP]
+        RESOLVED[RESOLVES_TO<br/>Domain → IP]
+        OPENED[OPENED<br/>Process → File]
+    end
+
+    Host -->|hostname| User
+    Process -->|executable| File
+    Process -->|source_ip| IP
+    Domain -->|resolves_to| IP
+
+    classDef nodeStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef edgeStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+
+    class Host,User,Process,File,IP,Domain nodeStyle
+    class EXEC,SPAWNED,WROTE,CONNECTED,RESOLVED,OPENED edgeStyle
+```
+
+### 2.3 索引（必须存在）
 
 为支撑展示与排障，Neo4j 必须为以下属性建立索引：
 
@@ -123,6 +157,45 @@ db.add_nodes_and_edges(nodes, edges)
 - 代码：`backend/app/services/neo4j/db.py:200-400`
 - 测试：`backend/tests/unit/test_services_neo4j/test_db_batch.py`
 
+```mermaid
+flowchart LR
+    subgraph Input["输入数据"]
+        Events[("1000+ 事件")]
+        Nodes[("节点列表<br/>nodes 数组")]
+        Edges[("边列表<br/>edges 数组")]
+    end
+
+    subgraph Process["批量写入流程"]
+        Step1["1. 事件解析<br/>提取节点与边"]
+        Step2["2. 节点分组<br/>按 Label 分类"]
+        Step3["3. UNWIND 批量 MERGE<br/>节点去重写入"]
+        Step4["4. 单事务内<br/>边逐个 MERGE"]
+    end
+
+    subgraph Output["Neo4j 存储"]
+        Neo4j[("Neo4j 图数据库")]
+        Metrics["性能指标<br/>~160 次网络往返<br/>100x 提升"]
+    end
+
+    Events --> Step1
+    Step1 --> Nodes
+    Step1 --> Edges
+    Nodes --> Step2
+    Step2 --> Step3
+    Edges --> Step4
+    Step3 --> Neo4j
+    Step4 --> Neo4j
+    Neo4j --> Metrics
+
+    classDef inputStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef outputStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+
+    class Events,Nodes,Edges inputStyle
+    class Step1,Step2,Step3,Step4 processStyle
+    class Neo4j,Metrics outputStyle
+```
+
 ## 4. 查询：可视化与算法的图查询
 
 ### 4.1 图查询能力清单（必须支持）
@@ -151,6 +224,46 @@ Neo4j 模块必须提供以下查询能力：
 其中：
 
 - `analysis_edges_by_task`：按 `analysis.task_id` 拉取该任务写回的边集合；当请求参数 `only_path=true` 时只返回 `analysis.is_path_edge=true` 的关键路径边；当 `only_path=false` 时返回该任务写回的全部边。
+
+```mermaid
+sequenceDiagram
+    participant Frontend as 前端<br/>图可视化
+    participant API as 后端 API<br/>/api/v1/graph/query
+    participant Service as Neo4j Service<br/>查询服务
+    participant Neo4j as Neo4j 数据库
+
+    Note over Frontend,Neo4j: 场景1: 告警边查询
+    Frontend->>API: POST {action: "alarm_edges"}
+    API->>Service: query_alarm_edges()
+    Service->>Neo4j: MATCH (e)-[r:ALARM]->(e2)<br/>WHERE r.is_alarm=true
+    Neo4j-->>Service: 边集合
+    Service-->>API: nodes + edges
+    API-->>Frontend: JSON 响应
+
+    Note over Frontend,Neo4j: 场景2: 时间窗查询
+    Frontend->>API: POST {action: "edges_in_window"<br/>t_min, t_max}
+    API->>Service: query_edges_in_window(t_min, t_max)
+    Service->>Neo4j: MATCH (n)-[r]->(m)<br/>WHERE r.ts_float >= t_min<br/>AND r.ts_float <= t_max
+    Neo4j-->>Service: 时间窗内的边
+    Service-->>API: nodes + edges
+    API-->>Frontend: JSON 响应
+
+    Note over Frontend,Neo4j: 场景3: 最短路查询
+    Frontend->>API: POST {action: "shortest_path_in_window"<br/>src_uid, dst_uid, t_min, t_max}
+    API->>Service: query_shortest_path(src, dst, t_min, t_max)
+    Service->>Neo4j: 1. 投影时间窗子图<br/>2. GDS algo.shortestPath<br/>3. 返回路径边序列
+    Neo4j-->>Service: 加权最短路径
+    Service-->>API: path_nodes + path_edges
+    API-->>Frontend: JSON 响应
+
+    Note over Frontend,Neo4j: 场景4: 溯源结果查询
+    Frontend->>API: POST {action: "analysis_edges_by_task"<br/>task_id, only_path}
+    API->>Service: query_analysis_edges(task_id, only_path)
+    Service->>Neo4j: MATCH (n)-[r]->(m)<br/>WHERE r.analysis.task_id = $task_id<br/>AND (only_path=false OR r.analysis.is_path_edge=true)
+    Neo4j-->>Service: 任务写回的边
+    Service-->>API: nodes + edges
+    API-->>Frontend: JSON 响应
+```
 
 ## 5. 结果写回：边属性规范
 
