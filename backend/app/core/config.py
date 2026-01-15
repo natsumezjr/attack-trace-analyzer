@@ -1,5 +1,35 @@
 from dataclasses import dataclass
 import os
+from pathlib import Path
+
+# 加载 .env 文件（如果存在）
+try:
+    from dotenv import load_dotenv
+    # 从 backend/app/core/config.py 向上3层到 backend 目录
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=False)  # override=False: 环境变量优先于 .env
+        print(f"[INFO] 已加载环境变量文件: {env_path}")
+    else:
+        print(f"[INFO] 未找到 .env 文件: {env_path}，使用系统环境变量")
+except ImportError:
+    # 如果没有安装 python-dotenv，尝试手动解析 .env 文件
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        print(f"[WARN] 未安装 python-dotenv，尝试手动解析 .env 文件: {env_path}")
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key and value and key not in os.environ:
+                            os.environ[key] = value
+            print(f"[INFO] 手动加载 .env 文件成功")
+        except Exception as e:
+            print(f"[WARN] 手动加载 .env 文件失败: {e}")
 
 
 @dataclass(frozen=True)
