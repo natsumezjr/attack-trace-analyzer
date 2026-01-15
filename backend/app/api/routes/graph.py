@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.utils import err, ok, utc_now_rfc3339
+from app.services.neo4j import internal as graph_api
 
 
 router = APIRouter()
@@ -18,6 +19,7 @@ class GraphQueryRequest(BaseModel):
         "alarm_edges",
         "edges_in_window",
         "shortest_path_in_window",
+        "analysis_edges_by_task",
     ] = "alarm_edges"
 
     start_ts: datetime | None = None
@@ -31,6 +33,9 @@ class GraphQueryRequest(BaseModel):
 
     risk_weights: dict[str, float] | None = None
     min_risk: float = Field(0.0, ge=0.0)
+
+    task_id: str | None = None
+    only_path: bool = False
 
     include_nodes: bool = False
 
@@ -59,15 +64,6 @@ def _node_to_dict(node: Any) -> dict[str, Any]:
 
 @router.post("/api/v1/graph/query")
 def graph_query(req: GraphQueryRequest):
-    # Lazy import: graph module depends on neo4j, which may not be installed in every dev env.
-    try:
-        from app.services.neo4j import internal as graph_api  # type: ignore
-    except Exception as error:
-        return JSONResponse(
-            status_code=501,
-            content=err("NOT_IMPLEMENTED", f"graph backend unavailable: {error}"),
-        )
-
     try:
         if req.action == "alarm_edges":
             edges = graph_api.get_alarm_edges()
@@ -153,6 +149,26 @@ def graph_query(req: GraphQueryRequest):
                 found=True,
                 cost=cost,
                 edges=[_edge_to_dict(e) for e in edges],
+                server_time=utc_now_rfc3339(),
+            )
+
+        if req.action == "analysis_edges_by_task":
+            if not req.task_id:
+                return JSONResponse(
+                    status_code=400,
+                    content=err("BAD_REQUEST", "task_id is required"),
+                )
+            edges = graph_api.get_edges_by_task_id(task_id=req.task_id, only_path=req.only_path)
+            nodes: list[dict[str, Any]] = []
+            if req.include_nodes:
+                uids = {e.src_uid for e in edges} | {e.dst_uid for e in edges}
+                for uid in sorted(uids):
+                    node = graph_api.get_node(uid)
+                    if node is not None:
+                        nodes.append(_node_to_dict(node))
+            return ok(
+                edges=[_edge_to_dict(e) for e in edges],
+                nodes=nodes,
                 server_time=utc_now_rfc3339(),
             )
 

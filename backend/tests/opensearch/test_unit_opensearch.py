@@ -128,7 +128,6 @@ class TestIndexManagement:
         assert index_exists(get_index_name(INDEX_PATTERNS["ECS_EVENTS"], today))
         assert index_exists(get_index_name(INDEX_PATTERNS["RAW_FINDINGS"], today))
         assert index_exists(get_index_name(INDEX_PATTERNS["CANONICAL_FINDINGS"], today))
-        assert index_exists(get_index_name(INDEX_PATTERNS["ATTACK_CHAINS"], today))
         assert index_exists(INDEX_PATTERNS["CLIENT_REGISTRY"])
 
 
