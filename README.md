@@ -86,16 +86,16 @@ cd backend
 ```bash
 cd backend
 uv sync
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 后端会在启动时：初始化 OpenSearch 索引、启动客户机轮询、启动溯源任务 runner。
 
 常用访问地址：
 
-- 后端根路由：`http://localhost:8000/`
-- 健康检查：`http://localhost:8000/health`
-- API 文档（Swagger UI）：`http://localhost:8000/docs`
+- 后端根路由：`http://localhost:8001/`
+- 健康检查：`http://localhost:8001/health`
+- API 文档（Swagger UI）：`http://localhost:8001/docs`
 
 注意：后端应用不会自动加载 `backend/.env`。如果你修改了 Docker Compose 中的账号/密码/地址，需要在启动后端时显式导出：
 
@@ -178,7 +178,7 @@ cd backend
 - `curl https://localhost:9200` 报证书错误：开发环境是自签名证书，使用 `curl -k -u admin:...`。
 - 后端连不上 OpenSearch/Neo4j：确认 `docker compose up -d` 已启动且端口未被占用；如修改过密码，记得导出对应环境变量。
 - 报错 `ATT&CK Enterprise CTI file not found`：执行 `backend/scripts/fetch_mitre_attack_cti.sh` 下载 CTI bundle，或设置 `ATTACK_CTI_PATH`。
-- 前端报 `BACKEND_BASE_URL is not configured.`：创建 `frontend/.env.local` 并设置 `BACKEND_BASE_URL=http://localhost:8000`。
+- 前端报 `BACKEND_BASE_URL is not configured.`：创建 `frontend/.env.local` 并设置 `BACKEND_BASE_URL=http://localhost:8001`。
 - 客户机启动报 `SERVER_IP is required`：检查 `client/docker-compose.yml` 中 `services.backend.environment.SERVER_IP` 是否已按当前靶场配置。
 
 ## 免责声明
