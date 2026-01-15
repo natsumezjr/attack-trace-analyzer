@@ -478,16 +478,16 @@ class TestPhaseBCandidatePaths:
         fsa_graph = create_test_fsa_graph(edges)
         
         cache = AnchorPairCache()
-        result = connect_fsa_segments_to_candidates(
+        candidate, dropped = connect_fsa_segments_to_candidates(
             fsa_graph,
             cache=cache,
             allowed_reltypes=ALLOWED_RELTYPES,
         )
         
         # 单段或空段应该直接返回（无需连接）
-        assert result is not None
-        assert isinstance(result, SemanticCandidateSubgraph)
-        assert len(result.pair_candidates) == 0
+        assert dropped is None
+        assert isinstance(candidate, SemanticCandidateSubgraph)
+        assert len(candidate.pair_candidates) == 0
     
     @patch("app.services.analyze.killchain.graph_api.get_edges_in_window")
     def test_connect_fsa_segments_to_candidates_no_path(self, mock_get_edges):
@@ -535,14 +535,15 @@ class TestPhaseBCandidatePaths:
         mock_get_edges.return_value = []
         
         cache = AnchorPairCache()
-        result = connect_fsa_segments_to_candidates(
+        candidate, dropped = connect_fsa_segments_to_candidates(
             fsa_graph,
             cache=cache,
             allowed_reltypes=ALLOWED_RELTYPES,
         )
         
-        # 无路径时应返回 None（因为枚举候选路径失败）
-        assert result is None, f"Expected None when no path found, got {result}"
+        # 无路径时应丢弃该图并返回 DroppedFSAGraph 信息
+        assert candidate is None
+        assert dropped is not None
     
     def test_build_semantic_candidate_subgraphs(self):
         """测试批量构建语义候选子图"""
@@ -558,14 +559,16 @@ class TestPhaseBCandidatePaths:
             mock_get_edges.return_value = []
             
             cache = AnchorPairCache()
-            results = build_semantic_candidate_subgraphs(
+            candidates, dropped = build_semantic_candidate_subgraphs(
                 [fsa_graph],
                 cache=cache,
                 allowed_reltypes=ALLOWED_RELTYPES,
             )
             
-            assert isinstance(results, list)
+            assert isinstance(candidates, list)
             # 单段图应该被保留（无需连接）
+            assert len(candidates) == 1
+            assert dropped == []
 
 
 # ========== Phase C: LLM 选择测试 ==========
@@ -738,7 +741,7 @@ class TestPhaseCLLMSelection:
         assert len(killchain.selected_paths) == 1
         # fallback 应该选择最短路径
         assert killchain.selected_paths[0].path_id == "p-002"
-        assert "mock" in killchain.explanation.lower()
+        assert "回退策略" in killchain.explanation
     
     def test_select_killchain_with_llm_client(self):
         """测试使用 LLM client 选择"""
@@ -846,9 +849,10 @@ class TestPhaseCLLMSelection:
 class TestPersistence:
     """测试持久化功能"""
     
+    @patch("app.services.analyze.killchain.graph_api.set_analysis_task_id")
+    @patch("app.services.analyze.killchain.graph_api.get_node")
     @patch("app.services.analyze.killchain.graph_api.add_edge")
-    @patch("app.services.analyze.killchain.graph_api.add_node")
-    def test_persist_killchain_to_db(self, mock_add_node, mock_add_edge):
+    def test_persist_killchain_to_db(self, mock_add_edge, mock_get_node, mock_set_task_id):
         """测试持久化 killchain 到数据库"""
         edges = [
             create_test_edge(
@@ -880,6 +884,8 @@ class TestPersistence:
             explanation="Test",
         )
         
+        mock_get_node.side_effect = lambda uid: Mock(uid=uid)
+
         persist_killchain_to_db(killchain)
         
         # 验证 add_edge 被调用
@@ -891,12 +897,13 @@ class TestPersistence:
         assert isinstance(edge, GraphEdge)
         assert edge.props.get(KC_ECS_FIELD) == "test-uuid-123"
         
-        # 验证 add_node 被调用
-        assert mock_add_node.called
+        # 验证节点 analysis.task_id 写入被调用
+        assert mock_set_task_id.called
     
+    @patch("app.services.analyze.killchain.graph_api.set_analysis_task_id")
+    @patch("app.services.analyze.killchain.graph_api.get_node")
     @patch("app.services.analyze.killchain.graph_api.add_edge")
-    @patch("app.services.analyze.killchain.graph_api.add_node")
-    def test_persist_killchain_duplicate_edges(self, mock_add_node, mock_add_edge):
+    def test_persist_killchain_duplicate_edges(self, mock_add_edge, mock_get_node, mock_set_task_id):
         """测试去重边的情况"""
         edge = create_test_edge(
             src_uid="Host:h-001",
@@ -928,11 +935,14 @@ class TestPersistence:
             explanation="Test",
         )
         
+        mock_get_node.side_effect = lambda uid: Mock(uid=uid)
+
         persist_killchain_to_db(killchain)
         
         # 应该只写入一次（去重）
         # 注意：实际调用次数取决于去重逻辑
         assert mock_add_edge.called
+        assert mock_set_task_id.called
 
 
 # ========== 完整流水线测试 ==========

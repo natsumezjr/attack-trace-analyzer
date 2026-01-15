@@ -313,7 +313,7 @@ class TestBuildChoosePrompt:
         assert messages[1]["role"] == "user"
 
         # 检查 system message
-        assert "incident responder" in messages[0]["content"].lower()
+        assert "安全事件响应专家" in messages[0]["content"]
 
         # 检查 user message 包含 payload
         user_content = json.loads(messages[1]["content"])
@@ -508,7 +508,7 @@ class TestLLMChooser:
         result = chooser.choose(payload)
 
         assert "chosen_path_ids" in result
-        assert "fallback" in result["explanation"].lower()
+        assert "回退" in result["explanation"]
 
     def test_llm_chooser_with_valid_llm_response(self):
         """测试有效的 LLM 响应"""
@@ -540,7 +540,7 @@ class TestLLMChooser:
 
         # 应该回退到 fallback
         assert "chosen_path_ids" in result
-        assert "fallback" in result["explanation"].lower()
+        assert "回退" in result["explanation"]
 
     def test_llm_chooser_with_invalid_path_id(self):
         """测试 LLM 返回无效 path_id"""
@@ -601,27 +601,27 @@ class TestCreateLLMClient:
         """测试默认创建 Mock 客户端（无 API key）"""
         # settings 是在 create_llm_client 函数内部导入的，需要 mock app.core.config.settings
         with patch("app.core.config.settings") as mock_settings:
-            mock_settings.llm_provider = "openai"
-            mock_settings.openai_api_key = ""
+            mock_settings.llm_provider = "deepseek"
+            mock_settings.llm_api_key = ""
             client = create_llm_client()
             assert isinstance(client, MockChooser)
 
-    def test_create_openai_client_with_key(self):
-        """测试创建 OpenAI 客户端（有 API key）"""
-        with patch("app.services.analyze.killchain_llm._create_openai_chat_complete") as mock_create:
+    def test_create_deepseek_client_with_key(self):
+        """测试创建 DeepSeek 客户端（有 API key）"""
+        with patch("app.services.analyze.killchain_llm._create_llm_chat_complete") as mock_create:
             mock_fn = Mock(return_value="test")
             mock_create.return_value = mock_fn
 
             client = create_llm_client(
-                provider="openai",
+                provider="deepseek",
                 api_key="sk-test123",
             )
             assert isinstance(client, LLMChooser)
             mock_create.assert_called_once()
 
-    def test_create_openai_client_without_key(self):
+    def test_create_deepseek_client_without_key(self):
         """测试没有 API key 时回退到 Mock"""
-        client = create_llm_client(provider="openai", api_key="")
+        client = create_llm_client(provider="deepseek", api_key="")
         assert isinstance(client, MockChooser)
 
     def test_create_client_with_config(self):
@@ -641,11 +641,11 @@ class TestCreateLLMClient:
         # settings 是在 create_llm_client 函数内部导入的，需要 mock app.core.config.settings
         with patch("app.core.config.settings") as mock_settings:
             mock_settings.llm_provider = "mock"
-            mock_settings.openai_api_key = ""
-            mock_settings.openai_base_url = "https://api.openai.com/v1"
-            mock_settings.openai_model = "gpt-4"
-            mock_settings.openai_timeout = 60.0
-            mock_settings.openai_max_retries = 3
+            mock_settings.llm_api_key = ""
+            mock_settings.llm_base_url = "https://api.deepseek.com/v1"
+            mock_settings.llm_model = "deepseek-chat"
+            mock_settings.llm_timeout = 60.0
+            mock_settings.llm_max_retries = 3
 
             client = create_llm_client()
             assert isinstance(client, MockChooser)
@@ -700,8 +700,6 @@ class TestIntegration:
         chooser = LLMChooser(chat_complete=mock_chat_complete)
         payload = create_sample_payload()
 
-        # 当前实现中，异常会向上传播（未捕获）
-        # 这是合理的设计，让调用者决定如何处理
-        with pytest.raises(RuntimeError, match="API error"):
-            chooser.choose(payload)
-
+        result = chooser.choose(payload)
+        assert "chosen_path_ids" in result
+        assert "回退" in result.get("explanation", "")

@@ -10,8 +10,8 @@ from app.services.neo4j.ecs_ingest import _extract_dns_answer_ips, ecs_event_to_
 
 
 def _fixtures_dir() -> Path:
-    # tests/graph/test_*.py -> tests/fixtures
-    return Path(__file__).resolve().parents[1] / "fixtures"
+    # backend/tests/integration/test_services_neo4j/* -> backend/tests/fixtures
+    return Path(__file__).resolve().parents[2] / "fixtures"
 
 
 def test_fixture_testexample_json_is_present_and_valid_json() -> None:

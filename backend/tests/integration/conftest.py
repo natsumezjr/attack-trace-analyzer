@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 
@@ -86,9 +87,9 @@ def clean_neo4j_db(neo4j_driver):
 
 # ========== API测试Fixtures ==========
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def async_client():
     """FastAPI异步测试客户端"""
-    from app.api.router import app
+    from main import app
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client

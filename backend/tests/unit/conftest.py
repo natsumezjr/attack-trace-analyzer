@@ -14,7 +14,7 @@ def mock_opensearch_client():
     """模拟OpenSearch客户端"""
     client = MagicMock()
     client.indices = MagicMock()
-    client.search = MagicMock(return_value={"hits": {"hits": [], "total": {"value": 0}})
+    client.search = MagicMock(return_value={"hits": {"hits": [], "total": {"value": 0}}})
     client.index = MagicMock(return_value={"result": "created"})
     client.get = MagicMock(return_value={"_source": {}})
     client.exists = MagicMock(return_value=False)

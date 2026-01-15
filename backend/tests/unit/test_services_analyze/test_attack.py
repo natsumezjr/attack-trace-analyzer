@@ -12,8 +12,8 @@ from app.services.neo4j import get_graph_by_attack_id
 
 
 def _fixtures_dir() -> Path:
-    # tests/graph/test_*.py -> tests/fixtures
-    return Path(__file__).resolve().parents[1] / "fixtures"
+    # backend/tests/unit/test_services_analyze/* -> backend/tests/fixtures
+    return Path(__file__).resolve().parents[2] / "fixtures"
 
 
 def _load_attack_events() -> list[dict[str, Any]]:

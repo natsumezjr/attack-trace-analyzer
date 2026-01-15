@@ -12,8 +12,8 @@ from app.services.neo4j.models import RelType
 
 
 def _fixtures_dir() -> Path:
-    # tests/graph/test_*.py -> tests/fixtures
-    return Path(__file__).resolve().parents[1] / "fixtures"
+    # backend/tests/integration/test_api/* -> backend/tests/fixtures
+    return Path(__file__).resolve().parents[2] / "fixtures"
 
 
 def _load_edges_in_window_rows() -> list[dict[str, Any]]:
