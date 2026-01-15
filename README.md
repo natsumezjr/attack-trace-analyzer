@@ -5,13 +5,13 @@ Attack Trace Analyzer (ATA) 是一个分布式安全监控与溯源分析系统�
 
 - 中心机：`backend/`（FastAPI）+ `frontend/`（Next.js）
 - 客户机：`client/`（Falco/Filebeat(+Sigma)/Suricata + RabbitMQ + Go 后端）
-- 课程交付文档（唯一正式文档）：`new-docs/`
+- 课程交付文档（唯一正式文档）：`docs/`
 
 ## 快速链接
 
-- 文档入口：`new-docs/README.md`
-- 一键编排（靶场 / 演示固定流程）：`new-docs/90-运维与靶场/92-一键编排.md`
-- 环境变量与配置规范（权威口径）：`new-docs/80-规范/89-环境变量与配置规范.md`
+- 文档入口：`docs/README.md`
+- 一键编排（靶场 / 演示固定流程）：`docs/90-运维与靶场/92-一键编排.md`
+- 环境变量与配置规范（权威口径）：`docs/80-规范/89-环境变量与配置规范.md`
 - 后端测试说明：`backend/tests/README.md`
 
 ## 核心能力（概览）
@@ -33,7 +33,7 @@ flowchart TD
   C --> D[Step 4: ECS → Graph\n写入 Neo4j 图谱]
 ```
 
-更完整的机制、数据分层与验收/复现剧本，请直接阅读 `new-docs/`（README 只保留“怎么跑起来”）。
+更完整的机制、数据分层与验收/复现剧本，请直接阅读 `docs/`（README 只保留“怎么跑起来”）。
 
 ## 快速启动（本地单机：中心机）
 
@@ -144,7 +144,7 @@ docker compose up -d --build
 
 </details>
 
-多节点靶场、网络规划、固定演示启动顺序，请按文档执行：`new-docs/90-运维与靶场/92-一键编排.md`。
+多节点靶场、网络规划、固定演示启动顺序，请按文档执行：`docs/90-运维与靶场/92-一键编排.md`。
 
 ## 目录结构
 
@@ -154,7 +154,7 @@ docker compose up -d --build
 | `backend/` | Python FastAPI + uv | 中心机后端：轮询调度、检测融合、OpenSearch/Neo4j 与 API |
 | `frontend/` | Next.js + TypeScript | 中心机前端：图谱可视化、溯源任务交互 |
 | `deploy/` | Docker Compose | 靶场辅助组件（如 C2） |
-| `new-docs/` | Markdown | 课程交付文档体系（唯一正式文档） |
+| `docs/` | Markdown | 课程交付文档体系（唯一正式文档） |
 
 ## 开发与测试
 
