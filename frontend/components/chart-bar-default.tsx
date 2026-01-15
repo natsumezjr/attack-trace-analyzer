@@ -44,9 +44,10 @@ const barColors = [
   "var(--chart-5)",
 ];
 
-export function ChartBarDefault() {
+export function ChartBarDefault({ className }: { className?: string }) {
+  const cardClassName = ["h-full", className].filter(Boolean).join(" ");
   return (
-    <Card>
+    <Card className={cardClassName}>
       <CardHeader>
         <CardTitle>Bar Chart</CardTitle>
       </CardHeader>
