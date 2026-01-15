@@ -32,6 +32,7 @@ show_help() {
 
 选项:
   -m, --modules MODULES    指定要启动的模块（用逗号分隔，不指定则启动全部）
+  -c, --clear-db          启动前清空数据库（OpenSearch 和 Neo4j）
   -h, --help              显示此帮助信息
 
 可用模块:
@@ -41,6 +42,7 @@ show_help() {
   backend     - 中心机后端（FastAPI）
   frontend    - 中心机前端（Next.js）
   register    - 注册客户机到中心机
+  db          - 数据库（OpenSearch、Neo4j）- 仅清空数据，不启动服务
   all         - 启动所有模块（默认）
 
 示例:
@@ -48,16 +50,24 @@ show_help() {
   $0 -m center,c2         # 只启动中心机和C2
   $0 -m backend,frontend  # 只启动后端和前端
   $0 -m client,register   # 只启动客户机和注册
+  $0 -c                   # 启动所有模块前清空数据库
+  $0 -m center -c         # 启动中心机前清空数据库
+  $0 -m db                # 只清空数据库（不启动服务）
 EOF
 }
 
 # 解析参数
 MODULES="all"
+CLEAR_DB=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         -m|--modules)
             MODULES="$2"
             shift 2
+            ;;
+        -c|--clear-db)
+            CLEAR_DB=true
+            shift
             ;;
         -h|--help)
             show_help
@@ -84,21 +94,121 @@ log_info "=========================================="
 log_info "靶场一键启动脚本"
 log_info "=========================================="
 log_info "启动模块: $MODULES"
+if [ "$CLEAR_DB" = true ]; then
+    log_warn "清空数据库: 已启用（将清空 OpenSearch 和 Neo4j）"
+fi
 log_info "=========================================="
+
+# 清空数据库函数（与 close.sh 中的相同）
+clear_databases() {
+    log_info "清空数据库..."
+    
+    # 检查中心机依赖是否运行
+    if ! docker ps | grep -qE '(opensearch|neo4j)'; then
+        log_warn "中心机依赖未运行，跳过数据库清空"
+        return 1
+    fi
+    
+    # 清空 OpenSearch
+    log_info "清空 OpenSearch..."
+    OPENSEARCH_PASSWORD="${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-OpenSearch@2024!Dev}"
+    
+    # 使用 docker exec 在容器内执行，获取所有非系统索引
+    if docker ps | grep -q opensearch; then
+        # 获取所有非系统索引（排除以 . 开头的系统索引和 security-auditlog）
+        INDICES=$(docker exec opensearch curl -k -s -u "admin:$OPENSEARCH_PASSWORD" "https://localhost:9200/_cat/indices?h=index" 2>/dev/null | grep -v '^\.' | grep -v '^security-auditlog' | grep -v '^$' || true)
+        
+        if [ -n "$INDICES" ]; then
+            # 删除所有非系统索引
+            DELETED_COUNT=0
+            while IFS= read -r idx; do
+                if [ -n "$idx" ]; then
+                    if docker exec opensearch curl -k -s -u "admin:$OPENSEARCH_PASSWORD" -X DELETE "https://localhost:9200/$idx" >/dev/null 2>&1; then
+                        log_info "  已删除索引: $idx"
+                        DELETED_COUNT=$((DELETED_COUNT + 1))
+                    else
+                        log_warn "  删除索引失败: $idx"
+                    fi
+                fi
+            done <<< "$INDICES"
+            
+            if [ $DELETED_COUNT -gt 0 ]; then
+                log_info "OpenSearch 清空完成（已删除 $DELETED_COUNT 个索引）"
+            else
+                log_info "OpenSearch 清空完成（没有可删除的索引）"
+            fi
+        else
+            log_info "OpenSearch 没有需要删除的索引"
+        fi
+    else
+        log_warn "OpenSearch 容器未运行，跳过清空"
+    fi
+    
+    # 清空 Neo4j
+    log_info "清空 Neo4j..."
+    if docker ps | grep -q neo4j; then
+        # 使用 docker exec 在容器内执行 cypher-shell
+        NEO4J_AUTH="${NEO4J_AUTH:-neo4j/password}"
+        NEO4J_USER=$(echo "$NEO4J_AUTH" | cut -d'/' -f1)
+        NEO4J_PASSWORD=$(echo "$NEO4J_AUTH" | cut -d'/' -f2)
+        
+        # 在 Neo4j 容器内执行 Cypher 命令
+        docker exec neo4j cypher-shell -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" "MATCH (n) DETACH DELETE n;" >/dev/null 2>&1 && \
+            log_info "Neo4j 清空完成" || \
+            log_warn "Neo4j 清空失败（可能数据库已关闭或连接失败）"
+    else
+        log_warn "Neo4j 容器未运行，跳过清空"
+    fi
+}
+
+# 计算总步骤数
+TOTAL_STEPS=6
+if [ "$CLEAR_DB" = true ] && should_start "center"; then
+    TOTAL_STEPS=7
+fi
+if should_start "db"; then
+    TOTAL_STEPS=$((TOTAL_STEPS + 1))
+fi
+
+# 0. 处理 db 模块（仅清空数据库，不启动服务）
+CURRENT_STEP=0
+if should_start "db"; then
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 清空数据库（db 模块）..."
+    # 如果 center 未运行，先启动它
+    if ! docker ps | grep -qE '(opensearch|neo4j)'; then
+        log_info "中心机依赖未运行，先启动中心机依赖..."
+        cd "$REPO"/backend
+        docker-compose up -d
+        sleep 5
+        log_info "等待数据库就绪..."
+        sleep 5
+    fi
+    clear_databases
+fi
 
 # 1. 启动中心机依赖（OpenSearch、Neo4j）
 if should_start "center"; then
-    log_info "步骤 1/6: 启动中心机依赖..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 启动中心机依赖..."
     cd "$REPO"/backend
     docker-compose up -d
     sleep 5
+    
+    # 如果启用 -c 选项，在启动后清空数据库
+    if [ "$CLEAR_DB" = true ]; then
+        log_info "等待数据库就绪..."
+        sleep 5
+        clear_databases
+    fi
 else
     log_warn "跳过: 中心机依赖"
 fi
 
 # 2. 启动 C2（DNS+HTTP）
 if should_start "c2"; then
-    log_info "步骤 2/6: 启动 C2..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 启动 C2..."
     docker rm -f c2-dns c2-http 2>/dev/null || true
     docker run -d --name c2-dns \
       --network c2-macvlan --ip 10.92.35.50 \
@@ -117,7 +227,8 @@ fi
 
 # 3. 启动 4 套客户机采集栈
 if should_start "client"; then
-    log_info "步骤 3/6: 启动客户机..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 启动客户机..."
     for i in 01 02 03 04; do
         cd "$BASE"/run/client-$i
         docker-compose -p client-$i up -d
@@ -129,7 +240,8 @@ fi
 
 # 4. 启动中心机后端（FastAPI）
 if should_start "backend"; then
-    log_info "步骤 4/6: 启动后端..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 启动后端..."
     cd "$REPO"/backend
     export OPENSEARCH_NODE="https://localhost:9200"
     export OPENSEARCH_USERNAME="admin"
@@ -155,7 +267,8 @@ fi
 
 # 5. 启动中心机前端（Next.js）
 if should_start "frontend"; then
-    log_info "步骤 5/6: 启动前端..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 启动前端..."
     cd "$REPO"/frontend
 
     # 确保使用 Node.js 20（如果 nvm 可用）
@@ -190,7 +303,8 @@ fi
 
 # 6. 注册 4 个客户机到中心机
 if should_start "register"; then
-    log_info "步骤 6/6: 注册客户机..."
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    log_info "步骤 $CURRENT_STEP/$TOTAL_STEPS: 注册客户机..."
     sleep 2
     
     register_client() {
