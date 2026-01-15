@@ -221,8 +221,11 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
     # event.dataset (best-effort legacy mapping)
     dataset_raw = event_obj.get("dataset")
     dataset = dataset_raw.strip() if isinstance(dataset_raw, str) else ""
+    # #region agent log
     if not dataset:
+        print(f"[DEBUG] _ensure_required_fields: dataset is empty, kind={kind}, doc_keys={list(doc.keys())[:10]}")
         return None
+    # #endregion
     if kind == "alert":
         if dataset in ("falco", "finding.raw.falco"):
             dataset = "finding.raw.falco"
@@ -242,6 +245,9 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
     # Enforce the dataset whitelist (docs/81-ECS字段规范.md).
     if kind == "event":
         if dataset not in telemetry_datasets:
+            # #region agent log
+            print(f"[DEBUG] _ensure_required_fields: dataset '{dataset}' not in telemetry_datasets for kind='event'")
+            # #endregion
             return None
     else:
         if dataset == "finding.canonical":
@@ -249,8 +255,14 @@ def _ensure_required_fields(doc: dict[str, Any]) -> dict[str, Any] | None:
         elif dataset.startswith("finding.raw."):
             provider = dataset.split("finding.raw.", 1)[1]
             if provider not in finding_providers:
+                # #region agent log
+                print(f"[DEBUG] _ensure_required_fields: provider '{provider}' from dataset '{dataset}' not in finding_providers={finding_providers}")
+                # #endregion
                 return None
         else:
+            # #region agent log
+            print(f"[DEBUG] _ensure_required_fields: dataset '{dataset}' for kind='alert' is not 'finding.canonical' and doesn't start with 'finding.raw.'")
+            # #endregion
             return None
 
     # ecs.version (fixed)
@@ -635,14 +647,18 @@ def store_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         # #region agent log
         if idx < 3:
             event_obj_before = event.get("event", {})
-            print(f"[DEBUG] Event {idx} before ensure_required_fields: event.kind={event_obj_before.get('kind') if isinstance(event_obj_before, dict) else None}, has_host={'host' in event}")
+            host_obj_before = event.get("host", {})
+            print(f"[DEBUG] Event {idx} before ensure_required_fields: event.kind={event_obj_before.get('kind') if isinstance(event_obj_before, dict) else None}, event.dataset={event_obj_before.get('dataset') if isinstance(event_obj_before, dict) else None}, host.name={host_obj_before.get('name') if isinstance(host_obj_before, dict) else None}, event.id={event_obj_before.get('id') if isinstance(event_obj_before, dict) else None}")
         # #endregion
-        if _ensure_required_fields(event) is None:
+        result = _ensure_required_fields(event)
+        if result is None:
             drop_reasons["no_required_fields"] += 1
             total_dropped += 1
             # #region agent log
             if idx < 3:
-                print(f"[DEBUG] Event {idx} DROPPED: missing required fields (hypothesis B)")
+                event_obj_after = event.get("event", {})
+                host_obj_after = event.get("host", {})
+                print(f"[DEBUG] Event {idx} DROPPED: missing required fields (hypothesis B). After check: event.kind={event_obj_after.get('kind')}, event.dataset={event_obj_after.get('dataset')}, host.name={host_obj_after.get('name') if isinstance(host_obj_after, dict) else None}")
             # #endregion
             continue
 
