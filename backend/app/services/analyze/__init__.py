@@ -13,16 +13,6 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
     api_key = settings.llm_api_key
     has_api_key = bool(api_key)
     
-    # 添加详细的调试信息
-    import os
-    env_provider = os.getenv("LLM_PROVIDER", "not_set")
-    env_api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    print(f"[DEBUG] analyze_killchain 配置检查:")
-    print(f"  - settings.llm_provider = {llm_provider}")
-    print(f"  - settings.llm_api_key = {'已设置(' + str(len(api_key)) + '字符)' if api_key else '未设置'}")
-    print(f"  - os.getenv('LLM_PROVIDER') = {env_provider}")
-    print(f"  - os.getenv('DEEPSEEK_API_KEY') = {'已设置(' + str(len(env_api_key)) + '字符)' if env_api_key else '未设置'}")
-    
     # 强制要求使用真实大模型
     if llm_provider.lower() == "mock" or not has_api_key:
         error_msg = (
@@ -43,14 +33,7 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
         # 强制使用 deepseek provider
         llm_client = create_llm_client(provider="deepseek", api_key=api_key)
         client_type = type(llm_client).__name__
-        print(f"[DEBUG] LLM client created: {client_type}")
         
-        # 检查 client 是否有 choose 方法
-        if hasattr(llm_client, "choose"):
-            print(f"[DEBUG] LLM client has choose method")
-        else:
-            print(f"[DEBUG] WARNING: LLM client does NOT have choose method")
-            
         # 如果是 MockChooser，说明配置有问题
         if client_type == "MockChooser":
             raise ValueError(
@@ -58,13 +41,10 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
                 "请检查 DEEPSEEK_API_KEY 是否正确设置。"
             )
         elif client_type == "LLMChooser":
-            print(f"[DEBUG] ✓ Using LLMChooser (real LLM mode)")
             # 检查 chat_complete 是否设置
             if hasattr(llm_client, "chat_complete"):
                 if llm_client.chat_complete is None:
                     raise ValueError("LLMChooser.chat_complete is None，无法调用真实LLM")
-                else:
-                    print(f"[DEBUG] ✓ LLMChooser.chat_complete is set，可以调用真实LLM")
     except ValueError as e:
         # 重新抛出配置错误
         raise
@@ -76,7 +56,6 @@ def analyze_killchain(kc_uuid: str) -> List[KillChain]:
             "2. 网络连接是否正常\n"
             "3. 是否安装了 openai 库: uv add openai 或 pip install openai"
         )
-        print(error_msg)
         import traceback
         traceback.print_exc()
         raise RuntimeError(error_msg) from e
@@ -117,10 +96,6 @@ def load_test_fsa_to_database() -> tuple[int, int]:
     current_file = Path(__file__).resolve()
     backend_dir = current_file.parents[3]  # 使用 parents[3] 更可靠
     fixture_path = backend_dir / "tests" / "fixtures" / "graph" / "testFSA.json"
-    print(f"[DEBUG] 当前文件: {current_file}")
-    print(f"[DEBUG] backend_dir: {backend_dir}")
-    print(f"[DEBUG] 查找测试数据文件: {fixture_path}")
-    print(f"[DEBUG] 文件是否存在: {fixture_path.exists()}")
     
     if not fixture_path.exists():
         raise FileNotFoundError(f"测试数据文件不存在: {fixture_path}")

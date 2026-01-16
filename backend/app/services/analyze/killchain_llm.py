@@ -350,18 +350,15 @@ def _extract_json_obj(text: str) -> Optional[Dict[str, Any]]:
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
-            print(f"[DEBUG JSON] ✓ 直接解析成功")
             return obj
-    except Exception as e:
-        print(f"[DEBUG JSON] 直接解析失败: {type(e).__name__}: {str(e)[:200]}")
+    except Exception:
+        pass
     
     # 如果直接解析失败，尝试找到 JSON 对象的开始和结束
     # 查找第一个 { 和最后一个 }
     start_idx = text.find('{')
     if start_idx == -1:
-        print(f"[DEBUG JSON] ❌ 未找到 JSON 开始标记 '{{'")
         return None
-    print(f"[DEBUG JSON] 找到 JSON 开始位置: {start_idx}")
     
     # 从后往前查找匹配的 }
     brace_count = 0
@@ -389,15 +386,12 @@ def _extract_json_obj(text: str) -> Optional[Dict[str, Any]]:
     
     # 提取完整的 JSON 对象
     json_str = text[start_idx:end_idx + 1]
-    print(f"[DEBUG JSON] 提取的 JSON 字符串长度: {len(json_str)}")
     try:
         obj = json.loads(json_str)
         if isinstance(obj, dict):
-            print(f"[DEBUG JSON] ✓ 提取并解析成功")
             return obj
-    except Exception as e:
-        print(f"[DEBUG JSON] ❌ 提取的 JSON 解析失败: {type(e).__name__}: {str(e)[:200]}")
-        print(f"[DEBUG JSON] JSON 字符串前500字符: {json_str[:500]}")
+    except Exception:
+        pass
     
     return None
 
@@ -431,7 +425,6 @@ def fallback_choose(payload: Mapping[str, Any]) -> Dict[str, Any]:
     fallback：每个 pair 选 hop 最短的一条。
     payload 需为 reduced/preselected 后的结构（candidates.steps 已裁剪）。
     """
-    print(f"[DEBUG FALLBACK] 使用 fallback 策略选择路径")
     chosen_ids: List[str] = []
     for p in payload.get("pairs", []) or []:
         cands = p.get("candidates", []) or []
@@ -440,9 +433,8 @@ def fallback_choose(payload: Mapping[str, Any]) -> Dict[str, Any]:
             continue
         best = min(cands, key=lambda c: len(c.get("steps", []) or []))
         chosen_ids.append(best.get("path_id", ""))
-        print(f"[DEBUG FALLBACK] pair {p.get('pair_idx')}: 选择路径 {best.get('path_id')} (hop={len(best.get('steps', []))})")
 
-    result = {
+    return {
         "chosen_path_ids": chosen_ids,
         "explanation": (
             "由于大语言模型不可用或无效，系统使用回退策略选择了攻击链路径。"
@@ -454,8 +446,6 @@ def fallback_choose(payload: Mapping[str, Any]) -> Dict[str, Any]:
         "confidence": 0.5,  # fallback 模式默认可信度
         "pair_explanations": [],
     }
-    print(f"[DEBUG FALLBACK] fallback 结果: chosen_path_ids={len(chosen_ids)}个, confidence=0.5")
-    return result
 
 
 # ---------------------------------------------------------------------
@@ -481,7 +471,7 @@ class LLMChooser(KillChainLLMClient):
         self.reducer = PayloadReducer(self.cfg)
         self.preselector = HeuristicPreselector(self.cfg)
         self.enable_preselect = enable_preselect
-        self._timeout = timeout  # 保存 timeout 用于调试信息
+        self._timeout = timeout
 
     def choose(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
         """
@@ -497,83 +487,31 @@ class LLMChooser(KillChainLLMClient):
 
         # 如果 pairs 为空，直接使用 fallback，不调用 LLM
         if not reduced.get('pairs'):
-            print(f"[DEBUG LLM] ⚠️ pairs 为空，使用 fallback")
             result = fallback_choose(reduced)
             return result
 
         # 如果没有注入真实 LLM，则直接 fallback
         if self.chat_complete is None:
-            print(f"[DEBUG LLM] ⚠️ chat_complete 为 None，使用 fallback")
             result = fallback_choose(reduced)
             return result
-        
-        print(f"[DEBUG LLM] 准备调用 LLM，pairs 数量: {len(reduced.get('pairs', []))}")
 
         messages = build_choose_prompt(reduced, require_pair_explanations=self.cfg.require_pair_explanations)
-        # 计算 payload 大小用于调试
-        import json
-        import time
-        payload_json = json.dumps(messages, ensure_ascii=False)
-        payload_size = len(payload_json)
-        payload_size_kb = payload_size / 1024
-        print(f"[DEBUG LLM] 准备调用 LLM")
-        print(f"[DEBUG LLM]   - payload 大小: {payload_size} 字符 ({payload_size_kb:.2f} KB)")
-        print(f"[DEBUG LLM]   - pairs 数量: {len(reduced.get('pairs', []))}")
-        print(f"[DEBUG LLM]   - segments 数量: {len(reduced.get('segments', []))}")
-        # 统计候选路径总数
-        total_candidates = sum(len(p.get('candidates', [])) for p in reduced.get('pairs', []))
-        print(f"[DEBUG LLM]   - 候选路径总数: {total_candidates}")
-        start_time = time.time()
         try:
-            print(f"[DEBUG LLM] 开始调用 LLM API（可能需要较长时间，请耐心等待）...")
             text = self.chat_complete(messages)
-            elapsed_time = time.time() - start_time
-            print(f"[DEBUG LLM] ✓ API 调用成功，耗时: {elapsed_time:.2f} 秒")
-            print(f"[DEBUG LLM] ✓ API 调用成功，返回文本长度: {len(text) if isinstance(text, str) else 'N/A'}")
-            # 打印前500字符用于调试（避免输出过长）
-            text_preview = (text[:500] + "..." if len(text) > 500 else text) if isinstance(text, str) else str(text)[:500]
-            print(f"[DEBUG LLM] 返回文本预览: {text_preview}")
         except Exception as e:
-            elapsed_time = time.time() - start_time
-            error_type = type(e).__name__
-            error_msg = str(e)
-            print(f"[DEBUG LLM] ❌ API 调用异常（耗时 {elapsed_time:.2f} 秒）: {error_type}: {error_msg}")
-            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
-                current_timeout = getattr(self, '_timeout', 'unknown')
-                print(f"[DEBUG LLM] ⚠️ 超时错误：LLM API 响应时间过长（已等待 {elapsed_time:.2f} 秒）")
-                print(f"[DEBUG LLM] 可能原因：")
-                print(f"[DEBUG LLM]   1. Payload 太大（当前 {payload_size_kb:.2f} KB），LLM 处理时间长")
-                print(f"[DEBUG LLM]   2. 网络连接慢或不稳定")
-                print(f"[DEBUG LLM]   3. DeepSeek API 服务器响应慢")
-                print(f"[DEBUG LLM] 建议解决方案：")
-                print(f"[DEBUG LLM]   1. 增加 LLM_TIMEOUT 环境变量（当前超时设置: {current_timeout}秒）")
-                print(f"[DEBUG LLM]   2. 减少候选路径数量（修改 LLMChooseConfig.per_pair_keep，当前为 {self.cfg.per_pair_keep}）")
-                print(f"[DEBUG LLM]   3. 检查网络连接质量")
             result = fallback_choose(reduced)
             return result
 
         obj = _extract_json_obj(text if isinstance(text, str) else str(text))
         if obj is None:
-            print(f"[DEBUG LLM] ❌ JSON 提取失败，无法从 LLM 响应中解析 JSON 对象")
-            print(f"[DEBUG LLM] 原始文本前1000字符: {(text[:1000] if isinstance(text, str) else str(text)[:1000])}")
             return fallback_choose(reduced)
-
-        print(f"[DEBUG LLM] ✓ JSON 提取成功，提取的键: {list(obj.keys())}")
-        print(f"[DEBUG LLM] chosen_path_ids: {obj.get('chosen_path_ids', 'NOT_FOUND')}")
-        print(f"[DEBUG LLM] confidence: {obj.get('confidence', 'NOT_FOUND')}")
-        print(f"[DEBUG LLM] explanation 长度: {len(obj.get('explanation', ''))}")
 
         ok, reason = validate_choose_result(obj, reduced)
         if not ok:
-            print(f"[DEBUG LLM] ❌ 验证失败: {reason}")
-            print(f"[DEBUG LLM] pairs 数量: {len(reduced.get('pairs', []))}")
-            print(f"[DEBUG LLM] chosen_path_ids 数量: {len(obj.get('chosen_path_ids', []))}")
             # 给上层留 trace 的话，可以在 obj 中附加 reason
             fb = fallback_choose(reduced)
             fb["explanation"] += f" (invalid_llm_output: {reason})"
             return fb
-
-        print(f"[DEBUG LLM] ✓ 验证通过，使用 LLM 返回的结果")
 
         # 保证至少返回 required keys
         out: Dict[str, Any] = {
@@ -584,16 +522,13 @@ class LLMChooser(KillChainLLMClient):
         conf = obj.get("confidence")
         if isinstance(conf, (int, float)):
             out["confidence"] = max(0.0, min(1.0, float(conf)))  # 确保在 0.0-1.0 范围内
-            print(f"[DEBUG LLM] 使用 LLM 返回的可信度: {out['confidence']}")
         else:
             out["confidence"] = 0.5  # 默认可信度
-            print(f"[DEBUG LLM] LLM 未返回可信度，使用默认值: 0.5")
         
         if isinstance(obj.get("pair_explanations"), list):
             out["pair_explanations"] = obj.get("pair_explanations")
         else:
             out["pair_explanations"] = []
-        print(f"[DEBUG LLM] 最终返回结果: chosen_path_ids={len(out.get('chosen_path_ids', []))}个, confidence={out.get('confidence')}, explanation长度={len(out.get('explanation', ''))}")
         return out
 
 
@@ -650,8 +585,6 @@ def _create_llm_chat_complete(
         write=30.0,       # 写入请求最多 30 秒
         pool=5.0,         # 从连接池获取连接最多 5 秒
     )
-    
-    print(f"[DEBUG LLM] 创建 OpenAI client，超时配置: connect=10s, read={timeout}s, write=30s, pool=5s")
 
     client = OpenAI(
         api_key=api_key,
@@ -679,9 +612,6 @@ def _create_llm_chat_complete(
             if "deepseek" in model.lower() or "gpt-4" in model.lower():
                 kwargs["response_format"] = {"type": "json_object"}
             
-            # 注意：timeout 参数已经在 OpenAI client 初始化时设置
-            # 但这里可以显式传递以覆盖（如果需要）
-            print(f"[DEBUG LLM] 发送请求到 {base_url}，模型: {model}，超时设置: {timeout}秒")
             response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
             if content is None:

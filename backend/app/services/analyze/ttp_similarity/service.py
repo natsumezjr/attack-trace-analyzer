@@ -369,9 +369,63 @@ def get_enterprise_cti_index() -> EnterpriseCtiIndex:
     - If ATTACK_CTI_PATH is not set, fall back to the module-local default:
       backend/app/services/analyze/ttp_similarity/cti/enterprise-attack.json
     """
+    # #region agent log
+    import json
+    log_path = Path(r"e:\大学文件夹\这学期的课题\网络空间安全设计\attack-trace-analyzer\.cursor\debug.log")
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "A",
+                "location": "service.py:372",
+                "message": "get_enterprise_cti_index entry",
+                "data": {
+                    "cwd": str(Path.cwd()),
+                    "__file__": str(__file__),
+                    "resolved_file": str(Path(__file__).resolve()),
+                },
+                "timestamp": int(__import__("time").time() * 1000)
+            }, ensure_ascii=False) + "\n")
+    except: pass
+    # #endregion
     default_path = Path(__file__).resolve().parent / "cti" / "enterprise-attack.json"
 
+    # #region agent log
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "A",
+                "location": "service.py:376",
+                "message": "default_path computed",
+                "data": {
+                    "default_path": str(default_path),
+                    "default_path_exists": default_path.exists(),
+                },
+                "timestamp": int(__import__("time").time() * 1000)
+            }, ensure_ascii=False) + "\n")
+    except: pass
+    # #endregion
+
     raw = os.environ.get("ATTACK_CTI_PATH", "").strip()
+    # #region agent log
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "C",
+                "location": "service.py:378",
+                "message": "ATTACK_CTI_PATH env var",
+                "data": {
+                    "ATTACK_CTI_PATH": raw if raw else "<not set>",
+                },
+                "timestamp": int(__import__("time").time() * 1000)
+            }, ensure_ascii=False) + "\n")
+    except: pass
+    # #endregion
     if not raw:
         path = default_path
     else:
@@ -381,7 +435,25 @@ def get_enterprise_cti_index() -> EnterpriseCtiIndex:
             candidates.append(env_path)
         else:
             # 1) relative to current working directory
-            candidates.append(env_path)
+            cwd_candidate = Path.cwd() / env_path
+            candidates.append(cwd_candidate)
+            # #region agent log
+            try:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "D",
+                        "location": "service.py:393",
+                        "message": "candidate 1: relative to cwd",
+                        "data": {
+                            "candidate": str(cwd_candidate),
+                            "exists": cwd_candidate.exists(),
+                        },
+                        "timestamp": int(__import__("time").time() * 1000)
+                    }, ensure_ascii=False) + "\n")
+            except: pass
+            # #endregion
 
             # 2) relative to backend root (best-effort; more stable across different cwd)
             resolved = Path(__file__).resolve()
@@ -392,16 +464,90 @@ def get_enterprise_cti_index() -> EnterpriseCtiIndex:
             normalized = raw
             if normalized.startswith("backend/"):
                 normalized = normalized[len("backend/") :]
-            candidates.append(backend_root / normalized)
+            backend_candidate = backend_root / normalized
+            candidates.append(backend_candidate)
+            # #region agent log
+            try:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "D",
+                        "location": "service.py:410",
+                        "message": "candidate 2: relative to backend root",
+                        "data": {
+                            "backend_root": str(backend_root),
+                            "normalized": normalized,
+                            "candidate": str(backend_candidate),
+                            "exists": backend_candidate.exists(),
+                        },
+                        "timestamp": int(__import__("time").time() * 1000)
+                    }, ensure_ascii=False) + "\n")
+            except: pass
+            # #endregion
 
         path = next((p for p in candidates if p.exists()), env_path)
+        # #region agent log
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "B",
+                    "location": "service.py:420",
+                    "message": "final path selected",
+                    "data": {
+                        "final_path": str(path),
+                        "final_path_exists": path.exists(),
+                        "all_candidates": [str(c) for c in candidates],
+                    },
+                    "timestamp": int(__import__("time").time() * 1000)
+                }, ensure_ascii=False) + "\n")
+        except: pass
+        # #endregion
 
+    # #region agent log
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "A",
+                "location": "service.py:428",
+                "message": "before file existence check",
+                "data": {
+                    "path": str(path),
+                    "path_exists": path.exists(),
+                    "path_is_file": path.is_file() if path.exists() else False,
+                    "path_is_dir": path.is_dir() if path.exists() else False,
+                },
+                "timestamp": int(__import__("time").time() * 1000)
+            }, ensure_ascii=False) + "\n")
+    except: pass
+    # #endregion
     if not path.exists():
         hint = (
             "Place attack-stix-data Enterprise bundle at "
             "backend/app/services/analyze/ttp_similarity/cti/enterprise-attack.json "
             "or set ATTACK_CTI_PATH."
         )
+        # #region agent log
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "A",
+                    "location": "service.py:445",
+                    "message": "FileNotFoundError raised",
+                    "data": {
+                        "path": str(path),
+                        "hint": hint,
+                    },
+                    "timestamp": int(__import__("time").time() * 1000)
+                }, ensure_ascii=False) + "\n")
+        except: pass
+        # #endregion
         raise FileNotFoundError(f"ATT&CK Enterprise CTI file not found: {path}. {hint}")
 
     return build_enterprise_cti_index(path)
