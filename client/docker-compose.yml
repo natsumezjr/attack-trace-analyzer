@@ -20,8 +20,6 @@ services:
       rabbitmq:
         condition: service_healthy
     privileged: true
-    environment:
-      - FALCO_DRIVER_ENGINE=modern_ebpf
     pid: host
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
@@ -39,8 +37,14 @@ services:
       - ./data:/data
     command:
       - falco
-      - -c
-      - /etc/falco/falco.yaml
+      - -o
+      - json_output=true
+      - -o
+      - json_include_output_property=true
+      - -o
+      - file_output.enabled=true
+      - -o
+      - file_output.filename=/data/falco.jsonl
 
   falco-ecs:
     build:
