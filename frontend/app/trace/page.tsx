@@ -209,7 +209,10 @@ function getNodeLabel(node: GraphApiNode): string {
 
 type ViewMode = "alarm" | "window" | "task";
 
-function computeRecentWindow(minutes: number): { startTs: string; endTs: string } {
+function computeRecentWindow(minutes: number): {
+  startTs: string;
+  endTs: string;
+} {
   const safeMinutes = Number.isFinite(minutes) ? Math.max(1, minutes) : 5;
   const end = new Date();
   const start = new Date(end.getTime() - safeMinutes * 60 * 1000);
@@ -258,9 +261,11 @@ function toSimilarAptItems(value: unknown): SimilarAptItem[] {
     items.push({
       intrusion_set: {
         id: typeof intrusionSetId === "string" ? intrusionSetId : undefined,
-        name: typeof intrusionSetName === "string" ? intrusionSetName : undefined,
+        name:
+          typeof intrusionSetName === "string" ? intrusionSetName : undefined,
       },
-      similarity_score: typeof similarityScore === "number" ? similarityScore : undefined,
+      similarity_score:
+        typeof similarityScore === "number" ? similarityScore : undefined,
       top_tactics: Array.isArray(topTactics)
         ? topTactics.filter((v) => typeof v === "string")
         : undefined,
@@ -288,11 +293,14 @@ export default function TracePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("window");
   const [onlyAlarm, setOnlyAlarm] = useState(true);
   const [recentMinutes, setRecentMinutes] = useState(15);
-  const [activeWindow, setActiveWindow] = useState(() =>
-    computeRecentWindow(recentMinutes)
-  );
+  const [activeWindow, setActiveWindow] = useState<{
+    startTs: string;
+    endTs: string;
+  } | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [killChainPathIds, setKillChainPathIds] = useState<Set<string>>(new Set());
+  const [killChainPathIds, setKillChainPathIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const graphQueryRequest = useMemo<GraphQueryRequest | null>(() => {
     if (viewMode === "alarm") {
@@ -300,8 +308,13 @@ export default function TracePage() {
     }
     if (viewMode === "task") {
       if (!activeTaskId) return null;
-      return { action: "analysis_edges_by_task", task_id: activeTaskId, only_path: true };
+      return {
+        action: "analysis_edges_by_task",
+        task_id: activeTaskId,
+        only_path: true,
+      };
     }
+    if (!activeWindow) return null;
     return {
       action: "edges_in_window",
       start_ts: activeWindow.startTs,
@@ -309,14 +322,20 @@ export default function TracePage() {
       allowed_reltypes: null,
       only_alarm: onlyAlarm,
     };
-  }, [activeTaskId, activeWindow.endTs, activeWindow.startTs, onlyAlarm, viewMode]);
+  }, [
+    activeTaskId,
+    activeWindow?.endTs,
+    activeWindow?.startTs,
+    onlyAlarm,
+    viewMode,
+  ]);
 
   const { data: graphResponse, isFetching: isGraphFetching } = useQuery({
     queryKey: [
       "graph-query",
       graphQueryRequest?.action ?? "none",
-      activeWindow.startTs,
-      activeWindow.endTs,
+      activeWindow?.startTs ?? "none",
+      activeWindow?.endTs ?? "none",
       onlyAlarm,
       activeTaskId,
     ],
@@ -365,8 +384,7 @@ export default function TracePage() {
     },
   });
 
-  const activeTask: AnalysisTaskItem | null =
-    getTaskFromResponse(taskResponse);
+  const activeTask: AnalysisTaskItem | null = getTaskFromResponse(taskResponse);
   const activeTaskStatus = getTaskStatus(activeTask);
   const activeTaskProgressRaw = activeTask?.["task.progress"];
   const activeTaskProgress =
@@ -388,10 +406,16 @@ export default function TracePage() {
     : [];
 
   useEffect(() => {
+    if (activeWindow) return;
+    setActiveWindow(computeRecentWindow(recentMinutes));
+  }, [activeWindow, recentMinutes]);
+
+  useEffect(() => {
     if (!activeTaskId) return;
     if (!activeTask) return;
     if (handledTaskResultIdRef.current === activeTaskId) return;
-    if (activeTaskStatus !== "succeeded" && activeTaskStatus !== "failed") return;
+    if (activeTaskStatus !== "succeeded" && activeTaskStatus !== "failed")
+      return;
 
     handledTaskResultIdRef.current = activeTaskId;
     void queryClient.invalidateQueries({ queryKey: ["graph-query"] });
@@ -457,16 +481,14 @@ export default function TracePage() {
       }
     });
 
-    const links: GraphLink[] = Array.from(edgeMap.values()).map(
-      (entry) => ({
-        id: `${entry.source}__${entry.rtype}__${entry.target}`,
-        source: entry.source,
-        target: entry.target,
-        rtype: entry.rtype,
-        count: entry.records.length,
-        records: entry.records,
-      })
-    );
+    const links: GraphLink[] = Array.from(edgeMap.values()).map((entry) => ({
+      id: `${entry.source}__${entry.rtype}__${entry.target}`,
+      source: entry.source,
+      target: entry.target,
+      rtype: entry.rtype,
+      count: entry.records.length,
+      records: entry.records,
+    }));
 
     return { nodes, links };
   }, [graphResponse]);
@@ -513,7 +535,11 @@ export default function TracePage() {
             const link = datum as GraphLink;
             // KillChain highlighting (highest priority)
             const kcData = activeTask?.["task.result.killchain"];
-            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+            if (
+              kcData &&
+              typeof kcData === "object" &&
+              killChainPathIds.size > 0
+            ) {
               const selectedPaths = Array.isArray(kcData.selected_paths)
                 ? kcData.selected_paths
                 : [];
@@ -523,8 +549,9 @@ export default function TracePage() {
                 if (!edgeId || typeof edgeId !== "string") return false;
 
                 return Array.from(killChainPathIds).some((pathId) => {
-                  const path = selectedPaths.find((p: any) =>
-                    p && typeof p === "object" && p.path_id === pathId
+                  const path = selectedPaths.find(
+                    (p: any) =>
+                      p && typeof p === "object" && p.path_id === pathId
                   );
                   if (!path || !Array.isArray(path.edge_ids)) return false;
                   return path.edge_ids.includes(edgeId);
@@ -549,15 +576,25 @@ export default function TracePage() {
             const link = datum as GraphLink;
             // KillChain highlighting (highest priority)
             const kcData = activeTask?.["task.result.killchain"];
-            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+            if (
+              kcData &&
+              typeof kcData === "object" &&
+              killChainPathIds.size > 0
+            ) {
               const hasKillChainEdge = link.records.some((edge) => {
                 const edgeId = edge.props?.["event.id"];
-                return edgeId && Array.from(killChainPathIds).some((pathId) => {
-                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
-                    (p: any) => p.path_id === pathId
-                  );
-                  return path?.edge_ids?.includes(edgeId);
-                });
+                return (
+                  edgeId &&
+                  Array.from(killChainPathIds).some((pathId) => {
+                    const path = (
+                      kcData.selected_paths as Array<{
+                        path_id: string;
+                        edge_ids: string[];
+                      }>
+                    )?.find((p: any) => p.path_id === pathId);
+                    return path?.edge_ids?.includes(edgeId);
+                  })
+                );
               });
               if (hasKillChainEdge) return 3;
             }
@@ -578,15 +615,25 @@ export default function TracePage() {
             const link = datum as GraphLink;
             // KillChain highlighting (highest priority)
             const kcData = activeTask?.["task.result.killchain"];
-            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+            if (
+              kcData &&
+              typeof kcData === "object" &&
+              killChainPathIds.size > 0
+            ) {
               const hasKillChainEdge = link.records.some((edge) => {
                 const edgeId = edge.props?.["event.id"];
-                return edgeId && Array.from(killChainPathIds).some((pathId) => {
-                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
-                    (p: any) => p.path_id === pathId
-                  );
-                  return path?.edge_ids?.includes(edgeId);
-                });
+                return (
+                  edgeId &&
+                  Array.from(killChainPathIds).some((pathId) => {
+                    const path = (
+                      kcData.selected_paths as Array<{
+                        path_id: string;
+                        edge_ids: string[];
+                      }>
+                    )?.find((p: any) => p.path_id === pathId);
+                    return path?.edge_ids?.includes(edgeId);
+                  })
+                );
               });
               if (hasKillChainEdge) return 0.95;
             }
@@ -607,15 +654,25 @@ export default function TracePage() {
             const link = datum as GraphLink;
             // KillChain highlighting (highest priority)
             const kcData = activeTask?.["task.result.killchain"];
-            if (kcData && typeof kcData === "object" && killChainPathIds.size > 0) {
+            if (
+              kcData &&
+              typeof kcData === "object" &&
+              killChainPathIds.size > 0
+            ) {
               const hasKillChainEdge = link.records.some((edge) => {
                 const edgeId = edge.props?.["event.id"];
-                return edgeId && Array.from(killChainPathIds).some((pathId) => {
-                  const path = (kcData.selected_paths as Array<{ path_id: string; edge_ids: string[] }>)?.find(
-                    (p: any) => p.path_id === pathId
-                  );
-                  return path?.edge_ids?.includes(edgeId);
-                });
+                return (
+                  edgeId &&
+                  Array.from(killChainPathIds).some((pathId) => {
+                    const path = (
+                      kcData.selected_paths as Array<{
+                        path_id: string;
+                        edge_ids: string[];
+                      }>
+                    )?.find((p: any) => p.path_id === pathId);
+                    return path?.edge_ids?.includes(edgeId);
+                  })
+                );
               });
               if (hasKillChainEdge) return [5, 5];
             }
@@ -634,10 +691,11 @@ export default function TracePage() {
         width: size.width,
         height: size.height,
         center: [size.width / 2, size.height / 2],
-        kr: 400,
-        kg: 0.1,
-        ks: 0.1,
-        ksmax: 10,
+        // Tighten spacing: lower repulsion, stronger gravity/springs.
+        kr: 200,
+        kg: 0.5,
+        ks: 0.4,
+        ksmax: 5,
         barnesHut: true,
         dissuadeHubs: false,
         prune: false,
@@ -713,7 +771,7 @@ export default function TracePage() {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-96px)] flex-col gap-4 overflow-hidden p-6">
+    <div className="flex h-[calc(100vh-96px)] min-h-0 flex-col gap-4 overflow-hidden p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-foreground">溯源分析</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -754,7 +812,8 @@ export default function TracePage() {
                 <span className="font-semibold">{recentMinutes}</span> 分钟
               </div>
               <div className="text-xs text-muted-foreground">
-                当前窗口：{activeWindow.startTs} → {activeWindow.endTs}
+                当前窗口：{activeWindow?.startTs ?? "-"} →{" "}
+                {activeWindow?.endTs ?? "-"}
               </div>
               {activeTaskId ? (
                 <div className="space-y-2 pt-1">
@@ -787,24 +846,28 @@ export default function TracePage() {
                       style={{ width: `${activeTaskProgress}%` }}
                     />
                   </div>
-                  {activeTaskStatus === "failed" && activeTask?.["task.error"] ? (
+                  {activeTaskStatus === "failed" &&
+                  activeTask?.["task.error"] ? (
                     <div className="text-xs text-destructive">
                       {activeTask["task.error"]}
                     </div>
                   ) : null}
                   {activeTaskStatus === "succeeded" ? (
                     <div className="space-y-3 pt-2">
-	                      <div className="rounded-md border border-border/60 p-3">
-	                        <div className="flex items-center justify-between gap-3">
-	                          <div className="text-sm font-semibold text-foreground">
-	                            TTP 相似度（Top-3）
-	                          </div>
-	                          <ExportButton taskId={activeTaskId} taskStatus={activeTaskStatus} />
-	                        </div>
-	                        <div className="mt-1 text-xs text-muted-foreground">
-	                          {attackTactics.length ? (
-	                            <div>覆盖战术：{attackTactics.join(", ")}</div>
-	                          ) : (
+                      <div className="rounded-md border border-border/60 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-foreground">
+                            TTP 相似度（Top-3）
+                          </div>
+                          <ExportButton
+                            taskId={activeTaskId}
+                            taskStatus={activeTaskStatus}
+                          />
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {attackTactics.length ? (
+                            <div>覆盖战术：{attackTactics.join(", ")}</div>
+                          ) : (
                             <div>覆盖战术：-</div>
                           )}
                           {attackTechniques.length ? (
@@ -826,7 +889,9 @@ export default function TracePage() {
                                   : "-";
                               return (
                                 <div
-                                  key={`${item.intrusion_set?.id ?? name}-${index}`}
+                                  key={`${
+                                    item.intrusion_set?.id ?? name
+                                  }-${index}`}
                                   className="rounded-md bg-muted/40 px-3 py-2"
                                 >
                                   <div className="flex items-center justify-between gap-3 text-sm">
@@ -840,7 +905,8 @@ export default function TracePage() {
                                   <div className="mt-1 text-xs text-muted-foreground">
                                     {item.top_tactics?.length ? (
                                       <div>
-                                        Top Tactics：{item.top_tactics.join(", ")}
+                                        Top Tactics：
+                                        {item.top_tactics.join(", ")}
                                       </div>
                                     ) : null}
                                     {item.top_techniques?.length ? (
@@ -855,7 +921,8 @@ export default function TracePage() {
                             })
                           ) : (
                             <div className="text-xs text-muted-foreground">
-                              暂无相似组织结果（可能该时间窗内没有 Canonical Findings，或 CTI 未配置）。
+                              暂无相似组织结果（可能该时间窗内没有 Canonical
+                              Findings，或 CTI 未配置）。
                             </div>
                           )}
                         </div>
@@ -914,8 +981,8 @@ export default function TracePage() {
         </CardContent>
       </Card>
 
-      <Card className="flex min-h-[360px] flex-1 flex-col overflow-hidden">
-        <CardContent className="flex-1">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardContent className="flex-1 p-0">
           <div ref={containerRef} className="h-full w-full" />
         </CardContent>
       </Card>

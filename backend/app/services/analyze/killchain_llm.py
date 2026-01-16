@@ -464,12 +464,14 @@ class LLMChooser(KillChainLLMClient):
         chat_complete: Optional[Any] = None,
         config: Optional[LLMChooseConfig] = None,
         enable_preselect: bool = True,
+        timeout: Optional[float] = None,
     ) -> None:
         self.cfg = config or LLMChooseConfig()
         self.chat_complete = chat_complete  # callable(messages)->str
         self.reducer = PayloadReducer(self.cfg)
         self.preselector = HeuristicPreselector(self.cfg)
         self.enable_preselect = enable_preselect
+        self._timeout = timeout
 
     def choose(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
         """
@@ -566,15 +568,28 @@ def _create_llm_chat_complete(
     """
     try:
         from openai import OpenAI
+        from httpx import Timeout as HTTPXTimeout
     except ImportError:
         raise ImportError(
             "请安装 openai: uv add openai 或 pip install openai>=1.0.0"
         )
 
+    # 使用 httpx.Timeout 设置更细粒度的超时控制
+    # connect: 连接超时（短）
+    # read: 读取超时（长，因为 LLM 生成需要时间）
+    # write: 写入超时（中等）
+    # pool: 连接池超时（短）
+    httpx_timeout = HTTPXTimeout(
+        connect=10.0,      # 连接服务器最多 10 秒
+        read=timeout,     # 读取响应最多 timeout 秒（这是关键，LLM 生成需要时间）
+        write=30.0,       # 写入请求最多 30 秒
+        pool=5.0,         # 从连接池获取连接最多 5 秒
+    )
+
     client = OpenAI(
         api_key=api_key,
         base_url=base_url,
-        timeout=timeout,
+        timeout=httpx_timeout,  # 使用 httpx.Timeout 对象
         max_retries=max_retries,
     )
 
@@ -699,6 +714,7 @@ def create_llm_client(
             chat_complete=chat_complete_fn,
             config=config,
             enable_preselect=enable_preselect,
+            timeout=_timeout,  # 传递 timeout 用于调试
         )
 
     # 未知 provider，回退到 mock

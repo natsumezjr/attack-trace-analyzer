@@ -9,14 +9,10 @@ try:
     env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path, override=False)  # override=False: 环境变量优先于 .env
-        print(f"[INFO] 已加载环境变量文件: {env_path}")
-    else:
-        print(f"[INFO] 未找到 .env 文件: {env_path}，使用系统环境变量")
 except ImportError:
     # 如果没有安装 python-dotenv，尝试手动解析 .env 文件
     env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
-        print(f"[WARN] 未安装 python-dotenv，尝试手动解析 .env 文件: {env_path}")
         try:
             with open(env_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -27,9 +23,8 @@ except ImportError:
                         value = value.strip().strip('"').strip("'")
                         if key and value and key not in os.environ:
                             os.environ[key] = value
-            print(f"[INFO] 手动加载 .env 文件成功")
-        except Exception as e:
-            print(f"[WARN] 手动加载 .env 文件失败: {e}")
+        except Exception:
+            pass
 
 
 @dataclass(frozen=True)
@@ -44,7 +39,7 @@ class Settings:
     llm_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
     llm_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
     llm_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-    llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "30.0"))
+    llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "120.0"))  # 增加到 120 秒，killchain 分析需要更长时间
     llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
 
