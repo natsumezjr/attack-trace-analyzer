@@ -53,7 +53,7 @@ class Settings:
     llm_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
     llm_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
     llm_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-    llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "30.0"))
+    llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "120.0"))  # 增加到 120 秒，killchain 分析需要更长时间
     llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
 

@@ -474,12 +474,14 @@ class LLMChooser(KillChainLLMClient):
         chat_complete: Optional[Any] = None,
         config: Optional[LLMChooseConfig] = None,
         enable_preselect: bool = True,
+        timeout: Optional[float] = None,
     ) -> None:
         self.cfg = config or LLMChooseConfig()
         self.chat_complete = chat_complete  # callable(messages)->str
         self.reducer = PayloadReducer(self.cfg)
         self.preselector = HeuristicPreselector(self.cfg)
         self.enable_preselect = enable_preselect
+        self._timeout = timeout  # 保存 timeout 用于调试信息
 
     def choose(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
         """
@@ -508,14 +510,45 @@ class LLMChooser(KillChainLLMClient):
         print(f"[DEBUG LLM] 准备调用 LLM，pairs 数量: {len(reduced.get('pairs', []))}")
 
         messages = build_choose_prompt(reduced, require_pair_explanations=self.cfg.require_pair_explanations)
+        # 计算 payload 大小用于调试
+        import json
+        import time
+        payload_json = json.dumps(messages, ensure_ascii=False)
+        payload_size = len(payload_json)
+        payload_size_kb = payload_size / 1024
+        print(f"[DEBUG LLM] 准备调用 LLM")
+        print(f"[DEBUG LLM]   - payload 大小: {payload_size} 字符 ({payload_size_kb:.2f} KB)")
+        print(f"[DEBUG LLM]   - pairs 数量: {len(reduced.get('pairs', []))}")
+        print(f"[DEBUG LLM]   - segments 数量: {len(reduced.get('segments', []))}")
+        # 统计候选路径总数
+        total_candidates = sum(len(p.get('candidates', [])) for p in reduced.get('pairs', []))
+        print(f"[DEBUG LLM]   - 候选路径总数: {total_candidates}")
+        start_time = time.time()
         try:
+            print(f"[DEBUG LLM] 开始调用 LLM API（可能需要较长时间，请耐心等待）...")
             text = self.chat_complete(messages)
-            print(f"[DEBUG LLM] API 调用成功，返回文本长度: {len(text) if isinstance(text, str) else 'N/A'}")
+            elapsed_time = time.time() - start_time
+            print(f"[DEBUG LLM] ✓ API 调用成功，耗时: {elapsed_time:.2f} 秒")
+            print(f"[DEBUG LLM] ✓ API 调用成功，返回文本长度: {len(text) if isinstance(text, str) else 'N/A'}")
             # 打印前500字符用于调试（避免输出过长）
             text_preview = (text[:500] + "..." if len(text) > 500 else text) if isinstance(text, str) else str(text)[:500]
             print(f"[DEBUG LLM] 返回文本预览: {text_preview}")
         except Exception as e:
-            print(f"[DEBUG LLM] API 调用异常: {type(e).__name__}: {e}")
+            elapsed_time = time.time() - start_time
+            error_type = type(e).__name__
+            error_msg = str(e)
+            print(f"[DEBUG LLM] ❌ API 调用异常（耗时 {elapsed_time:.2f} 秒）: {error_type}: {error_msg}")
+            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                current_timeout = getattr(self, '_timeout', 'unknown')
+                print(f"[DEBUG LLM] ⚠️ 超时错误：LLM API 响应时间过长（已等待 {elapsed_time:.2f} 秒）")
+                print(f"[DEBUG LLM] 可能原因：")
+                print(f"[DEBUG LLM]   1. Payload 太大（当前 {payload_size_kb:.2f} KB），LLM 处理时间长")
+                print(f"[DEBUG LLM]   2. 网络连接慢或不稳定")
+                print(f"[DEBUG LLM]   3. DeepSeek API 服务器响应慢")
+                print(f"[DEBUG LLM] 建议解决方案：")
+                print(f"[DEBUG LLM]   1. 增加 LLM_TIMEOUT 环境变量（当前超时设置: {current_timeout}秒）")
+                print(f"[DEBUG LLM]   2. 减少候选路径数量（修改 LLMChooseConfig.per_pair_keep，当前为 {self.cfg.per_pair_keep}）")
+                print(f"[DEBUG LLM]   3. 检查网络连接质量")
             result = fallback_choose(reduced)
             return result
 
@@ -600,15 +633,30 @@ def _create_llm_chat_complete(
     """
     try:
         from openai import OpenAI
+        from httpx import Timeout as HTTPXTimeout
     except ImportError:
         raise ImportError(
             "请安装 openai: uv add openai 或 pip install openai>=1.0.0"
         )
 
+    # 使用 httpx.Timeout 设置更细粒度的超时控制
+    # connect: 连接超时（短）
+    # read: 读取超时（长，因为 LLM 生成需要时间）
+    # write: 写入超时（中等）
+    # pool: 连接池超时（短）
+    httpx_timeout = HTTPXTimeout(
+        connect=10.0,      # 连接服务器最多 10 秒
+        read=timeout,     # 读取响应最多 timeout 秒（这是关键，LLM 生成需要时间）
+        write=30.0,       # 写入请求最多 30 秒
+        pool=5.0,         # 从连接池获取连接最多 5 秒
+    )
+    
+    print(f"[DEBUG LLM] 创建 OpenAI client，超时配置: connect=10s, read={timeout}s, write=30s, pool=5s")
+
     client = OpenAI(
         api_key=api_key,
         base_url=base_url,
-        timeout=timeout,
+        timeout=httpx_timeout,  # 使用 httpx.Timeout 对象
         max_retries=max_retries,
     )
 
@@ -631,6 +679,9 @@ def _create_llm_chat_complete(
             if "deepseek" in model.lower() or "gpt-4" in model.lower():
                 kwargs["response_format"] = {"type": "json_object"}
             
+            # 注意：timeout 参数已经在 OpenAI client 初始化时设置
+            # 但这里可以显式传递以覆盖（如果需要）
+            print(f"[DEBUG LLM] 发送请求到 {base_url}，模型: {model}，超时设置: {timeout}秒")
             response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
             if content is None:
@@ -733,6 +784,7 @@ def create_llm_client(
             chat_complete=chat_complete_fn,
             config=config,
             enable_preselect=enable_preselect,
+            timeout=_timeout,  # 传递 timeout 用于调试
         )
 
     # 未知 provider，回退到 mock
