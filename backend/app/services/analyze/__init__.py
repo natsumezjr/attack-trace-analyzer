@@ -4,12 +4,24 @@ from typing import List
 import json
 from pathlib import Path
 
+# 确保导入 config 模块，触发 .env 文件加载
+from app.core.config import settings
+
 def analyze_killchain(kc_uuid: str) -> List[KillChain]:
+    # 使用 settings 而不是直接使用 os.getenv，确保 .env 文件已被加载
+    llm_provider = settings.llm_provider
+    api_key = settings.llm_api_key
+    has_api_key = bool(api_key)
+    
+    # 添加详细的调试信息
     import os
-    llm_provider = os.getenv("LLM_PROVIDER", "not_set")
-    has_api_key = bool(os.getenv("DEEPSEEK_API_KEY"))
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    print(f"[DEBUG] analyze_killchain: LLM_PROVIDER={llm_provider}, has_api_key={has_api_key}")
+    env_provider = os.getenv("LLM_PROVIDER", "not_set")
+    env_api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    print(f"[DEBUG] analyze_killchain 配置检查:")
+    print(f"  - settings.llm_provider = {llm_provider}")
+    print(f"  - settings.llm_api_key = {'已设置(' + str(len(api_key)) + '字符)' if api_key else '未设置'}")
+    print(f"  - os.getenv('LLM_PROVIDER') = {env_provider}")
+    print(f"  - os.getenv('DEEPSEEK_API_KEY') = {'已设置(' + str(len(env_api_key)) + '字符)' if env_api_key else '未设置'}")
     
     # 强制要求使用真实大模型
     if llm_provider.lower() == "mock" or not has_api_key:

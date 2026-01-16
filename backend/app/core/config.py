@@ -8,10 +8,19 @@ try:
     # 从 backend/app/core/config.py 向上3层到 backend 目录
     env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
-        load_dotenv(env_path, override=False)  # override=False: 环境变量优先于 .env
+        # 读取文件内容用于调试（不包含敏感信息）
+        with open(env_path, "r", encoding="utf-8") as f:
+            env_lines = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
         print(f"[INFO] 已加载环境变量文件: {env_path}")
+        print(f"[INFO] .env 文件包含 {len(env_lines)} 行配置")
+        # 检查关键配置是否存在
+        has_llm_provider = any("LLM_PROVIDER" in line for line in env_lines)
+        has_api_key = any("DEEPSEEK_API_KEY" in line for line in env_lines)
+        print(f"[INFO] .env 文件检查: LLM_PROVIDER={'存在' if has_llm_provider else '不存在'}, DEEPSEEK_API_KEY={'存在' if has_api_key else '不存在'}")
+        load_dotenv(env_path, override=False)  # override=False: 环境变量优先于 .env
     else:
         print(f"[INFO] 未找到 .env 文件: {env_path}，使用系统环境变量")
+        print(f"[INFO] 请确认 .env 文件路径是否正确")
 except ImportError:
     # 如果没有安装 python-dotenv，尝试手动解析 .env 文件
     env_path = Path(__file__).parent.parent.parent / ".env"
