@@ -1,0 +1,17 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    Edges [label="边集合", fillcolor="#fce4ec"];
+    Sort1 [label="主排序\nts_float 升序", fillcolor="#fff3e0"];
+    Check [label="时间戳相同?", shape=diamond, fillcolor="#fff9c4"];
+    Result [label="稳定输出", fillcolor="#e3f2fd"];
+    Sort2 [label="次排序\nsrc_uid + dst_uid", fillcolor="#fff3e0"];
+
+    Edges -> Sort1;
+    Sort1 -> Check;
+    Check -> Result [label="否"];
+    Check -> Sort2 [label="是"];
+    Sort2 -> Result;
+}

@@ -1,0 +1,18 @@
+digraph "AttributeWriteBackFlow" {
+    rankdir=LR;
+    node [fontname="Arial", fontsize=11];
+    edge [fontname="Arial", fontsize=10];
+
+    // Nodes
+    Task [label="溯源任务\nTrace Analysis", shape=box, fillcolor="#fce4ec", style=filled, color="#880e4f", penwidth=2];
+    Compute [label="compute_trace\n生成analysis.*字段", shape=box, fillcolor="#fce4ec", style=filled, color="#880e4f", penwidth=2];
+    Fields [label="写回字段\nanalysis.is_path_edge\nanalysis.score\nanalysis.remarks", shape=box, fillcolor="#fce4ec", style=filled, color="#880e4f", penwidth=2];
+    Write [label="write_analysis_results\n写入Neo4j边", shape=box, fillcolor="#e3f2fd", style=filled, color="#1565c0", penwidth=2];
+    EdgeUpdate [label="Neo4j边属性更新", shape=box, fillcolor="#e3f2fd", style=filled, color="#1565c0", penwidth=2];
+
+    // Flow
+    Task -> Compute;
+    Compute -> Fields;
+    Fields -> Write;
+    Write -> EdgeUpdate;
+}

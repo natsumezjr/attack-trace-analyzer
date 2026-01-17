@@ -1,0 +1,31 @@
+digraph "BatchWriteProcess" {
+    rankdir=LR;
+    node [fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9];
+
+    // Input
+    Events [label="1000+ 事件", shape=folder, fillcolor="#e1f5fe", style=filled];
+    Nodes [label="节点列表\nnodes 数组", shape=box, fillcolor="#e1f5fe", style=filled];
+    Edges [label="边列表\nedges 数组", shape=box, fillcolor="#e1f5fe", style=filled];
+
+    // Process steps
+    Step1 [label="1. 事件解析\n提取节点与边", shape=box, fillcolor="#fff9c4", style=filled];
+    Step2 [label="2. 节点分组\n按 Label 分类", shape=box, fillcolor="#fff9c4", style=filled];
+    Step3 [label="3. UNWIND 批量 MERGE\n节点去重写入", shape=box, fillcolor="#fff9c4", style=filled];
+    Step4 [label="4. 单事务内\n边逐个 MERGE", shape=box, fillcolor="#fff9c4", style=filled];
+
+    // Output
+    Neo4j [label="Neo4j 图数据库", shape=cylinder, fillcolor="#c8e6c9", style=filled];
+    Metrics [label="性能指标\n~160 次网络往返\n100x 提升", shape=note, fillcolor="#c8e6c9", style=filled];
+
+    // Flow
+    Events -> Step1;
+    Step1 -> Nodes;
+    Step1 -> Edges;
+    Nodes -> Step2;
+    Step2 -> Step3;
+    Edges -> Step4;
+    Step3 -> Neo4j;
+    Step4 -> Neo4j;
+    Neo4j -> Metrics;
+}

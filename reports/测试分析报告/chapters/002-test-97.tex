@@ -1,0 +1,208 @@
+\section{测试用例与结果明细}\label{test-cases-results}
+
+\subsection{文档目的}\label{doc-purpose-97}
+
+本文件列出测试用例的执行步骤、期望结果、实际结果与证据位置，便于复核与复现。
+
+\subsection{读者对象}\label{target-audience-97}
+
+\begin{itemize}
+\tightlist
+\item
+  团队内部测试负责人
+\item
+  负责演示的同学
+\end{itemize}
+
+\subsection{引用关系}\label{references-97}
+
+\begin{itemize}
+\tightlist
+\item
+  验收用例：\texttt{../20-需求与验收/21-验收标准与验收用例.md}
+\end{itemize}
+
+\subsection{用例列表}\label{test-case-list}
+
+ATA系统测试用例分为两类：
+
+\begin{itemize}
+\tightlist
+\item
+  自动化测试用例：以 \texttt{pytest} 为入口，结果以命令输出为准
+\item
+  验收测试用例：以 AC-01 到 AC-08 为入口，结果以截图与录像证据为准
+\end{itemize}
+
+用例清单固定如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+用例编号 & 用例名称 & 类型 & 执行入口 & 结果 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+TC-AUTO-01 & 后端快速回归测试 & 自动化 & \texttt{cd\ backend\ \&\&\ RUN\_NEO4J\_TESTS=0\ uv\ run\ pytest\ -q} & 通过 \\
+TC-AUTO-02 & 后端全量集成测试 & 自动化 & \texttt{cd\ backend\ \&\&\ RUN\_OPENSEARCH\_TESTS=1\ RUN\_NEO4J\_TESTS=1\ KEEP\_NEO4J\_TEST\_DATA=0\ uv\ run\ pytest\ -q} & 通过 \\
+AC-01 & 多节点在线与轮询拉取 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-02 & 多源事件入库与字段规范 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-03 & 告警产生与融合生成 Canonical & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-04 & 图谱可视化查询 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-05 & 创建溯源任务与状态轮询 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-06 & 溯源结果写回与可解释展示 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-07 & APT 相似度匹配输出 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+AC-08 & 报告导出可复现 & 验收 & \texttt{../20-需求与验收/21-验收标准与验收用例.md} & 待现场验收 \\
+\end{longtable}
+}
+
+\subsection{用例明细}\label{test-case-details}
+
+\subsubsection{TC-AUTO-01 后端快速回归测试}\label{tc-auto-01-backend-regression}
+
+\textbf{目的}
+
+在不启动 Neo4j 的条件下验证后端核心逻辑可运行，保证每次提交的快速回归结果稳定。
+
+\textbf{执行步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  进入后端目录：\texttt{cd\ backend}
+\item
+  执行测试：\texttt{RUN\_NEO4J\_TESTS=0\ uv\ run\ pytest\ -q}
+\end{enumerate}
+
+\textbf{期望结果}
+
+\begin{itemize}
+\tightlist
+\item
+  测试完成，退出码为 0
+\item
+  输出包含：\texttt{121\ passed,\ 62\ skipped}
+\end{itemize}
+
+\textbf{实际结果}
+
+\begin{itemize}
+\tightlist
+\item
+  通过：\texttt{121\ passed,\ 62\ skipped\ in\ 0.20s}
+\end{itemize}
+
+\textbf{证据位置}
+
+\begin{itemize}
+\tightlist
+\item
+  终端输出截图：见本文件第 3 节命名规则
+\end{itemize}
+
+\subsubsection{TC-AUTO-02 后端全量集成测试}\label{tc-auto-02-backend-integration}
+
+\textbf{目的}
+
+在 OpenSearch 与 Neo4j 均运行的条件下验证后端完整链路可运行，覆盖存储、查询、去重、图谱入库与溯源分析关键路径。
+
+\textbf{执行步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  启动基础设施（OpenSearch + Neo4j）：\texttt{cd\ backend\ \&\&\ docker-compose\ up\ -d}
+\item
+  执行测试：\texttt{cd\ backend\ \&\&\ RUN\_OPENSEARCH\_TESTS=1\ RUN\_NEO4J\_TESTS=1\ KEEP\_NEO4J\_TEST\_DATA=0\ uv\ run\ pytest\ -q}
+\end{enumerate}
+
+\textbf{期望结果}
+
+\begin{itemize}
+\tightlist
+\item
+  测试完成，退出码为 0
+\item
+  输出包含：\texttt{182\ passed,\ 1\ skipped}
+\end{itemize}
+
+\textbf{实际结果}
+
+\begin{itemize}
+\tightlist
+\item
+  通过：\texttt{182\ passed,\ 1\ skipped,\ 36\ warnings\ in\ 196.58s}
+\item
+  跳过用例：\texttt{tests/opensearch/test\_system\_opensearch.py:362}（需要 mock OpenSearch 连接）
+\end{itemize}
+
+\textbf{证据位置}
+
+\begin{itemize}
+\tightlist
+\item
+  终端输出截图：见本文件第 3 节命名规则
+\end{itemize}
+
+\subsubsection{AC-01 到 AC-08 现场验收用例}\label{ac-01-to-ac-08-acceptance}
+
+\textbf{统一执行入口}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  固定复现剧本：\texttt{../20-需求与验收/22-攻击场景与复现剧本.md}
+\item
+  固定验收步骤：\texttt{../20-需求与验收/21-验收标准与验收用例.md}
+\item
+  固定证据规则：\texttt{../10-交付与验收/14-录像与截图清单.md}、\texttt{../90-运维与靶场/94-验证清单.md}
+\end{enumerate}
+
+\textbf{期望结果}
+
+\begin{itemize}
+\tightlist
+\item
+  每条验收用例均能定位到 OpenSearch 事件证据 \texttt{event.id}
+\item
+  图谱与溯源任务输出字段满足规范文档要求
+\end{itemize}
+
+\textbf{证据位置}
+
+\begin{itemize}
+\tightlist
+\item
+  截图与录像存放目录固定为提交包内：\texttt{09-截屏录像/}
+\end{itemize}
+
+\subsection{证据索引}\label{evidence-index}
+
+\subsubsection{截图与录像命名规则}\label{screenshot-video-naming}
+
+文件命名与存放规则统一以 \texttt{../10-交付与验收/14-录像与截图清单.md} 为准：
+
+\begin{itemize}
+\tightlist
+\item
+  截图：\texttt{YYYYMMDD-序号-证据主题.png}
+\item
+  录像：\texttt{YYYYMMDD-项目演示.mp4}
+\end{itemize}
+
+\subsubsection{自动化测试证据清单}\label{automated-test-evidence}
+
+自动化测试证据固定为两张截图：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{YYYYMMDD-01-pytest-后端快速回归.png}（对应 TC-AUTO-01）
+\item
+  \texttt{YYYYMMDD-02-pytest-后端全量集成.png}（对应 TC-AUTO-02）
+\end{enumerate}

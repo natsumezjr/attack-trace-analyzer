@@ -174,7 +174,7 @@ flowchart TD
 1. `tech_score`：attack techniques 与 intrusion-set techniques 的余弦相似度；
 2. `tactic_score`：attack tactics 与 intrusion-set tactics 的余弦相似度。
 
-综合分数固定为：
+**综合分数计算**
 
 - `score = (1 - tactic_weight) * tech_score + tactic_weight * tactic_score`
 - 其中 `tactic_weight = 0.5`
@@ -187,7 +187,7 @@ flowchart TD
 
 ### 4.1 TopK 与解释字段（固定）
 
-输出规则固定：
+**输出规则**
 
 - TopK：`top_k = 3`
 - 每个候选的解释字段个数：`explain_top_n = 5`

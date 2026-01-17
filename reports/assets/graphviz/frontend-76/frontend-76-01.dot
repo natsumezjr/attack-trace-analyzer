@@ -1,0 +1,20 @@
+digraph {
+    rankdir=TB;
+    node [fontname="Arial"];
+
+    Report [label="Trace Report\nattack-trace-report.md", shape=folder, fillcolor="#e0f7fa", penwidth=3];
+
+    Section1 [label="1. Report Metadata\nTask ID / Status / Time Window", shape=folder, fillcolor="#e8f5e9"];
+    Section2 [label="2. Input and Boundaries\nTarget Node / Data Range", shape=folder, fillcolor="#e8f5e9"];
+    Section3 [label="3. Alert and Evidence Summary\nCanonical Finding Statistics", shape=folder, fillcolor="#e8f5e9"];
+    Section4 [label="4. Trace Critical Path\nGraph Nodes and Path Edges", shape=folder, fillcolor="#e8f5e9"];
+    Section5 [label="5. APT Similarity Match Results\nTop3 Similar APT", shape=folder, fillcolor="#e8f5e9"];
+    Section6 [label="6. Appendix: Raw Data\nComplete JSON Response", shape=folder, fillcolor="#e8f5e9"];
+
+    Report -> Section1;
+    Report -> Section2;
+    Report -> Section3;
+    Report -> Section4;
+    Report -> Section5;
+    Report -> Section6;
+}

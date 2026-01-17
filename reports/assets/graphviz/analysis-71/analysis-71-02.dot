@@ -1,0 +1,14 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    Start [label="起始节点\ntarget.node_uid", fillcolor="#fce4ec"];
+    Window [label="时间窗内的边\ntask.window", fillcolor="#e3f2fd"];
+    Filter [label="时间过滤\nstart_ts ≤ ts_float ≤ end_ts", fillcolor="#fff3e0"];
+    Edges [label="过滤后的边集合\n1-hop incident edges", fillcolor="#e3f2fd"];
+
+    Start -> Window;
+    Window -> Filter;
+    Filter -> Edges;
+}

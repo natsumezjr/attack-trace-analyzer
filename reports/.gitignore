@@ -1,0 +1,12 @@
+# 编译产物
+*/build/
+*.aux
+*.log
+*.out
+*.toc
+
+# PDF 输出
+*/main.pdf
+
+# macOS
+.DS_Store

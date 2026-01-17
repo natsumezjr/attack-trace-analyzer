@@ -1,0 +1,203 @@
+\subsection{Suricata 采集与 ECS 转换}\label{22-suricata-collection-ecs-conversion}
+
+\subsection{采集输入}\label{client-52-1-collection-input}
+
+\subsection{Suricata 引擎}\label{11-suricata-engine}
+
+Suricata 引擎运行于容器 \texttt{suricata} 中，通过以下脚本启动：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{client/sensor/suricata/engine/run-suricata.sh}
+\end{itemize}
+
+引擎将检测结果输出为 EVE 日志文件，供导出器读取处理：
+
+\begin{itemize}
+\tightlist
+\item
+  默认路径：\texttt{/data/eve.json}
+\end{itemize}
+
+\subsection{关键运行参数}\label{12-key-runtime-parameters}
+
+Suricata 的运行行为由环境变量控制：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{SURICATA\_MODE}：运行模式（\texttt{live} 或 \texttt{pcap}）
+\item
+  \texttt{SURICATA\_INTERFACE}：抓包网卡名称
+\item
+  \texttt{SURICATA\_HOME\_NET}：HOME\_NET 地址组
+\end{itemize}
+
+参数取值与运行逻辑在 \texttt{client/sensor/suricata/engine/run-suricata.sh} 中实现。
+
+\subsection{EVE JSON 示例}\label{13-eve-json-example}
+
+以下是一个 DNS 查询事件的 EVE JSON 格式示例：
+
+\begin{verbatim}
+{
+  "timestamp": "2026-01-14T12:00:00.000Z",
+  "event_type": "dns",
+  "src_ip": "10.0.0.1",
+  "src_port": 12345,
+  "dest_ip": "8.8.8.8",
+  "dest_port": 53,
+  "proto": "UDP",
+  "dns": {
+    "type": "QUERY",
+    "id": 12345,
+    "query": "example.com",
+    "query_type": "A",
+    "query_class": "IN",
+    "answers": [
+      {"rrname": "example.com", "rrtype": "A", "rdata": "93.184.216.34"}
+    ]
+  }
+}
+\end{verbatim}
+
+\subsection{转换规则}\label{2-conversion-rules}
+
+\subsection{导出器位置}\label{21-exporter-location}
+
+Suricata EVE 导出器位于：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{client/sensor/suricata/exporter/app.py}
+\end{itemize}
+
+导出器持续监听 EVE 文件的新增内容，将其解析为 ECS 格式并发布至 RabbitMQ 队列。
+
+\subsection{输出字段形态}\label{22-output-field-format}
+
+Suricata 导出器采用\textbf{点号扁平键形态}输出（例如 \texttt{event.dataset}、\texttt{source.ip}），中心机在入库前将其转换为嵌套对象形态。
+
+\subsection{主机身份（跨传感器关联）}\label{221-host-identity-cross-sensor}
+
+为实现 Suricata 网络遥测数据与 Falco/Filebeat 主机行为/日志在中心机的 \texttt{Host} 节点汇聚，导出器遵循以下规则：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{host.name}：默认取自环境变量 \texttt{HOST\_NAME}（见 \texttt{../../80-规范/89-环境变量与配置规范.md}）
+\item
+  \texttt{host.id}：优先使用环境变量 \texttt{HOST\_ID}；缺失时回退为 \texttt{h-} + sha1(host.name){[}:16{]}（见 \texttt{../../80-规范/81-ECS字段规范.md}）
+\end{itemize}
+
+\subsection{dataset 取值范围}\label{23-dataset-value-range}
+
+导出器依据 \texttt{event\_type} 映射 dataset，取值限定为以下类型：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{netflow.flow}
+\item
+  \texttt{netflow.dns}
+\item
+  \texttt{netflow.http}
+\item
+  \texttt{netflow.tls}
+\item
+  \texttt{netflow.icmp}
+\end{itemize}
+
+对于 Suricata IDS 告警，导出器以 \texttt{event.kind="alert"} 标记（\texttt{event.dataset="netflow.alert}），中心机入库时将其规范化为 Raw Finding：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{finding.raw.suricata}
+\end{itemize}
+
+\subsection{event\_type 与 dataset 映射表}\label{24-event_type-ux4e0e-dataset-ux6620ux5c04ux8868}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+event\_type & event.dataset & event.kind & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+dns & netflow.dns & event & DNS 查询 Telemetry \\
+http & netflow.http & event & HTTP 请求 Telemetry \\
+flow & netflow.flow & event & 网络流 Telemetry \\
+tls & netflow.tls & event & TLS 握手 Telemetry \\
+icmp & netflow.icmp & event & ICMP 流量 Telemetry \\
+alert & finding.raw.suricata & alert & IDS 告警（Raw Finding） \\
+\end{longtable}
+}
+
+\subsection{EVE JSON 到 ECS 转换流程}\label{25-eve-json-ecs-conversion-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/client-52/client-52-01.pdf}
+\caption{EVE JSON 到 ECS 转换流程}
+\label{fig:client-52-01}
+\end{figure}
+
+\subsection{网络字段与证据引用}\label{3-network-fields-evidence-reference}
+
+导出器按以下规则填充网络相关字段：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{source.ip}、\texttt{source.port}
+\item
+  \texttt{destination.ip}、\texttt{destination.port}
+\item
+  \texttt{network.transport}、\texttt{network.protocol}
+\item
+  \texttt{flow.id}、\texttt{network.community\_id}
+\item
+  DNS 查询与解析（当 \texttt{event\_type=dns} 时）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{dns.question.name}
+  \item
+    \texttt{dns.answers{[}{]}}（用于构建 \texttt{Domain\ →\ IP} 的 \texttt{RESOLVES\_TO} 边）
+  \end{itemize}
+\end{itemize}
+
+字段定义详见 \texttt{../../80-规范/81-ECS字段规范.md}。
+
+\subsection{队列投递}\label{client-52-4-queue-delivery}
+
+导出器将数据投递至 RabbitMQ：
+
+\begin{itemize}
+\tightlist
+\item
+  队列：\texttt{data.suricata}
+\item
+  \texttt{RABBITMQ\_URL} 与 \texttt{RABBITMQ\_QUEUE} 由容器环境变量指定
+\end{itemize}
+
+拉取接口在返回前会补齐稳定的 \texttt{event.id}，规则见 \texttt{../../80-规范/87-客户机与中心机接口.md}。
+
+\subsection{故障处理}\label{client-52-5-error-handling}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  EVE 文件不存在时，导出器自动创建目录并等待文件生成。
+\item
+  RabbitMQ 发布失败时，导出器重新连接并重试发布。
+\item
+  单条 EVE 行解析失败时，导出器跳过该行并继续处理后续数据。
+\end{enumerate}

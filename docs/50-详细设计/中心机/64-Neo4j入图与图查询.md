@@ -18,13 +18,13 @@
 
 ## 1. 模块职责与边界
 
-Neo4j 模块负责“实体关系图（Entity Graph）”的权威存储与图查询能力，具体职责固定为：
+Neo4j 模块承担"实体关系图（Entity Graph）"的权威存储与图查询职责，具体功能包括：
 
-1. **Schema 管理**：创建并维持节点唯一约束与常用索引；
-2. **入图写入**：将输入的 ECS 文档转换为节点/边，并写入 Neo4j；
-3. **时间窗查询**：支持按时间窗查询边集合（供图可视化与算法使用）；
-4. **图算法查询**：支持基于时间窗投影图的最短路（Neo4j GDS）；
-5. **结果承载**：承载溯源任务写回的边属性，供后续“按节点查询溯源结果”。
+1. **Schema 管理**：创建并维护节点唯一约束、常用索引与图数据模型；
+2. **入图写入**：将 ECS 文档解析为节点与边，通过批量 API 写入 Neo4j；
+3. **时间窗查询**：支持按时间范围查询边集合，供图可视化与算法分析使用；
+4. **图算法查询**：支持基于时间窗投影图的最短路径计算（Neo4j GDS）；
+5. **结果承载**：持久化溯源任务写回的边属性，支持按节点查询溯源结果。
 
 本模块不负责：
 
@@ -36,7 +36,7 @@ Neo4j 模块负责“实体关系图（Entity Graph）”的权威存储与图�
 
 ### 2.1 节点唯一约束（必须存在）
 
-节点类型与唯一键由 `../../80-规范/84-Neo4j实体图谱规范.md` 定义。Neo4j 必须落地以下唯一约束（表达为“Label + 属性键”）：
+节点类型与唯一键由 `../../80-规范/84-Neo4j实体图谱规范.md` 定义。Neo4j 必须创建以下唯一约束（表达为"Label + 属性键"组合）：
 
 | Label | 唯一键 |
 |---|---|
@@ -48,7 +48,10 @@ Neo4j 模块负责“实体关系图（Entity Graph）”的权威存储与图�
 | `Domain` | `domain.name` |
 | `IP` | `ip` |
 
-> 说明：`User` 与 `File` 的复合键用于避免跨主机误合并；当事件包含 `user.id` 时使用 `user.id` 作为唯一键；当事件不包含 `user.id` 时使用 `host.id + user.name` 作为唯一键。
+**唯一键说明**：
+- `User` 与 `File` 使用复合键避免跨主机误合并；
+- 当事件包含 `user.id` 时优先使用 `user.id` 作为唯一键；
+- 当事件不包含 `user.id` 时使用 `host.id + user.name` 作为唯一键。
 
 ### 2.2 图数据模型
 
@@ -99,33 +102,35 @@ flowchart TB
 
 ### 3.1 入图输入范围（严格）
 
-Neo4j 入图只接受两类 ECS 文档：
+Neo4j 入图严格限定为两类 ECS 文档：
 
-1. Telemetry：`event.kind="event"`
-2. Canonical Findings：`event.kind="alert"` 且 `event.dataset="finding.canonical"`
+1. **Telemetry 事件**：`event.kind="event"`，来自传感器的原始遥测数据；
+2. **Canonical Findings**：`event.kind="alert"` 且 `event.dataset="finding.canonical"`，经过融合去重的规范告警。
 
-任何 Raw Findings（含传感器原始告警与 Security Analytics 原始 finding）不得直接入图。
+任何 Raw Findings（含传感器原始告警与 Security Analytics 原始 finding）不得直接入图，避免噪声数据污染图谱。
 
 ### 3.2 入图边属性（必须写入）
 
 每条入图边必须写入以下属性（字段名与来源以 `../../80-规范/81-ECS字段规范.md` 与 `../../80-规范/84-Neo4j实体图谱规范.md` 为准）：
 
+**基础属性**（所有边必须携带）：
 - `ts` 或 `@timestamp`：边的事件时间（字符串时间戳）
 - `ts_float`：数值时间戳（秒，float），用于时间窗过滤与 GDS 投影
 - `custom.evidence.event_ids[]`：证据事件引用列表
 - `event.kind` / `event.dataset` / `event.id`：用于回溯与区分来源
 
-当边来自 Canonical Finding 时，边必须额外写入：
-
-- `is_alarm=true`
-- `rule.*`、`threat.*`、`event.severity`、`custom.finding.*` 等字段（用于解释与可视化）
+**告警边属性**（Canonical Finding 特有）：
+- `is_alarm=true`：标记该边为告警边
+- `rule.*`、`threat.*`、`event.severity`、`custom.finding.*`：用于前端展示与溯源解释
 
 ### 3.3 写入幂等边界
 
-- 节点写入必须幂等（MERGE），以唯一键去重；
-- 边写入是“按证据追加”的语义：边允许出现多条相同类型关系，但每条边必须携带其证据 `event.id` 与证据列表，便于后续去重/回放。
+Neo4j 入图遵循以下幂等性原则：
 
-> 边去重属于 Analysis 的工作范围：在"展示层"与"任务结果写回层"通过属性与过滤实现干净展示。
+- **节点写入**：必须使用 MERGE 语句实现幂等写入，以唯一键去重避免重复节点；
+- **边写入**：采用"按证据追加"语义，允许同类型边多次存在，但每条边必须携带唯一的 `event.id` 与证据列表，支持后续去重与回放。
+
+边的去重逻辑属于 Analysis 模块职责，在"展示层"与"任务结果写回层"通过属性过滤实现干净展示。
 
 ### 3.4 批量写入优化（v2.1+）
 
@@ -200,30 +205,29 @@ flowchart LR
 
 ### 4.1 图查询能力清单（必须支持）
 
-Neo4j 模块必须提供以下查询能力：
+Neo4j 模块提供以下核心查询能力：
 
-1. **告警边查询**：返回所有 `is_alarm=true` 的边集合；
-2. **时间窗边查询**：给定 `[t_min, t_max]`（秒），返回时间窗内的边集合，并支持按关系类型过滤；
-3. **时间窗最短路**：给定 `src_uid`、`dst_uid`、`[t_min, t_max]` 与风险权重表，返回时间窗内的加权最短路边序列。
+1. **告警边查询**：返回所有 `is_alarm=true` 的边集合，用于前端展示所有告警关联关系；
+2. **时间窗边查询**：给定时间范围 `[t_min, t_max]`（秒），返回该时间窗内的边集合，并支持按关系类型过滤；
+3. **时间窗最短路**：给定起点 `src_uid`、终点 `dst_uid`、时间窗 `[t_min, t_max]` 与风险权重表，使用 Neo4j GDS 算法返回时间窗内的加权最短路径边序列。
 
 ### 4.2 后端对外 API 绑定（固定）
 
 后端对外提供统一的图查询入口：
-
 - `POST /api/v1/graph/query`
 
-该接口支持以下动作：
+该接口支持以下查询动作：
+- `alarm_edges`：查询告警边
+- `edges_in_window`：时间窗边查询
+- `shortest_path_in_window`：时间窗最短路查询
+- `analysis_edges_by_task`：按任务查询溯源写回边
 
-- `alarm_edges`
-- `edges_in_window`
-- `shortest_path_in_window`
-- `analysis_edges_by_task`
+接口请求/响应字段由后端实现固定，Neo4j 模块负责提供稳定的查询语义与返回结构（包含 nodes/edges 的 uid、rtype、props 字段）。
 
-接口的请求/响应字段由后端实现固定，Neo4j 模块负责提供稳定的查询语义与返回结构（nodes/edges 的 uid、rtype、props）。
-
-其中：
-
-- `analysis_edges_by_task`：按 `analysis.task_id` 拉取该任务写回的边集合；当请求参数 `only_path=true` 时只返回 `analysis.is_path_edge=true` 的关键路径边；当 `only_path=false` 时返回该任务写回的全部边。
+**`analysis_edges_by_task` 查询说明**：
+- 按 `analysis.task_id` 拉取该溯源任务写回的边集合；
+- 当请求参数 `only_path=true` 时，只返回 `analysis.is_path_edge=true` 的关键路径边；
+- 当请求参数 `only_path=false` 时，返回该任务写回的全部边（包含非关键路径边）。
 
 ```mermaid
 sequenceDiagram

@@ -1,0 +1,26 @@
+digraph "FusionAlgorithm" {
+    rankdir=TD;
+    node [fontname="Arial", fontsize=11];
+    edge [fontname="Arial", fontsize=10];
+
+    // Input
+    RawFindings [label="Raw Findings\n时间窗内\n3分钟桶", shape=box, fillcolor="#e1f5fe", style=filled];
+
+    // Process nodes
+    TimeBucket [label="按时间桶分组\ntime_bucket_id 计算", shape=box, fillcolor="#e1f5fe", style=filled];
+    Fingerprint [label="生成指纹\ntechnique_id +\nhost_id + entity_id +\ntime_bucket", shape=box, fillcolor="#e1f5fe", style=filled];
+    Dedup [label="去重\n相同指纹合并\nprovider 列表", shape=box, fillcolor="#e1f5fe", style=filled];
+    Canonical [label="Canonical Finding\ndataset 设置为\nfinding.canonical\nprovider 字段列表", shape=box, fillcolor="#e1f5fe", style=filled];
+    ProviderMerge [label="Provider 信息合并\n补充 provider字段\nhost.name等", shape=box, fillcolor="#e1f5fe", style=filled];
+
+    // Output
+    OpenSearch [label="OpenSearch\ncanonical-findings-YYYY.MM.DD", shape=cylinder, fillcolor="#c8e6c9", style=filled];
+
+    // Edges
+    RawFindings -> TimeBucket;
+    TimeBucket -> Fingerprint;
+    Fingerprint -> Dedup;
+    Dedup -> Canonical;
+    Canonical -> ProviderMerge;
+    ProviderMerge -> OpenSearch;
+}

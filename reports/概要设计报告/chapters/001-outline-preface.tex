@@ -1,0 +1,20 @@
+\section*{概要设计报告}
+\addcontentsline{toc}{section}{概要设计报告}
+
+\begin{SideBar}
+\textbf{文档定位：}本报告用于描述 Attack Trace Analyzer（ATA）的总体架构与关键机制，回答"系统由哪些模块构成、模块如何协作、数据如何流转、关键设计为何这样取舍"。\\
+\textbf{与《详细设计报告》的关系：}本报告强调"模块边界 + 数据/控制流"；细节（字段、索引治理、图谱 schema、任务状态机实现）请参阅《详细设计报告》与对应代码目录。
+\end{SideBar}
+
+\begin{KeyBox}
+\textbf{一页总结（系统核心要点）：}
+\begin{itemize}
+  \item \textbf{多源采集（客户端）：}Falco（主机行为）、Filebeat(+Sigma)（主机日志）、Suricata（网络流量）统一转换为 ECS 子集字段。
+  \item \textbf{中心机流水线：}采用"单定时器顺序流水线"模型：轮询拉取增量数据 $\rightarrow$ Store-first 入 OpenSearch $\rightarrow$ 检测融合（Raw $\rightarrow$ Canonical）$\rightarrow$ ECS 入图写入 Neo4j。
+  \item \textbf{双存储分工：}OpenSearch 负责检索/检测/去重/索引治理；Neo4j 负责实体关系图、时间窗内关系遍历与溯源结果写回（边属性 \texttt{analysis.*}）。
+  \item \textbf{溯源任务模型：}前端/接口触发异步 Trace Task（目标节点 + 时间窗），后台计算后写回图谱，并提供任务状态与结果查询。
+  \item \textbf{可解释性原则：}每条溯源结论必须可回链到证据事件（如 \texttt{event.id}、\texttt{custom.evidence.event\_ids}），保证可复核。
+\end{itemize}
+\end{KeyBox}
+
+\clearpage

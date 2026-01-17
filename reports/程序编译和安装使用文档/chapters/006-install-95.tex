@@ -1,0 +1,173 @@
+\section{重置复现与排障}\label{reset-reproduce-troubleshoot}
+
+本文件给出靶场的固定重置步骤、固定复现步骤与固定排障顺序，保证每次演示从干净状态开始。
+
+\subsection{固定变量}\label{fixed-variables}
+
+本文件命令默认在靶场宿主机执行，并使用以下固定变量：
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+export REPO="$BASE"/repo/attack-trace-analyzer
+\end{verbatim}
+
+\subsection{重置（固定步骤）}\label{reset-steps}
+
+\subsubsection{停机（固定）}\label{stop-services}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  停止前端（运行 \texttt{npm\ run\ dev} 的终端按 \texttt{Ctrl+C}）
+\item
+  停止后端（运行 \texttt{uvicorn} 的终端按 \texttt{Ctrl+C}）
+\item
+  停止 4 套客户机容器
+\item
+  停止 C2 容器
+\item
+  停止中心机依赖并清空存储
+\end{enumerate}
+
+\begin{verbatim}
+for i in 01 02 03 04; do
+  cd "$BASE"/run/client-$i
+  docker-compose -p client-$i down
+done
+
+docker rm -f c2-dns c2-http || true
+
+cd "$REPO"/backend
+docker-compose down -v
+\end{verbatim}
+
+\subsubsection{清理数据（固定）}\label{cleanup-data}
+
+清理客户机数据目录（清空 Falco/Filebeat/Suricata 输出与状态文件）：
+
+\begin{verbatim}
+for i in 01 02 03 04; do
+  rm -rf "$BASE"/run/client-$i/data/*
+done
+\end{verbatim}
+
+重置 C2 静态内容（保留网络与容器配置口径）：
+
+\begin{verbatim}
+rm -rf "$BASE"/run/c2/html/*
+printf "ok\n" > "$BASE"/run/c2/html/health
+printf "hello from c2 (benign)\n" > "$BASE"/run/c2/html/payload
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{"\$BASE/run/client-01/data"} 到 \texttt{"\$BASE/run/client-04/data"} 目录为空；
+\item
+  \texttt{"\$BASE/run/c2/html/health"} 与 \texttt{"\$BASE/run/c2/html/payload"} 文件存在且内容可读。
+\end{itemize}
+
+\subsection{复现（固定步骤）}\label{reproduce-steps}
+
+复现步骤固定为：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  按 \texttt{92-一键编排.md} 启动全部服务；
+\item
+  按 \texttt{93-C2部署与证据点.md} 执行 DNS 与 HTTP 两条证据命令；
+\item
+  按 \texttt{94-验证清单.md} 完成网络、采集、入库与证据点验证。
+\end{enumerate}
+
+\subsection{排障顺序（固定）}\label{troubleshoot-order}
+
+排障严格按以下顺序执行，不允许跳步：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{后端健康检查}：\texttt{curl\ -sS\ http://localhost:8001/health} 返回 \texttt{\{"status":"ok"\}}
+\item
+  \textbf{OpenSearch 可用}：\texttt{curl\ -k\ -u\ admin:OpenSearch@2024!Dev\ https://localhost:9200/\_cluster/health} 的 \texttt{status} 为 \texttt{yellow\textbar{}green}
+\item
+  \textbf{C2 可用}：\texttt{dig\ @\textless{}C2\_DNS\_IP\textgreater{}\ \textless{}C2\_DOMAIN\textgreater{}\ +short} 返回 \texttt{\textless{}C2\_HTTP\_IP\textgreater{}}，且 \texttt{curl\ -s\ http://\textless{}C2\_HTTP\_IP\textgreater{}/health} 返回 \texttt{ok}
+\item
+  \textbf{客户机接口可用}：\texttt{curl\ -sS\ http://\textless{}CENTER\_IP\textgreater{}:18881/suricata} 返回 JSON 且包含 \texttt{total}
+\item
+  \textbf{注册表可见}：\texttt{curl\ -sS\ http://localhost:8001/api/v1/clients} 的结果包含 \texttt{client-01..04}
+\item
+  \textbf{Suricata 输出存在}：\texttt{"\$BASE/run/client-01/data/eve.json"} 文件存在且文件大小大于 0
+\end{enumerate}
+
+当上述任一项不满足时，直接在该项对应的组件上定位问题，不进入下一项。
+
+\subsection{常见问题与解决方案}\label{common-solutions}
+
+\subsubsection{容器名称冲突（\texttt{Cannot create container for service rabbitmq: Conflict}）}\label{container-name-conflict}
+
+\textbf{问题}：多个 client 实例启动时，容器名称冲突。
+
+\textbf{原因}：多个实例使用相同的 docker-compose.yml，没有指定不同的项目名称。
+
+\textbf{解决方案}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  先停止所有冲突的容器：
+
+\begin{verbatim}
+docker rm -f rabbitmq || true
+for i in 01 02 03 04; do
+  cd "$BASE"/run/client-$i
+  docker-compose -p client-$i down
+done
+\end{verbatim}
+\item
+  使用 \texttt{-p} 参数指定项目名称重新启动：
+
+\begin{verbatim}
+for i in 01 02 03 04; do
+  cd "$BASE"/run/client-$i
+  docker-compose -p client-$i up -d --build
+done
+\end{verbatim}
+\end{enumerate}
+
+\subsubsection{检查当前运行状态}\label{check-running-status}
+
+\begin{verbatim}
+## 检查所有client实例的容器
+for i in 01 02 03 04; do
+  echo "=== client-$i ==="
+  docker ps --filter "name=client-$i" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+done
+
+## 检查端口占用
+ss -lntup | grep -E ':(18881|18882|18883|18884)\b'
+
+## 检查中心机服务
+ss -lntup | grep -E ':(9200|7474|7687|8001|3000)\b'
+\end{verbatim}
+
+\subsubsection{清理所有残留容器}\label{cleanup-all-containers}
+
+如果遇到无法启动的情况，可以强制清理：
+
+\begin{verbatim}
+## 停止并删除所有client相关容器
+for i in 01 02 03 04; do
+  cd "$BASE"/run/client-$i
+  docker-compose -p client-$i down -v
+done
+
+## 删除可能残留的容器
+docker ps -a | grep -E 'client-|rabbitmq|falco|filebeat|suricata' | awk '{print $1}' | xargs -r docker rm -f
+\end{verbatim}

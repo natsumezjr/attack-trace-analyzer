@@ -1,0 +1,93 @@
+digraph "Complete Data Flow Diagram" {
+    rankdir=LR;
+    node [fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    subgraph cluster_user {
+        label="用户操作 (青色)";
+        style=filled;
+        fillcolor="#e0f7fa";
+        color="#006064";
+        fontsize=12;
+
+        Input1 [label="设置时间窗", shape=ellipse];
+        Input2 [label="点选节点", shape=ellipse];
+        Input3 [label="查看进度", shape=ellipse];
+        Input4 [label="查看报告", shape=ellipse];
+    }
+
+    subgraph cluster_frontend {
+        label="前端应用 (青色)";
+        style=filled;
+        fillcolor="#b2ebf2";
+        color="#006064";
+        fontsize=12;
+
+        UI [label="React 组件", shape=box];
+        State [label="useState 状态", shape=box];
+        Effect [label="useEffect 轮询", shape=box];
+    }
+
+    subgraph cluster_proxy {
+        label="Next.js 代理 (青色)";
+        style=filled;
+        fillcolor="#80deea";
+        color="#006064";
+        fontsize=12;
+
+        Proxy [label="Rewrite 规则\n/api/* → localhost:8001", shape=box];
+    }
+
+    subgraph cluster_backend {
+        label="后端服务 (绿色)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#1b5e20";
+        fontsize=12;
+
+        GraphService [label="图服务\n/api/v1/graph/query", shape=component, fillcolor="#c8e6c9"];
+        TaskService [label="任务服务\n/api/v1/analysis/tasks", shape=component, fillcolor="#c8e6c9"];
+        EventService [label="事件服务\n/api/v1/events/search", shape=component, fillcolor="#c8e6c9"];
+    }
+
+    subgraph cluster_data {
+        label="数据层 (深蓝)";
+        style=filled;
+        fillcolor="#e3f2fd";
+        color="#1565c0";
+        fontsize=12;
+
+        Neo4j [label="Neo4j 图数据库\n:7687", shape=cylinder, fillcolor="#fff9c4"];
+        OpenSearch [label="OpenSearch\n:9200", shape=cylinder, fillcolor="#fff9c4"];
+    }
+
+    Input1 -> UI;
+    Input2 -> UI;
+    Input3 -> UI;
+    Input4 -> UI;
+
+    UI -> State [label="更新"];
+    State -> UI [label="渲染"];
+    UI -> Proxy [label="触发请求"];
+    Effect -> Proxy [label="定时轮询"];
+
+    Proxy -> GraphService [label="HTTP"];
+    Proxy -> TaskService [label="HTTP"];
+    Proxy -> EventService [label="HTTP"];
+
+    GraphService -> Neo4j [label="Cypher 查询"];
+    GraphService -> Neo4j [label="写入/读取写回边"];
+    TaskService -> Neo4j [label="任务元数据"];
+    TaskService -> OpenSearch [style=dashed, label="可选"];
+    EventService -> OpenSearch [label="聚合查询"];
+
+    Neo4j -> GraphService [label="图数据 (节点/边)"];
+    OpenSearch -> EventService [label="事件/统计数据"];
+
+    GraphService -> Proxy [label="JSON 响应"];
+    TaskService -> Proxy [label="任务状态"];
+    EventService -> Proxy [label="统计数据"];
+
+    Proxy -> UI [label="响应数据"];
+    UI -> State [label="更新状态"];
+}

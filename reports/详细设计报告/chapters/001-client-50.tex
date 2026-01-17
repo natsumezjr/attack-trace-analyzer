@@ -1,0 +1,182 @@
+\section{客户机模块}\label{client-module}
+
+\subsection{客户机职责边界}\label{client-responsibility-boundary}
+
+客户机承担以下核心职责：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  采集三类数据源：Falco、Filebeat、Suricata；
+\item
+  将各类输出转换为 ECS 子集字段，生成可供中心机入库的 JSON 事件；
+\item
+  将事件写入 RabbitMQ 队列实现本地缓冲；
+\item
+  暴露拉取接口，支持中心机轮询获取增量数据。
+\end{enumerate}
+
+以下功能不在客户机职责范围内：
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch 存储与查询；
+\item
+  Neo4j 图谱建模与查询；
+\item
+  溯源算法执行与结果写回。
+\end{itemize}
+
+\subsection{组件清单与目录结构}\label{component-list-directory}
+
+客户机包含以下容器（配置文件：\texttt{client/docker-compose.yml}）：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+容器 & 作用 & 主要代码位置 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{rabbitmq} & 本地缓冲区 & \texttt{client/docker-compose.yml} \\
+\texttt{falco} & 主机行为采集 & \texttt{client/docker-compose.yml} \\
+\texttt{falco-ecs} & Falco ECS 转换并投递队列 & \texttt{client/sensor/falco/ecs-converter/} \\
+\texttt{filebeat} & 主机日志采集 + Sigma 检测并投递队列 & \texttt{client/sensor/filebeat/} \\
+\texttt{suricata} & 网络 IDS 与 EVE 输出 & \texttt{client/sensor/suricata/engine/} \\
+\texttt{suricata-exporter} & EVE ECS 转换并投递队列 & \texttt{client/sensor/suricata/exporter/} \\
+\texttt{backend} & 拉取 API（Gin） & \texttt{client/backend/} \\
+\end{longtable}
+}
+
+\subsection{端到端数据流}\label{end-to-end-data-flow}
+
+\subsubsection{数据流图（完整视图）}\label{data-flow-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/client-50/client-50-01.pdf}
+\caption{客户机数据流图}
+\label{fig:client-50-01}
+\end{figure}
+
+\subsubsection{三传感器数据流对比}\label{three-sensor-data-flow}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}llllll@{}}
+\toprule\noalign{}
+传感器 & 采集方式 & 输出格式 & 转换器 & 队列名 & 特点 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Falco} & 内核钩子 & JSONL & \texttt{falco\_json\_to\_ecs.py} & \texttt{data.falco} & 进程/文件/网络细粒度行为 \\
+\textbf{Filebeat} & 日志文件 & ECS JSON & \texttt{detector.py} & \texttt{data.filebeat} & 认证日志 + Sigma 规则告警 \\
+\textbf{Suricata} & 网络抓包 & EVE JSON & \texttt{exporter/app.py} & \texttt{data.suricata} & DNS/HTTP/Flow/IDS 告警 \\
+\end{longtable}
+}
+
+\subsubsection{关键设计约束}\label{key-design-constraints}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{队列增量语义}: 消息被 \texttt{ack} 后不再返回，确保中心机拉取的增量性
+\item
+  \textbf{event.id 稳定性}: 由 backend 拉取接口统一补齐，避免上游缺失
+\item
+  \textbf{host.id 一致性}: 三传感器统一使用 \texttt{HOST\_ID} 环境变量，或通过 \texttt{host.name} hash 生成
+\item
+  \textbf{ECS 归一化}: 三种不同格式统一为 ECS 子集，便于中心机入库
+\end{enumerate}
+
+\subsubsection{三传感器数据量规模对比}\label{three-sensor-data-volume}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}llllll@{}}
+\toprule\noalign{}
+数据源 & 事件速率 & 单事件大小 & 每分钟数据量 & 主要字段 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Falco} & \textasciitilde100-500 events/min & \textasciitilde2KB & \textasciitilde0.2-1 MB & process、file、network & 进程树、文件访问链路 \\
+\textbf{Filebeat} & \textasciitilde10-50 lines/min & \textasciitilde0.5KB & \textasciitilde0.005-0.025 MB & user、source、event.outcome & 认证链路、登录失败 \\
+\textbf{Suricata} & 取决于网络流量 & \textasciitilde1-3KB & 变化大（典型：0.1-10 MB） & source/destination、dns、http & DNS解析、网络连接、IDS告警 \\
+\end{longtable}
+}
+
+\textbf{说明}：
+
+\begin{itemize}
+\tightlist
+\item
+  Falco 事件速率取决于系统活跃度，正常运行时约 100-500 events/min；
+\item
+  Filebeat 仅处理认证相关日志，速率较低；
+\item
+  Suricata 数据量与网络流量成正比，演示环境建议控制在 \textless{} 1Gbps。
+\end{itemize}
+
+中心机轮询逻辑参考：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/client\_poller.py}
+\end{itemize}
+
+\subsection{分模块详细设计索引}\label{module-index}
+
+客户机详细设计按模块拆分如下：
+
+\begin{itemize}
+\tightlist
+\item
+  Falco：\texttt{51-Falco采集与ECS转换.md}
+\item
+  Suricata：\texttt{52-Suricata采集与ECS转换.md}
+\item
+  Filebeat：\texttt{53-Filebeat采集与ECS转换.md}
+\item
+  RabbitMQ：\texttt{54-RabbitMQ缓冲与队列语义.md}
+\item
+  拉取接口：\texttt{55-拉取接口.md}
+\end{itemize}
+
+\subsection{与中心机的交互边界}\label{interaction-boundary}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  客户机仅暴露拉取接口（HTTP GET），接口规范由 \texttt{../../80-规范/87-客户机与中心机接口.md} 定义；
+\item
+  客户机不保存中心机状态，不维护游标，增量语义由 RabbitMQ 队列保证；
+\item
+  客户机返回数据前需确保事件包含稳定的 \texttt{event.id}，补齐逻辑在拉取接口中实现。
+\end{enumerate}
+
+\subsection{运维与排障入口}\label{maintenance-troubleshooting}
+
+客户机部署、启动、验证、重置与排障详见运维文档：
+
+\begin{itemize}
+\tightlist
+\item
+  编译安装与使用：\texttt{../../90-运维与靶场/90-编译安装与使用.md}
+\item
+  靶场部署：\texttt{../../90-运维与靶场/91-靶场部署.md}
+\item
+  一键编排：\texttt{../../90-运维与靶场/92-一键编排.md}
+\item
+  验证清单：\texttt{../../90-运维与靶场/94-验证清单.md}
+\item
+  重置复现与排障：\texttt{../../90-运维与靶场/95-重置复现与排障.md}
+\end{itemize}

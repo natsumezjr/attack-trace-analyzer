@@ -1,0 +1,85 @@
+digraph {
+    rankdir=LR;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_host {
+        label="宿主机";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f5f5f5";
+
+        Falco [label="Falco 采集\nsyscall/events", fillcolor="#e1f5ff"];
+        Filebeat [label="Filebeat 采集\nauth/syslog", fillcolor="#e1f5ff"];
+        Suricata [label="Suricata 采集\n网络流量/IDS", fillcolor="#e1f5ff"];
+
+        FalcoFile [label="/data/falco.jsonl", shape=folder, fillcolor="#fff9c4"];
+        FilebeatFile [label="/tmp/filebeat-output/", shape=folder, fillcolor="#fff9c4"];
+        SuricataFile [label="/data/eve.json", shape=folder, fillcolor="#fff9c4"];
+
+        Falco -> FalcoFile;
+        Filebeat -> FilebeatFile;
+        Suricata -> SuricataFile;
+    }
+
+    subgraph cluster_containers {
+        label="客户机容器";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f0f0f0";
+
+        subgraph cluster_falco {
+            label="Falco 路径";
+            FalcoECS [label="falco-ecs 容器\nPython 转换器\n- 读取 JSONL\n- 转换为 ECS JSON\n- 补齐 host.id/name\n- 发布到队列", fillcolor="#fff3e0"];
+        }
+
+        subgraph cluster_filebeat {
+            label="Filebeat 路径";
+            Detector [label="detector Python\n- 采集日志\n- Sigma 规则检测\n- 转换为 ECS JSON\n- 补齐 host.id/name\n- 发布到队列", fillcolor="#fff3e0"];
+        }
+
+        subgraph cluster_suricata {
+            label="Suricata 路径";
+            SuricataExporter [label="suricata-exporter Py\n- 读取 EVE JSON\n- 转换为 ECS JSON\n- 补齐 host.id/name\n- 发布到队列", fillcolor="#fff3e0"];
+        }
+
+        subgraph cluster_rabbitmq {
+            label="RabbitMQ 消息队列";
+            QueueFalco [label="data.falco", shape=folder, fillcolor="#f3e5f5"];
+            QueueFilebeat [label="data.filebeat", shape=folder, fillcolor="#f3e5f5"];
+            QueueSuricata [label="data.suricata", shape=folder, fillcolor="#f3e5f5"];
+        }
+
+        Backend [label="backend HTTP API\nGin 框架\nGET /falco\nGET /filebeat\nGET /suricata\n- basic.get + ack\n- ensure event.id", fillcolor="#e8f5e9"];
+
+        FalcoFile -> FalcoECS;
+        FilebeatFile -> Detector;
+        SuricataFile -> SuricataExporter;
+
+        FalcoECS -> QueueFalco [label="publish"];
+        Detector -> QueueFilebeat [label="publish"];
+        SuricataExporter -> QueueSuricata [label="publish"];
+
+        QueueFalco -> Backend [label="consume\nbasic.get"];
+        QueueFilebeat -> Backend [label="consume\nbasic.get"];
+        QueueSuricata -> Backend [label="consume\nbasic.get"];
+    }
+
+    subgraph cluster_center {
+        label="中心机轮询 (5s 周期)";
+        style=dashed;
+        fillcolor="#fce4ec";
+
+        Poller [label="轮询调度器\nclient_poller.py", fillcolor="#fce4ec"];
+        HTTPClient [label="HTTP Client", fillcolor="#fce4ec"];
+        Pipeline [label="中心机流水线 Step 1\n拉取并入库到 OpenSearch", fillcolor="#fce4ec"];
+
+        Poller -> HTTPClient [label="GET /falco"];
+        Poller -> HTTPClient [label="GET /filebeat"];
+        Poller -> HTTPClient [label="GET /suricata"];
+
+        HTTPClient -> Backend [label="200 OK\ntotal + data"];
+        Backend -> Pipeline;
+    }
+}

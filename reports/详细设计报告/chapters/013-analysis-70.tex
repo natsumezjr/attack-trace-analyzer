@@ -1,0 +1,387 @@
+\section{分析模块}\label{analysis-module}
+
+\subsection{触发方式}\label{analysis-trigger}
+
+溯源任务通过前端点选节点触发，执行流程如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  前端在图中选择目标节点；
+\item
+  调用中心机创建任务接口；
+\item
+  中心机立即返回 \texttt{task\_id}；
+\item
+  中心机后台执行任务并持续更新状态；
+\item
+  任务完成后，前端通过图查询接口读取结果。
+\end{enumerate}
+
+\paragraph{任务执行时序图}\label{analysis-task-timing}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-70/analysis-70-01.pdf}
+\caption{任务执行时序图}
+\label{fig:analysis-70-01}
+\end{figure}
+
+\subsection{task\_id 规则}\label{analysis-task-id}
+
+\texttt{task\_id} 格式为：
+
+\begin{verbatim}
+trace-<uuid_v4>
+\end{verbatim}
+
+\textbf{示例}：
+
+\begin{verbatim}
+{
+  "task_id": "trace-550e8400-e29b-41d4-a716-446655440000"
+}
+\end{verbatim}
+
+实现位置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/analyze/pipeline.py} 的 \texttt{new\_task\_id()}
+\end{itemize}
+
+\subsection{任务状态存储}\label{analysis-task-storage}
+
+任务状态存储于 OpenSearch 的按日滚动索引：
+
+\begin{verbatim}
+analysis-tasks-YYYY-MM-DD
+\end{verbatim}
+
+\textbf{示例}：
+
+\begin{verbatim}
+analysis-tasks-2026-01-16
+analysis-tasks-2026-01-17
+\end{verbatim}
+
+索引创建与 mapping 定义位置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/opensearch/mappings.py} 的 \texttt{analysis\_tasks\_mapping}
+\end{itemize}
+
+\subsection{任务文档字段}\label{analysis-task-fields}
+
+\subsubsection{任务文档结构图}\label{analysis-task-structure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-70/analysis-70-02.pdf}
+\caption{任务文档结构图}
+\label{fig:analysis-70-02}
+\end{figure}
+
+\subsubsection{字段定义表}\label{analysis-field-definitions}
+
+任务文档字段定义如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.28\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.22\textwidth}@{}}
+\toprule\noalign{}
+字段路径 & 类型 & 说明 & 示例值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{@timestamp}} & string & 任务创建时间（RFC3339） & {\scriptsize\texttt{2026-01-16T10:30:00Z}} \\
+{\scriptsize\texttt{task.id}} & string & 任务唯一标识 & {\scriptsize\texttt{trace-550e8400-...}} \\
+{\scriptsize\texttt{task.status}} & string & 任务状态 & {\scriptsize\texttt{queued} / \texttt{running} / \texttt{succeeded} / \texttt{failed}} \\
+{\scriptsize\texttt{task.progress}} & integer & 任务进度（0-100） & {\scriptsize\texttt{85}} \\
+{\scriptsize\texttt{task.target.node\_uid}} & string & 目标节点 UID & {\scriptsize\texttt{node-123}} \\
+{\scriptsize\texttt{task.window.start\_ts}} & string & 分析时间窗起点 & {\scriptsize\texttt{2026-01-16T00:00:00Z}} \\
+{\scriptsize\texttt{task.window.end\_ts}} & string & 分析时间窗终点 & {\scriptsize\texttt{2026-01-16T23:59:59Z}} \\
+{\scriptsize\texttt{task.started\_at}} & string & 任务开始时间 & {\scriptsize\texttt{2026-01-16T10:30:05Z}} \\
+{\scriptsize\texttt{task.finished\_at}} & string & 任务结束时间 & {\scriptsize\texttt{2026-01-16T10:35:10Z}} \\
+{\scriptsize\texttt{task.error}} & string & 失败原因 & {\scriptsize\texttt{Neo4j connection timeout}} \\
+{\scriptsize\texttt{task.result.summary}} & string & 任务结果摘要 & {\scriptsize\texttt{Found 3 attack paths}} \\
+\end{longtable}
+}
+
+任务级结构化结果字段定义如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.45\textwidth}p{0.12\textwidth}p{0.33\textwidth}@{}}
+\toprule\noalign{}
+字段路径 & 类型 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{task.result.ttp\_similarity.attack\_tactics}} & array & 匹配的攻击战术列表 \\
+{\scriptsize\texttt{task.result.ttp\_similarity.attack\_techniques}} & array & 匹配的攻击技术列表 \\
+{\scriptsize\texttt{task.result.ttp\_similarity.similar\_apts}} & array & 相似 APT 组织列表 \\
+{\scriptsize\texttt{task.result.trace.updated\_edges}} & array & 更新的边属性集合 \\
+{\scriptsize\texttt{task.result.trace.path\_edges}} & array & 溯源路径边集合 \\
+\end{longtable}
+}
+
+\subsubsection{任务文档示例}\label{analysis-task-example}
+
+\begin{verbatim}
+{
+  "@timestamp": "2026-01-16T10:30:00Z",
+  "task": {
+    "id": "trace-550e8400-e29b-41d4-a716-446655440000",
+    "status": "succeeded",
+    "progress": 100,
+    "target": {
+      "node_uid": "node-malicious-ssh-123"
+    },
+    "window": {
+      "start_ts": "2026-01-16T00:00:00Z",
+      "end_ts": "2026-01-16T23:59:59Z"
+    },
+    "started_at": "2026-01-16T10:30:05Z",
+    "finished_at": "2026-01-16T10:35:10Z",
+    "error": null,
+    "result": {
+      "summary": "成功识别3条攻击路径，匹配2个APT组织",
+      "ttp_similarity": {
+        "attack_tactics": ["TA0001", "TA0002"],
+        "attack_techniques": ["T1190", "T1021"],
+        "similar_apts": ["APT28", "APT29"]
+      },
+      "trace": {
+        "updated_edges": 15,
+        "path_edges": ["edge-1", "edge-2", "edge-3"]
+      }
+    }
+  }
+}
+\end{verbatim}
+
+以上字段由任务执行流水线写入，实现位置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/analyze/pipeline.py} 的 \texttt{run\_analysis\_task()}
+\end{itemize}
+
+\subsection{状态机与进度更新}\label{analysis-state-machine}
+
+\subsubsection{状态机}\label{analysis-states}
+
+状态转移规则定义如下：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-70/analysis-70-03.pdf}
+\caption{状态机}
+\label{fig:analysis-70-03}
+\end{figure}
+
+\textbf{状态转移规则}：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+当前状态 & 可转移状态 & 触发条件 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{queued} & \texttt{running} & 任务执行器开始处理 \\
+\texttt{running} & \texttt{succeeded} & 分析完成且无错误 \\
+\texttt{running} & \texttt{failed} & 分析过程出现异常 \\
+\end{longtable}
+}
+
+\textbf{禁止操作}：
+
+\begin{itemize}
+\tightlist
+\item
+  ❌ \texttt{succeeded} → \texttt{running}（已完成任务不可重入）
+\item
+  ❌ \texttt{failed} → \texttt{running}（失败任务需重新创建）
+\item
+  ❌ \texttt{queued} → \texttt{succeeded}（跳过执行直接完成）
+\item
+  ❌ 任何状态的回退操作
+\end{itemize}
+
+\subsubsection{进度更新规则}\label{analysis-progress}
+
+任务进度由中心机流水线按以下规则更新：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+进度值 & 状态 & 阶段描述 & 更新时机 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+0 & \texttt{queued} & 任务已创建 & 写入任务文档时 \\
+5 & \texttt{running} & 开始执行 & 启动任务执行器时 \\
+20 & \texttt{running} & 准备并行计算 & 数据加载完成后 \\
+70 & \texttt{running} & 写入相似度结果 & TTP 分析完成时 \\
+95 & \texttt{running} & 写回图边属性 & Neo4j 更新完成时 \\
+100 & \texttt{succeeded} & 任务完成 & 所有步骤成功时 \\
+\end{longtable}
+}
+
+\textbf{进度更新示例}：
+
+\begin{verbatim}
+// 阶段 1: 创建任务
+{
+  "task": {
+    "status": "queued",
+    "progress": 0,
+    "started_at": null,
+    "finished_at": null
+  }
+}
+
+// 阶段 2: 开始执行
+{
+  "task": {
+    "status": "running",
+    "progress": 5,
+    "started_at": "2026-01-16T10:30:05Z",
+    "finished_at": null
+  }
+}
+
+// 阶段 3: 计算中
+{
+  "task": {
+    "status": "running",
+    "progress": 70,
+    "started_at": "2026-01-16T10:30:05Z",
+    "finished_at": null
+  }
+}
+
+// 阶段 4: 完成
+{
+  "task": {
+    "status": "succeeded",
+    "progress": 100,
+    "started_at": "2026-01-16T10:30:05Z",
+    "finished_at": "2026-01-16T10:35:10Z"
+  }
+}
+\end{verbatim}
+
+\textbf{失败处理}：
+
+任务执行失败时，必须写入以下字段：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+字段 & 要求 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{status} & 必须为 \texttt{failed} & 标记任务失败 \\
+\texttt{finished\_at} & 必须写入 & 记录失败时间 \\
+\texttt{error} & 必须写入且非空 & 描述失败原因 \\
+\end{longtable}
+}
+
+\textbf{失败示例}：
+
+\begin{verbatim}
+{
+  "task": {
+    "status": "failed",
+    "progress": 35,
+    "started_at": "2026-01-16T10:30:05Z",
+    "finished_at": "2026-01-16T10:31:20Z",
+    "error": "Neo4j query timeout: execution exceeded 30000ms"
+  }
+}
+\end{verbatim}
+
+\subsection{结果读取方式}\label{analysis-result-read}
+
+任务完成后，前端通过图查询接口读取结果。
+
+\subsubsection{查询接口}\label{analysis-query-api}
+
+调用 \texttt{POST\ /api/v1/graph/query} 的 \texttt{analysis\_edges\_by\_task} 动作，按 \texttt{task\_id} 拉取结果边集合。
+
+\textbf{请求示例}：
+
+\begin{verbatim}
+{
+  "action": "analysis_edges_by_task",
+  "params": {
+    "task_id": "trace-550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+\end{verbatim}
+
+\textbf{响应示例}：
+
+\begin{verbatim}
+{
+  "status": "success",
+  "data": {
+    "edges": [
+      {
+        "edge_uid": "edge-1",
+        "source": "node-ssh-server",
+        "target": "node-malicious-ssh-123",
+        "relationship": "CONNECTED_TO",
+        "properties": {
+          "task_id": "trace-550e8400-e29b-41d4-a716-446655440000",
+          "path_order": 1,
+          "is_attack_path": true
+        }
+      },
+      {
+        "edge_uid": "edge-2",
+        "source": "node-malicious-ssh-123",
+        "target": "node-lateral-move-456",
+        "relationship": "EXECUTED_ON",
+        "properties": {
+          "task_id": "trace-550e8400-e29b-41d4-a716-446655440000",
+          "path_order": 2,
+          "is_attack_path": true
+        }
+      }
+    ],
+    "total": 2
+  }
+}
+\end{verbatim}
+
+\subsubsection{查询结果流程图}\label{analysis-query-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-70/analysis-70-04.pdf}
+\caption{查询结果流程图}
+\label{fig:analysis-70-04}
+\end{figure}
+
+接口权威定义见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/88-前端与中心机接口.md}
+\end{itemize}

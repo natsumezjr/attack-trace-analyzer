@@ -1,0 +1,219 @@
+% Manual polished content for: 测试分析报告（基于仓库现状 + 可复现证据）
+% Note: Keep this file under manual/ to avoid being overwritten by generators.
+
+\section{测试分析报告}
+
+\begin{SideBar}
+\textbf{文档定位：}本报告用于说明ATA系统的测试策略、测试范围、证据组织方式与实际测试结果（含缺陷与限制）。\\
+\textbf{内容依据：}以仓库现有实现与可复现命令输出为唯一事实来源；不编造"代码中不存在"或"未执行过"的结论。\\
+\textbf{证据形式：}本报告\Emph{不提供}截图/录屏；所有证据以\Emph{可复现命令输出}（.txt/.json/.log）与\Emph{自动化测试日志}（pytest 输出、覆盖率 htmlcov）为准。\\
+\textbf{参考资料（仓库内权威文档）：}
+\begin{itemize}
+  \item 后端测试说明：\texttt{backend/tests/README.md}
+  \item 验收标准与验收用例：\texttt{docs/20-需求与验收/21-验收标准与验收用例.md}
+  \item 攻击场景与复现剧本：\texttt{docs/20-需求与验收/22-攻击场景与复现剧本.md}
+  \item 本报告的证据日志目录：\texttt{reports/测试分析报告/resources/}
+\end{itemize}
+\end{SideBar}
+
+\begin{KeyBox}
+\textbf{一页总结（以“可复核证据”为准）：}
+\begin{itemize}
+  \item 已生成并归档多类证据：pytest 自动化测试日志、系统脚本输出（Neo4j 导入/ KillChain fallback）、API 烟雾测试（Health / Clients / Events / Findings / Graph / Tasks）。
+  \item 自动化测试结果（2026-01-16）：
+    \begin{itemize}
+      \item 单元测试（\texttt{-m unit}）：\texttt{1 passed, 42 skipped, 183 deselected}（通过）。
+      \item 集成测试（\texttt{tests/integration/}）：\texttt{50 passed, 6 failed}（存在失败用例，详见第 6 节）。
+      \item 端到端系统测试（\texttt{tests/e2e/}）：因夹具作用域问题出现 \texttt{11 errors}（未达到“可直接运行”状态）。
+    \end{itemize}
+  \item 系统级脚本验证：
+    \begin{itemize}
+      \item \texttt{scripts/import\_test\_data.py}：成功导入 \texttt{142} 条事件至 Neo4j（\texttt{543} 节点 / \texttt{299} 边 / \texttt{25} 告警边）。
+      \item \texttt{scripts/test\_killchain.py}（不含 LLM）：成功生成 \texttt{1} 条 KillChain（\texttt{6} 个阶段段落，\texttt{5} 条选中路径）。
+    \end{itemize}
+  \item 重要限制：KillChain 的“LLM 增强解释”测试脚本 \texttt{scripts/test\_analyze.py} 强制要求真实 LLM（如 DeepSeek API Key）；在未配置 API Key 的环境下无法通过（本报告如实记录为\Emph{受限项}）。
+\end{itemize}
+\end{KeyBox}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.96\textwidth]{figures/evidence_flow.pdf}
+  \caption{测试证据组织方式（以可复现命令输出为准，不使用截图/录屏）}
+  \label{fig:test-evidence-flow}
+\end{figure}
+
+\subsection{测试范围与目标}
+
+\subsubsection{测试范围}
+
+本报告聚焦中心机侧（\texttt{backend/}）的可复核能力，覆盖：
+\begin{itemize}
+  \item \textbf{基础可用性：}服务健康检查、核心 API 路由可达；
+  \item \textbf{数据面：}Telemetry（事件）与 Findings（告警）查询接口可用，字段结构符合 ECS 子集；
+  \item \textbf{分析面：}图谱查询接口可用；溯源任务（Trace Task）结果可读取；
+  \item \textbf{自动化测试：}pytest 单元/集成/系统级测试的可运行性与结果（含失败项）；
+  \item \textbf{系统脚本：}基于 fixtures 的 Neo4j 导入、KillChain 流水线（fallback）验证。
+\end{itemize}
+
+不在本报告中\Emph{强行宣称已完成}的内容（若需完整验收，建议按附录复现剧本现场演示）：
+\begin{itemize}
+  \item 客户机侧 Falco/Filebeat/Suricata 在 \textbf{真实 Linux 节点}上的长期稳定采集；
+  \item \textbf{真实 ≥5 台物理/虚拟主机}靶场环境下的全链路压测与录像证据（ATA系统不提供录屏）。
+\end{itemize}
+
+\subsubsection{测试目标}
+
+\begin{itemize}
+  \item \textbf{可复现：}所有“通过/失败/受限”均可由命令复现，不依赖截图说明；
+  \item \textbf{可追溯：}关键分析结果能回链到证据事件（如 \texttt{event.id}、\texttt{custom.evidence.event\_ids}、\texttt{analysis.task\_id}）；
+  \item \textbf{不夸大：}测试失败的用例与原因明确记录，不以“理论上可以”替代“实际通过”。
+\end{itemize}
+
+\subsection{测试环境与依赖}
+
+本次测试在 macOS + Docker 的本地开发环境完成（中心机单机验证），核心依赖如下：
+
+\begin{itemize}
+  \item Docker Desktop + Docker Compose v2（用于 OpenSearch/Neo4j）；
+  \item Python 依赖管理：\texttt{uv}（在 \texttt{backend/.venv} 创建 CPython 3.12 环境）；
+  \item 后端：FastAPI（本地监听 \texttt{8001} 端口）；
+  \item 存储：OpenSearch（\texttt{https://localhost:9200}，自签名证书）、Neo4j（\texttt{bolt://localhost:7687}）。
+\end{itemize}
+
+\textbf{环境快照与证据：}详见 \texttt{reports/测试分析报告/resources/env-snapshot-*.txt}。
+
+\subsection{测试方法与证据组织}
+
+\subsubsection{自动化测试（pytest）}
+
+后端测试位于 \texttt{backend/tests/}，按层级划分为：
+\begin{itemize}
+  \item \textbf{unit：}不依赖外部服务（适合快速回归）；
+  \item \textbf{integration：}依赖 OpenSearch/Neo4j 等外部服务；
+  \item \textbf{system/e2e：}以更贴近业务流程的方式进行黑盒验证。
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.86\textwidth]{figures/test_pyramid.pdf}
+  \caption{后端自动化测试分层（unit/integration/system）与运行开关}
+  \label{fig:test-pyramid}
+\end{figure}
+
+项目采用环境变量控制外部依赖测试是否运行（参见 \texttt{backend/tests/conftest.py} 与 \texttt{backend/tests/README.md}）：
+\begin{itemize}
+  \item \texttt{RUN\_OPENSEARCH\_TESTS=1}：启用 OpenSearch 相关测试（默认跳过）；
+  \item \texttt{RUN\_NEO4J\_TESTS=0}：跳过 Neo4j 相关测试（默认启用）；
+  \item \texttt{RUN\_LLM\_TESTS=1}：启用需要 LLM 的测试（默认跳过）。
+\end{itemize}
+
+\subsubsection{系统脚本（fixtures 驱动）}
+
+除 pytest 外，仓库还提供了可直接运行的脚本用于快速验证关键链路：
+\begin{itemize}
+  \item \texttt{backend/scripts/import\_test\_data.py}：将 \texttt{tests/fixtures/graph/testExample.json} 导入 Neo4j，验证入图能力；
+  \item \texttt{backend/scripts/test\_killchain.py}：在不依赖 LLM 的情况下运行 KillChain 流水线（fallback），验证攻击链构建与回写；
+  \item \texttt{backend/scripts/test\_analyze.py}：强制依赖真实 LLM（受限项；未配置 API Key 时不可通过）。
+\end{itemize}
+
+\subsubsection{API 烟雾测试（无截图）}
+
+为验证“服务可用 + 结果可读取”，本次测试补充了最小 API 烟雾测试（curl 输出即证据）：
+\begin{itemize}
+  \item \texttt{/health}：服务健康；
+  \item \texttt{/api/v1/clients}：客户机注册/轮询状态；
+  \item \texttt{/api/v1/events/search}：事件检索；
+  \item \texttt{/api/v1/findings/search}：告警检索（raw/canonical）；
+  \item \texttt{/api/v1/graph/query}：图谱查询（告警边）；
+  \item \texttt{/api/v1/analysis/tasks}：溯源任务结果读取。
+\end{itemize}
+
+\subsection{测试执行与结果（以证据文件为准）}
+
+为便于复核，本次测试的所有命令输出均已落盘到 \texttt{reports/测试分析报告/resources/}。下表给出本次测试执行清单：
+
+{\def\LTcaptype{none}
+\begin{longtable}[]{@{}p{0.16\textwidth}p{0.52\textwidth}p{0.12\textwidth}p{0.16\textwidth}@{}}
+\toprule\noalign{}
+类别 & 命令（简写） & 结果 & 证据文件 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Unit & \texttt{cd backend \&\& uv run pytest -m unit -q} & 通过 & \texttt{pytest-unit-*.txt} \\
+Integration & \texttt{cd backend \&\& RUN\_OPENSEARCH\_TESTS=1 uv run pytest tests/integration -q} & 部分失败 & \texttt{pytest-integration-only-*.txt} \\
+E2E/System & \texttt{cd backend \&\& RUN\_OPENSEARCH\_TESTS=1 uv run pytest tests/e2e -q} & 夹具错误 & \texttt{pytest-e2e-*.txt} \\
+Neo4j 导入 & \texttt{cd backend \&\& uv run python scripts/import\_test\_data.py} & 通过 & \texttt{system-import-test-data-*.txt} \\
+KillChain (fallback) & \texttt{cd backend \&\& uv run python scripts/test\_killchain.py} & 通过 & \texttt{system-killchain-fallback-*.txt} \\
+API Smoke & \texttt{curl /health,/clients,/events,/findings,/graph,/tasks} & 通过 & \texttt{api-*-*.txt/.json} \\
+\end{longtable}
+}
+
+\subsection{验收项覆盖情况（实事求是）}
+
+本节将验收用例（见附录）与“本次已执行的证据”对齐。为避免“报告写了但代码/环境并未验证”，本表区分\Emph{已执行}与\Emph{仅提供复现步骤}。
+
+符号定义（避免使用截图/特殊符号字体）：
+\begin{itemize}
+  \item \textbf{PASS（已执行）：}已在本机环境运行并产出证据文件；
+  \item \textbf{PARTIAL（部分）：}接口可达/能力存在，但场景要素（多节点真实采集、LLM key 等）不完整或未全量覆盖；
+  \item \textbf{NOT RUN（未执行）：}本次未执行，仅在附录给出复现步骤。
+\end{itemize}
+
+{\def\LTcaptype{none}
+\begin{longtable}[]{@{}p{0.10\textwidth}p{0.40\textwidth}p{0.12\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+验收项 & 目标（简述） & 本次执行 & 证据/备注 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+AC-01 & 多节点在线与轮询拉取 & PARTIAL & \texttt{/api/v1/clients} 返回 \texttt{total=5}；是否为真实 5 台主机取决于靶场部署。 \\
+AC-02 & 多源事件入库与字段规范 & PARTIAL & \texttt{/api/v1/events/search} 有数据（含 \texttt{event.dataset}）；本次样本含模拟数据，未代表真实 Linux 采集全覆盖。 \\
+AC-03 & 告警产生与融合生成 Canonical & PASS & \texttt{/api/v1/findings/search} 同时存在 raw/canonical；canonical 含 \texttt{custom.evidence.event\_ids}。 \\
+AC-04 & 图谱查询与可视化基础数据 & PASS & \texttt{/api/v1/graph/query} 可返回 nodes/edges；含 \texttt{analysis.task\_id} 等属性。 \\
+AC-05 & 创建溯源任务与状态轮询 & PARTIAL & 本次读取到 \texttt{/api/v1/analysis/tasks} 中已完成任务；“从前端创建任务”未在本报告中强行宣称已执行。 \\
+AC-06 & 溯源结果写回与可解释展示 & PARTIAL & 已观察到图边属性中包含 \texttt{analysis.*} 写回字段；解释内容是否来自 LLM 取决于环境配置。 \\
+AC-07 & APT 相似度匹配输出 & PARTIAL & \texttt{/api/v1/analysis/tasks} 返回相似 APT 列表；需 CTI 数据与（可选）LLM 配置配合。 \\
+AC-08 & 报告导出可复现 & NOT RUN & 本次未验证前端导出；建议现场以导出的 Markdown/JSON 文件作为文本证据。 \\
+\end{longtable}
+}
+
+\subsection{失败用例与原因分析（不改代码，记录事实）}
+
+本次在启用外部依赖（OpenSearch/Neo4j）后运行集成测试，出现部分失败用例；端到端系统测试出现夹具作用域错误。根据 pytest 输出，主要问题类别如下：
+
+\subsubsection{集成测试失败（\texttt{tests/integration/}）}
+
+见证据：\texttt{pytest-integration-only-*.txt}。失败项集中在 OpenSearch 增量处理与分析辅助函数：
+\begin{itemize}
+  \item \textbf{时间戳状态：}部分用例断言“last\_processed\_timestamp 非空”，但实际返回 \texttt{None}；
+  \item \textbf{去重逻辑：}部分用例期望过滤结果为空，但实际返回非空（可能与索引状态/时间窗边界有关）；
+  \item \textbf{接口变更：}用例尝试导入 \texttt{\_should\_trigger\_scan}，但目标模块中已不存在该函数（典型的测试/实现不同步）。
+\end{itemize}
+
+以上失败为\Emph{测试结果事实}；由于ATA系统代码不再改动，本报告不在此处给出“已修复”结论，仅作为风险与改进建议记录。
+
+\subsubsection{E2E/System 测试错误（\texttt{tests/e2e/}）}
+
+见证据：\texttt{pytest-e2e-*.txt}。错误核心为夹具不可见：
+\begin{itemize}
+  \item \texttt{tests/e2e/test\_opensearch\_system.py} 依赖夹具 \texttt{initialized\_indices}；
+  \item 该夹具定义在 \texttt{tests/integration/conftest.py}，pytest 默认作用域不会向 \texttt{tests/e2e/} 目录暴露；
+  \item 因此出现 \texttt{fixture 'initialized\_indices' not found} 的系统性错误。
+\end{itemize}
+
+\subsubsection{LLM 相关脚本受限}
+
+见证据：\texttt{system-killchain-analyze-*.txt}。脚本 \texttt{scripts/test\_analyze.py} 强制要求真实 LLM（DeepSeek API Key），未配置时会直接抛出错误并退出。该项在本次测试中按“受限项”记录。
+
+\subsection{结论}
+
+\begin{Takeaway}
+\textbf{结论：}
+\begin{itemize}
+  \item ATA系统在中心机本地环境下完成了多类可复核验证：API 可用、数据可查、告警可融合、图谱可查询、溯源任务结果可读取、KillChain fallback 可运行。
+  \item 自动化测试体系已具备雏形（unit/integration/system 分层），但当前版本存在部分失败与夹具作用域错误；如需提升“可交付质量”，应优先修复测试与实现不同步、以及 e2e 夹具组织问题。
+  \item LLM 增强解释能力在工程上可选：未配置 API Key 时仍可使用 fallback 生成基础连通的攻击链；如需更强解释性，可在有 API Key 的环境下启用。
+\end{itemize}
+\end{Takeaway}

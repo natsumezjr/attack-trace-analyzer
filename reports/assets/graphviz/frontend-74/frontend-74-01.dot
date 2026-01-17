@@ -1,0 +1,56 @@
+digraph "Component Relationship Diagram" {
+    rankdir=TB;
+    node [shape=box, style="filled, rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    subgraph cluster_pages {
+        label="页面层 (青色)";
+        style=filled;
+        fillcolor="#e0f7fa";
+        color="#006064";
+        fontsize=12;
+
+        GraphPage [label="图谱页\n/trace"];
+        DashboardPage [label="总览页\n/dashboard"];
+    }
+
+    subgraph cluster_components {
+        label="组件层 (青色)";
+        style=filled;
+        fillcolor="#b2ebf2";
+        color="#006064";
+        fontsize=12;
+
+        GraphVis [label="图谱可视化\nG6 Component"];
+        TaskList [label="任务列表\nTaskTable"];
+        TaskPanel [label="任务面板\n创建/轮询/进度"];
+        ReportViewer [label="报告查看器\nPDFViewer"];
+        Cards [label="统计卡片\nStatCards"];
+    }
+
+    subgraph cluster_api {
+        label="后端 API (绿色)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#1b5e20";
+        fontsize=12;
+
+        GraphAPI [label="图查询 API\n/api/v1/graph/query"];
+        TaskAPI [label="任务 API\n/api/v1/analysis/tasks"];
+        EventAPI [label="事件搜索 API\n/api/v1/events/search"];
+        FindingAPI [label="发现搜索 API\n/api/v1/findings/search"];
+    }
+
+    GraphPage -> GraphVis;
+    GraphPage -> TaskPanel;
+    GraphPage -> TaskList;
+    GraphPage -> ReportViewer;
+
+    DashboardPage -> Cards;
+
+    GraphVis -> GraphAPI [label="POST 查询图数据"];
+    TaskPanel -> TaskAPI [label="POST 创建任务"];
+    TaskList -> TaskAPI [label="GET 轮询状态"];
+    Cards -> EventAPI [label="POST 统计"];
+    Cards -> FindingAPI [label="POST 统计"];
+}

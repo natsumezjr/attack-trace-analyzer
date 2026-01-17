@@ -1,0 +1,164 @@
+\subsection{图谱回标与边属性}\label{center-65-writeback}
+
+\subsubsection{告警映射与回标规则}\label{center-65-alert-mapping}
+
+\paragraph{输入边界（固定）}\label{center-65-input-boundary}
+
+Neo4j 入图时仅接受以下两类 ECS 文档（严格执行）：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Telemetry：\texttt{event.kind="event"}
+\item
+  Canonical Finding：\texttt{event.kind="alert"} 且 \texttt{event.dataset="finding.canonical"}
+\end{enumerate}
+
+该边界定义属于图谱口径规范，详见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/84-Neo4j实体图谱规范.md} 0.1
+\end{itemize}
+
+\paragraph{Canonical Finding → 告警边（固定）}\label{center-65-canonical-edge}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-65/center-65-01.pdf}
+\caption{告警边映射流程}
+\label{fig:center-65-01}
+\end{figure}
+
+Canonical Finding 在入图阶段映射为一组关系边，其边属性需满足以下固定规则：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  每条边都携带 \texttt{event.id}、\texttt{event.kind}、\texttt{event.dataset}、\texttt{ts\_float}、\texttt{custom.evidence.event\_ids{[}{]}}；
+\item
+  当输入为 Canonical Finding 时，每条边额外携带 \texttt{is\_alarm=true} 标记；
+\item
+  Canonical Finding 的解释字段写入边属性，用于前端展示与溯源：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{rule.*}
+  \item
+    \texttt{threat.*}
+  \item
+    \texttt{event.severity}
+  \item
+    \texttt{custom.finding.*}
+  \end{itemize}
+\end{enumerate}
+
+代码实现位置：
+
+\begin{itemize}
+\tightlist
+\item
+  入图转换：\texttt{backend/app/services/neo4j/ecs\_ingest.py:ecs\_event\_to\_graph()}
+\item
+  告警边标记：\texttt{backend/app/services/neo4j/ecs\_ingest.py} 中 \texttt{edge\_props.setdefault("is\_alarm",\ True)}
+\end{itemize}
+
+\paragraph{证据引用缺失的处理（固定）}\label{center-65-evidence-missing}
+
+Canonical Finding 必须携带 \texttt{custom.evidence.event\_ids{[}{]}}，否则该事件不会入图，视为``无效告警''。
+
+代码实现位置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/neo4j/ecs\_ingest.py} 中对 \texttt{event\_kind=="alert"} 的 \texttt{evidence\_ids} 校验
+\end{itemize}
+
+\subsubsection{写回字段集合与覆盖规则}\label{center-65-writeback-fields}
+
+\paragraph{属性写回流程}\label{center-65-writeback-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-65/center-65-02.pdf}
+\caption{属性写回流程}
+\label{fig:center-65-02}
+\end{figure}
+
+\paragraph{字段映射关系}\label{center-65-field-mapping}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+算法生成字段 & Neo4j 边属性 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{analysis.is\_path\_edge} & \texttt{analysis.is\_path\_edge} & 是否为关键路径边 \\
+\texttt{analysis.score} & \texttt{analysis.score} & 边的权重评分 \\
+\texttt{analysis.remarks} & \texttt{analysis.remarks} & 备注信息 \\
+\texttt{task\_id} & \texttt{analysis.task\_id} & 关联的溯源任务ID \\
+\end{longtable}
+}
+
+\paragraph{工程实现绑定点}\label{center-65-implementation}
+
+写回字段集合与覆盖规则属于规范文档的权威口径，本文件不再重复字段表，仅说明工程实现绑定点：
+
+\begin{itemize}
+\tightlist
+\item
+  权威写回字段口径：\texttt{../../80-规范/85-溯源结果写回规范.md}
+\item
+  写回入口：\texttt{backend/app/services/neo4j/db.py:write\_analysis\_results()}
+\item
+  覆盖写实现：\texttt{backend/app/services/neo4j/db.py:\_write\_analysis\_result\_tx()}（先清空字段后写入）
+\end{itemize}
+
+溯源任务在算法侧生成写回字段的入口：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/analyze/trace.py:compute\_trace()}（生成 \texttt{analysis.*} 字段）
+\item
+  \texttt{backend/app/services/analyze/pipeline.py:run\_analysis\_task()}（调用写回）
+\end{itemize}
+
+\subsubsection{前端读取与过滤规则}\label{center-65-frontend-read}
+
+前端读取``告警边''与``溯源写回边''时使用不同的查询动作：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  告警边展示：\texttt{POST\ /api/v1/graph/query}，\texttt{action="alarm\_edges"}
+\item
+  任务写回结果：\texttt{POST\ /api/v1/graph/query}，\texttt{action="analysis\_edges\_by\_task"}，并传入 \texttt{task\_id}
+\end{enumerate}
+
+当 \texttt{action="analysis\_edges\_by\_task"} 时：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{only\_path=true}：只返回 \texttt{analysis.is\_path\_edge=true} 的关键路径边
+\item
+  \texttt{only\_path=false}：返回该任务写回的全部边（包含非关键路径边）
+\end{itemize}
+
+接口字段的权威定义详见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/88-前端与中心机接口.md}
+\end{itemize}

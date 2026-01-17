@@ -1,0 +1,62 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_api {
+        label="API 路由层\nbackend/app/api/";
+        style=filled;
+        fillcolor="#fff3e0";
+        color="#e65100";
+        penwidth=2;
+
+        Router [label="router.py\n总路由", shape=box, style="rounded, filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+        GraphAPI [label="graph.py\n图查询API", shape=box, style="rounded, filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+        TaskAPI [label="task.py\n任务API", shape=box, style="rounded, filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+    }
+
+    subgraph cluster_services {
+        label="服务层\nbackend/app/services/";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#1b5e20";
+        penwidth=2;
+
+        Poller [label="client_poller.py\n轮询服务", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+        OpensearchSvc [label="opensearch/\n存储服务", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+        Neo4jSvc [label="neo4j/\n图服务", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+        AnalyzeSvc [label="analyze/\n溯源服务", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+    }
+
+    subgraph cluster_core {
+        label="核心层\nbackend/app/core/";
+        style=filled;
+        fillcolor="#e3f2fd";
+        color="#1565c0";
+        penwidth=2;
+
+        Config [label="config.py\n配置管理", shape=box, style="rounded, filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+        Logger [label="logger.py\n日志", shape=box, style="rounded, filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+    }
+
+    Router -> GraphAPI;
+    Router -> TaskAPI;
+
+    GraphAPI -> OpensearchSvc [label="查询"];
+    GraphAPI -> Neo4jSvc [label="查询"];
+
+    TaskAPI -> AnalyzeSvc [label="创建"];
+    TaskAPI -> AnalyzeSvc [label="查询"];
+
+    Poller -> OpensearchSvc [label="入库"];
+    Poller -> Neo4jSvc [label="入图"];
+
+    AnalyzeSvc -> Neo4jSvc [label="读取"];
+    AnalyzeSvc -> Neo4jSvc [label="写回"];
+
+    Config -> Poller [style=dashed, label="配置"];
+    Config -> AnalyzeSvc [style=dashed, label="配置"];
+    Logger -> Poller [style=dashed, label="日志"];
+    Logger -> AnalyzeSvc [style=dashed, label="日志"];
+}

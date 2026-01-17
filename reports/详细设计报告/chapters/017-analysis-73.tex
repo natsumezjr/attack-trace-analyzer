@@ -1,0 +1,363 @@
+\subsection{TTP 相似度匹配}\label{sec:ttp-similarity-matching}
+
+\subsubsection{输入与特征抽取}\label{subsec:input-feature-extraction}
+
+TTP 相似度匹配以 Canonical Finding 作为输入样本，提取 ATT\&CK 的 tactic 与 technique 集合，计算与 CTI 中 intrusion-set（APT 组织）的相似度。
+
+实现绑定点（以代码为准）：
+
+\begin{itemize}
+\tightlist
+\item
+  入口服务：\texttt{backend/app/services/analyze/ttp\_similarity/service.py}
+\item
+  HTTP 接口：\texttt{backend/app/services/analyze/ttp\_similarity/router.py}
+\end{itemize}
+
+\paragraph{输入参数（固定）}\label{subsec:input-parameters}
+
+HTTP 接口输入字段固定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{host\_id}：ECS \texttt{host.id}
+\item
+  \texttt{start\_ts}：ISO 8601 起始时间（包含边界）
+\item
+  \texttt{end\_ts}：ISO 8601 结束时间（包含边界）
+\end{itemize}
+
+当 \texttt{end\_ts\ \textless{}\ start\_ts} 时，接口返回 HTTP 400 错误。
+
+\paragraph{Canonical Finding 拉取范围（固定）}\label{subsec:canonical-finding-range}
+
+系统从 OpenSearch 的 Canonical Findings 索引中拉取样本，查询条件固定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{event.dataset\ ==\ "finding.canonical"}
+\item
+  \texttt{host.id\ ==\ host\_id}
+\item
+  \texttt{@timestamp} 在 \texttt{{[}start\_ts,\ end\_ts{]}}（包含边界）
+\end{itemize}
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:fetch\_attack\_ttps\_from\_canonical\_findings()}。
+
+\paragraph{Technique 提取与规范化（固定）}\label{subsec:technique-extraction-normalization}
+
+每条 Canonical Finding 的 technique 提取规则固定如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  按固定顺序读取：优先读取嵌套字段 \texttt{threat.technique.id}；
+\item
+  若嵌套字段不存在，则读取平铺字段 \texttt{threat.technique.id}；
+\item
+  将 technique id 标准化为大写，满足正则表达式：\texttt{Tdddd} 或 \texttt{Tdddd.ddd}；
+\item
+  过滤占位值：\texttt{UNKNOWN}、\texttt{TBD}、\texttt{T0000}、\texttt{T0000.xxx}；
+\item
+  若 technique 为子技术（如 \texttt{T1055.012}），则展开为集合 \texttt{\{T1055.012,\ T1055\}}。
+\end{enumerate}
+
+实现绑定点：
+
+\begin{itemize}
+\tightlist
+\item
+  解析与过滤：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:\_normalize\_technique\_id()}
+\item
+  子技术展开：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:\_expand\_technique\_ids()}
+\end{itemize}
+
+\paragraph{Tactic 提取与规范化（固定）}\label{subsec:tactic-extraction-normalization}
+
+每条 Canonical Finding 的 tactic 提取规则固定如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  按固定顺序读取：优先读取平铺字段 \texttt{threat.tactic.id}；
+\item
+  若平铺字段不存在，则读取嵌套字段 \texttt{threat.tactic.id}；
+\item
+  标准化为大写，满足正则表达式：\texttt{TAdddd}；
+\item
+  过滤占位值：\texttt{UNKNOWN}、\texttt{TBD}、\texttt{TA0000}。
+\end{enumerate}
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:\_normalize\_tactic\_id()}。
+
+\subsubsection{CTI 数据与预处理}\label{subsec:cti-data-preprocessing}
+
+\paragraph{CTI 文件路径解析（固定）}\label{subsec:cti-file-path-resolution}
+
+系统加载本地 ATT\&CK Enterprise CTI（STIX bundle JSON），路径解析规则固定如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  读取环境变量 \texttt{ATTACK\_CTI\_PATH}；
+\item
+  若 \texttt{ATTACK\_CTI\_PATH} 为空字符串，则使用默认路径：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{backend/app/services/analyze/ttp\_similarity/cti/enterprise-attack.json}
+  \end{itemize}
+\item
+  若 \texttt{ATTACK\_CTI\_PATH} 为绝对路径，则直接使用该路径；
+\item
+  若 \texttt{ATTACK\_CTI\_PATH} 为相对路径，则按顺序尝试：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    以当前工作目录为基准的相对路径；
+  \item
+    以 \texttt{backend} 根目录为基准的相对路径（若路径以 \texttt{backend/} 开头，则自动去除该前缀）。
+  \end{itemize}
+\item
+  若最终路径不存在，则抛出 \texttt{FileNotFoundError}，接口返回 HTTP 500 错误。
+\end{enumerate}
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:get\_enterprise\_cti\_index()}。
+
+\paragraph{CTI 索引构建（固定）}\label{subsec:cti-index-construction}
+
+系统将 STIX bundle 构建为内存索引，索引内容固定如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{intrusion-set}：建立 \texttt{intrusion\_set\_stix\_id\ -\textgreater{}\ (display\_id,\ name)} 映射；其中 \texttt{display\_id} 的取值规则为：若存在 ATT\&CK 外部编号（\texttt{Gdddd}），则使用该编号，否则使用 stix id；
+\item
+  \texttt{attack-pattern}：建立 \texttt{attack\_pattern\_stix\_id\ -\textgreater{}\ technique\_id} 映射；technique id 来自 \texttt{external\_references.source\_name="mitre-attack"} 的 \texttt{external\_id}；
+\item
+  \texttt{x-mitre-tactic}：建立 tactic shortname（或 name）到 tactic id（\texttt{TAdddd}）的映射；
+\item
+  \texttt{attack-pattern.kill\_chain\_phases}：派生 \texttt{technique\_id\ -\textgreater{}\ tactics} 映射；子技术与父技术共享该 tactic 映射；
+\item
+  \texttt{relationship(uses)}：派生 \texttt{intrusion\_set\_stix\_id\ -\textgreater{}\ techniques} 映射（并将子技术展开到父技术）。
+\end{enumerate}
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:build\_enterprise\_cti\_index()}。
+
+\paragraph{TF-IDF 权重（固定公式）}\label{subsec:tf-idf-weights}
+
+系统将 intrusion-set 集合作为"文档集合"计算 IDF：
+
+\begin{itemize}
+\tightlist
+\item
+  设 intrusion-set 文档数为 \texttt{N}；
+\item
+  对任意 technique id，设文档频次为 \texttt{df}；
+\item
+  technique 的 IDF 定义为：\texttt{idf\ =\ ln((N\ +\ 1)\ /\ (df\ +\ 1))\ +\ 1.0}；
+\item
+  tactic 的 IDF 使用相同公式（以 tactic 集合作为特征）。
+\end{itemize}
+
+并计算每个 intrusion-set 的 L2 范数：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{group\_norm}：technique TF-IDF 向量的 L2 范数；
+\item
+  \texttt{group\_tactic\_norm}：tactic TF-IDF 向量的 L2 范数。
+\end{itemize}
+
+\subparagraph{向量化示意}\label{subsec:vectorization-illustration}
+
+TTP 标签到 TF-IDF 向量的转换过程如图所示：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-73/analysis-73-01.pdf}
+\caption{TTP 向量化示意}
+\label{fig:analysis-73-01}
+\end{figure}
+
+\subsubsection{相似度计算}\label{subsec:similarity-calculation}
+
+\paragraph{算法流程}\label{subsec:algorithm-flow}
+
+TTP 相似度匹配的完整处理流程如图所示：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-73/analysis-73-02.pdf}
+\caption{TTP 相似度匹配算法流程}
+\label{fig:analysis-73-02}
+\end{figure}
+
+\paragraph{相似度向量（固定）}\label{subsec:similarity-vectors}
+
+系统使用二值 TF（出现记 1，不出现记 0）的 TF-IDF 向量，并采用余弦相似度计算。
+
+余弦分子 dot 的定义固定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  仅对交集项求和：\texttt{dot\ =\ Σ\ (idf(t)\^{}2)}。
+\end{itemize}
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:\_cosine\_from\_intersection\_weights()}。
+
+\paragraph{综合分数（固定）}\label{subsec:composite-score}
+
+每个 intrusion-set 的综合相似度分数由两部分组成：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{tech\_score}：attack techniques 与 intrusion-set techniques 的余弦相似度；
+\item
+  \texttt{tactic\_score}：attack tactics 与 intrusion-set tactics 的余弦相似度。
+\end{enumerate}
+
+综合分数计算公式为：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{score\ =\ (1\ -\ tactic\_weight)\ *\ tech\_score\ +\ tactic\_weight\ *\ tactic\_score}
+\item
+  其中 \texttt{tactic\_weight\ =\ 0.5}
+\end{itemize}
+
+当 \texttt{score\ \textless{}=\ 0.0} 时，该 intrusion-set 不进入候选集合。
+
+实现绑定点：\texttt{backend/app/services/analyze/ttp\_similarity/service.py:rank\_similar\_intrusion\_sets()}。
+
+\subsubsection{Top3 输出结构}\label{subsec:top3-output-structure}
+
+\paragraph{TopK 与解释字段（固定）}\label{subsec:topk-explanation-fields}
+
+输出规则固定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  TopK：\texttt{top\_k\ =\ 3}
+\item
+  每个候选的解释字段个数：\texttt{explain\_top\_n\ =\ 5}
+\end{itemize}
+
+对于每个 TopK intrusion-set，系统输出以下内容：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{intrusion\_set.id}：若 CTI 中存在 ATT\&CK 外部编号（如 \texttt{G0016}），则输出该编号，否则输出 intrusion-set 的 stix id；
+\item
+  \texttt{intrusion\_set.name}：组织名称；
+\item
+  \texttt{similarity\_score}：综合相似度；
+\item
+  \texttt{top\_techniques{[}{]}}：交集 technique 按 \texttt{technique\_idf} 降序排列的前 \texttt{explain\_top\_n} 个；
+\item
+  \texttt{top\_tactics{[}{]}}：交集 tactic 按 \texttt{tactic\_idf} 降序排列的前 \texttt{explain\_top\_n} 个。
+\end{enumerate}
+
+\paragraph{HTTP Response（固定字段）}\label{subsec:http-response-fields}
+
+接口返回字段固定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{host\_id}
+\item
+  \texttt{start\_ts}
+\item
+  \texttt{end\_ts}
+\item
+  \texttt{attack\_tactics{[}{]}}（排序后输出）
+\item
+  \texttt{attack\_techniques{[}{]}}（过滤后输出）
+\item
+  \texttt{similar\_apts{[}{]}}（最多 3 项）
+\end{itemize}
+
+\subparagraph{Top3 输出示例}\label{subsec:top3-output-example}
+
+\begin{verbatim}
+{
+  "host_id": "i-0abc123def456",
+  "start_ts": "2024-01-01T00:00:00Z",
+  "end_ts": "2024-01-01T23:59:59Z",
+  "attack_tactics": [
+    {"id": "TA0001", "name": "Initial Access"},
+    {"id": "TA0006", "name": "Credential Access"}
+  ],
+  "attack_techniques": [
+    {"id": "T1078", "name": "Valid Accounts"},
+    {"id": "T1110", "name": "Brute Force"},
+    {"id": "T1021", "name": "Remote Services"}
+  ],
+  "similar_apts": [
+    {
+      "intrusion_set": {
+        "id": "G0016",
+        "name": "APT28"
+      },
+      "similarity_score": 0.85,
+      "top_techniques": [
+        {"technique_id": "T1078", "technique_idf": 2.1},
+        {"technique_id": "T1110", "technique_idf": 1.8}
+      ],
+      "top_tactics": [
+        {"tactic_id": "TA0001", "tactic_idf": 1.2},
+        {"tactic_id": "TA0006", "tactic_idf": 0.9}
+      ]
+    },
+    {
+      "intrusion_set": {
+        "id": "G0015",
+        "name": "APT29"
+      },
+      "similarity_score": 0.72,
+      "top_techniques": [
+        {"technique_id": "T1078", "technique_idf": 2.1}
+      ],
+      "top_tactics": [
+        {"tactic_id": "TA0001", "tactic_idf": 1.2}
+      ]
+    },
+    {
+      "intrusion_set": {
+        "id": "G0035",
+        "name": "Lazarus Group"
+      },
+      "similarity_score": 0.65,
+      "top_techniques": [
+        {"technique_id": "T1021", "technique_idf": 1.5}
+      ],
+      "top_tactics": []
+    }
+  ]
+}
+\end{verbatim}
+
+字段结构的权威口径见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/88-前端与中心机接口.md}
+\end{itemize}

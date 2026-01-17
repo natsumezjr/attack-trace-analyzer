@@ -1,0 +1,48 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_producers {
+        label="数据生产者";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e1f5fe";
+
+        FalcoECS [label="falco-ecs\n发布到 data.falco", fillcolor="#e1f5fe"];
+        FilebeatDetector [label="filebeat detector\n发布到 data.filebeat", fillcolor="#e1f5fe"];
+        SuricataExporter [label="suricata exporter\n发布到 data.suricata", fillcolor="#e1f5fe"];
+    }
+
+    subgraph cluster_rabbitmq {
+        label="RabbitMQ 服务器";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#fff3e0";
+
+        QFalco [label="队列: data.falco\ndurable 为 true", shape=folder, fillcolor="#fff3e0"];
+        QFilebeat [label="队列: data.filebeat\ndurable 为 true", shape=folder, fillcolor="#fff3e0"];
+        QSuricata [label="队列: data.suricata\ndurable 为 true", shape=folder, fillcolor="#fff3e0"];
+    }
+
+    subgraph cluster_consumer {
+        label="数据消费者";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f3e5f5";
+
+        Backend [label="客户机 Backend\nGin API", fillcolor="#f3e5f5"];
+        APIS [label="\nGET /falco\nGET /filebeat\nGET /suricata", fillcolor="#f3e5f5"];
+    }
+
+    FalcoECS -> QFalco [label="publish"];
+    FilebeatDetector -> QFilebeat [label="publish"];
+    SuricataExporter -> QSuricata [label="publish"];
+
+    Backend -> QFalco [label="basic.get + ack"];
+    Backend -> QFilebeat [label="basic.get + ack"];
+    Backend -> QSuricata [label="basic.get + ack"];
+
+    Backend -> APIS;
+}

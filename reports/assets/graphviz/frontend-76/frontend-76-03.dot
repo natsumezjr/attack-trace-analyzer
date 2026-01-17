@@ -1,0 +1,17 @@
+digraph {
+    rankdir=LR;
+    node [fontname="Arial", shape=box, style="rounded"];
+
+    Trigger [label="User Click\nExport Report", fillcolor="#e0f7fa"];
+    Collect [label="Collect Data\n4 API Requests", fillcolor="#e8f5e9"];
+    Template [label="Apply Report Template\nFixed Section Structure", fillcolor="#e8f5e9"];
+    Render [label="Render Report\nSort and Format", fillcolor="#e8f5e9"];
+    Validate [label="Reproducibility Check\nExclude server_time", fillcolor="#e8f5e9"];
+    Download [label="Generate File\nMarkdown Download", fillcolor="#e0f7fa"];
+
+    Trigger -> Collect;
+    Collect -> Template;
+    Template -> Render;
+    Render -> Validate;
+    Validate -> Download;
+}

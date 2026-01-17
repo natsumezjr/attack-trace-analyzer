@@ -1,0 +1,460 @@
+\section{概要设计报告}\label{outline-design-report}
+
+本文件定义系统的\textbf{总体架构与关键机制}，重点包括：
+
+\begin{itemize}
+\tightlist
+\item
+  中心机单定时器顺序流水线架构
+\item
+  前端可视化查询链路
+\item
+  面向教师交互的异步溯源任务模型
+\item
+  三大模块（OpenSearch、Neo4j、Analysis）的边界与协作方式
+\end{itemize}
+
+本文件不重复以下文档的细节：
+
+\begin{itemize}
+\tightlist
+\item
+  字段口径：\texttt{../80-规范/81-ECS字段规范.md}
+\item
+  图谱口径：\texttt{../80-规范/84-Neo4j实体图谱规范.md}
+\item
+  环境变量：\texttt{../80-规范/89-环境变量与配置规范.md}
+\item
+  客户机与中心机接口：\texttt{../80-规范/87-客户机与中心机接口.md}
+\item
+  OpenSearch 存储：\texttt{../50-详细设计/中心机/}\\ \texttt{62-OpenSearch存储与索引治理.md}
+\item
+  Neo4j 入图与图查询：\texttt{../50-详细设计/中心机/}\\ \texttt{64-Neo4j入图与图查询.md}
+\item
+  Analysis 任务模型：\texttt{../50-详细设计/分析/}\\ \texttt{70-任务模型与状态机.md}
+\end{itemize}
+
+\subsection{总体架构}\label{overall-architecture}
+
+\subsubsection{术语与缩略语}\label{terminology}
+
+为保证文档表述的一致性，本节定义核心术语：
+
+{\def\LTcaptype{none} % do not increment counter
+\small
+\begin{longtable}[]{@{}p{0.2\textwidth}p{0.25\textwidth}p{0.45\textwidth}@{}}
+\toprule\noalign{}
+术语 & 英文 & 定义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{客户机（Client）} & Client & 部署在被监控主机上的数据采集与转换节点，采集 Falco、Filebeat、Suricata 三类数据源，转换为 ECS 格式并缓冲在本地队列 \\
+\textbf{中心机（Center）} & Center Server & 汇聚数据、执行检测与分析的核心服务节点，承担轮询拉取、入库、检测融合、入图、对外 API 与异步溯源任务 \\
+\textbf{Telemetry} & Telemetry & 遥测数据，指未经检测规则触发的原始观测事件，\texttt{event.kind="event"} \\
+\textbf{Raw Finding} & Raw Finding & 由单一检测规则（如 Sigma 规则、Security Analytics 检测器）产生的初步告警，\texttt{event.kind="alert"} 且 \texttt{dataset!="canonical"} \\
+\textbf{Canonical Finding} & Canonical Finding & 经融合去重后的标准化告警，\texttt{event.kind="alert"} 且 \texttt{dataset="finding.canonical"}，用于图谱入图与溯源分析主输入 \\
+\textbf{溯源任务（Trace Task）} & Trace Task & 以目标节点为起点、时间窗为边界的溯源分析任务，异步执行并在完成后将结果写回 Neo4j 边属性 \\
+\textbf{TTP} & Tactics, Techniques, and Procedures & 战术、技术与过程，指 MITRE ATT\&CK 框架中对攻击行为的分类与描述 \\
+\textbf{ECS} & Elastic Common Schema & Elastic 公司定义的通用事件字段规范，用于统一不同数据源的字段命名 \\
+\textbf{实体图谱} & Entity Graph & 以 Host、User、Process、File、IP、Domain 等实体为节点、以事件为边构成的属性图，存储于 Neo4j \\
+\textbf{关键路径} & Critical Path & 溯源任务计算出的攻击传播路径，由边属性 \texttt{analysis.is\_path\_edge=true} 标记 \\
+\textbf{顺序流水线} & Sequential Pipeline & 中心机使用单个定时器串行执行轮询、存储、检测、入图四个步骤的架构模式 \\
+\end{longtable}
+}
+
+\subsubsection{系统组成}\label{system-components}
+
+系统由客户机侧和中心机侧组成：
+
+\begin{itemize}
+\tightlist
+\item
+  客户机侧：采集、转换、本地缓冲、对外提供拉取接口
+\item
+  中心机侧：定时拉取、入库、检测、融合、入图、对外 API、异步溯源与报告
+\end{itemize}
+
+\subsubsection{系统架构图（逻辑视图）}\label{architecture-logic-view}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/outline-40-01.pdf}
+\caption{系统架构图}
+\label{fig:outline-40-01}
+\end{figure}
+
+\subsection{核心数据分层（中心机视角）}\label{data-layers}
+
+\subsubsection{数据分层架构}\label{data-layer-architecture}
+
+系统采用以下数据层次（从底到顶）：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/outline-40-02.pdf}
+\caption{数据分层架构}
+\label{fig:outline-40-02}
+\end{figure}
+
+\subsubsection{数据层次说明}\label{data-layer-description}
+
+{\def\LTcaptype{none} % do not increment counter
+\small
+\begin{longtable}[]{@{}p{0.12\textwidth}p{0.22\textwidth}p{0.25\textwidth}p{0.2\textwidth}p{0.15\textwidth}@{}}
+\toprule\noalign{}
+层次 & 名称 & 判定条件 & 存储位置 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Layer 1} & Telemetry（事实层） & \texttt{event.kind="event"} & OpenSearch \texttt{ecs-events-*} & 原始事件检索、检测输入 \\
+\textbf{Layer 2} & Raw Findings（原始告警层） & \texttt{event.kind="alert"} 且 \texttt{dataset!="canonical"} & OpenSearch \texttt{raw-findings-*} & 原始告警审计、融合输入 \\
+\textbf{Layer 3} & Canonical Findings（规范告警层） & \texttt{event.kind="alert"} 且 \texttt{dataset="canonical"} & OpenSearch \texttt{canonical-findings-*} & 图谱与溯源主输入 \\
+\textbf{Layer 4} & Entity Graph（图谱层） & Telemetry + Canonical 转换 & Neo4j 节点/边 & 图查询、路径分析 \\
+\textbf{Layer 5} & Trace Task（溯源任务层） & 异步任务创建 & OpenSearch \texttt{analysis-tasks-*} + Neo4j 边属性 & 任务状态、溯源结果 \\
+\end{longtable}
+}
+
+\begin{quote}
+说明：攻击链作为展示结构，由图谱与任务结果共同承载。前端展示时以图谱边序列及边属性为主，不依赖单独的链路索引。
+\end{quote}
+
+\subsection{中心机定时流水线（单定时器顺序流水线）}\label{sequential-pipeline}
+
+\subsubsection{调度原则}\label{scheduling-principles}
+
+\begin{itemize}
+\tightlist
+\item
+  中心机必须使用\textbf{单一}定时器触发流水线
+\item
+  定时器周期由环境变量 \texttt{CENTER\_POLL\_INTERVAL\_SECONDS} 控制，默认值为 \texttt{5} 秒
+\item
+  同一时间只允许存在一个流水线实例运行：当上一次流水线未结束时，新的定时触发必须被跳过，避免并发写入导致的数据漂移与重复工作
+\end{itemize}
+
+\subsubsection{设计决策：为什么采用单定时器顺序流水线架构}\label{sequential-pipeline-decision}
+
+\textbf{决策内容}：采用单个定时器串行执行轮询、存储、检测、入图四个步骤，而非并发或事件驱动架构
+
+\textbf{决策依据}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{数据一致性保证}：串行执行避免了并发写入导致的事件顺序错乱，确保 Telemetry → Raw → Canonical → Graph 的严格因果顺序
+\item
+  \textbf{资源可控性}：单线程模型使 CPU、内存、网络带宽消耗可预测，避免高并发场景下的资源竞争
+\item
+  \textbf{故障排查简化}：串行流水线的调用链清晰，便于通过日志追踪问题根因
+\item
+  \textbf{实现简洁性}：避免引入分布式锁、消息队列去重等复杂机制
+\end{enumerate}
+
+\textbf{代价与权衡}：
+
+\begin{itemize}
+\tightlist
+\item
+  吞吐量上限受限于单线程处理速度，预计可支撑约 10 个客户机规模
+\item
+  单步骤故障会导致后续步骤阻塞，需通过快速失败与错误隔离缓解
+\end{itemize}
+
+\subsubsection{流水线输入与输出}\label{pipeline-inputs-outputs}
+
+\begin{itemize}
+\tightlist
+\item
+  输入：所有已注册客户机的新数据（由轮询拉取接口返回，格式为 ECS 文档）
+\item
+  输出：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    OpenSearch：Telemetry、Raw Findings、Canonical Findings、Tasks
+  \item
+    Neo4j：Entity Graph（含溯源任务写回的边属性）
+  \end{itemize}
+\end{itemize}
+
+\subsubsection{四步顺序与职责（每次 tick 内严格顺序执行）}\label{four-steps-sequential}
+
+\paragraph{Step 1：从客户机拉取数据}\label{step-1-poll-data}
+
+对每个已注册客户机：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  中心机读取注册表条目（含 \texttt{listen\_url}、\texttt{client\_token\_hash} 等元数据）
+\item
+  调用客户机拉取接口（见 \texttt{../80-规范/87-客户机与中心机接口.md}）
+\item
+  客户机从 RabbitMQ 队列中取出消息并返回 ECS 文档列表：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    队列为空则返回空数组
+  \item
+    拉取行为会消费队列中的消息（队列语义保证增量）
+  \end{itemize}
+\end{enumerate}
+
+\paragraph{Step 2：写入 OpenSearch（字段处理）}\label{step-2-write-opensearch}
+
+中心机必须对每条 ECS 文档执行字段处理（细节见 \texttt{../50-详细设计/中心机/62-OpenSearch存储与索引治理.md} 与 \texttt{../80-规范/81-ECS字段规范.md}）：
+
+\begin{itemize}
+\tightlist
+\item
+  三时间字段补齐与覆盖规则
+\item
+  \texttt{event.kind} 与 \texttt{event.dataset} 校验
+\item
+  \texttt{event.id} 补齐与幂等去重
+\item
+  按 \texttt{event.kind/event.dataset} 路由写入对应索引
+\end{itemize}
+
+\paragraph{Step 3：Store-first 检测 + Raw→Canonical 融合}\label{step-3-detection-fusion}
+
+中心机必须在每个 tick 内执行：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  触发 Store-first 检测：由 OpenSearch Security Analytics 对 Telemetry 索引执行扫描
+\item
+  读取检测产生的 Findings，并转换为 ECS Finding 文档，写入 \texttt{raw-findings-*}
+\item
+  对指定时间窗内的 Raw Findings 执行融合去重，生成 Canonical Findings，写入 \texttt{canonical-findings-*}
+\end{enumerate}
+
+融合去重的指纹规则、provider 合并规则与幂等规则由 \texttt{../50-详细设计/中心机/62-OpenSearch存储与索引治理.md} 定义。
+
+\begin{quote}
+实现口径（与当前代码对齐）：Step 3 在每个 tick 内固定执行（不提供开关），用于持续产出 Raw→Canonical 的规范告警层
+\end{quote}
+
+\paragraph{Step 4：触发 ECS→Graph 写入 Neo4j}\label{step-4-write-neo4j}
+
+中心机必须在每个 tick 内执行入图：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  以 Canonical Findings 为主，补充必要的 Telemetry（用于补边与证据回溯）
+\item
+  对每条输入文档执行 ECS→Graph 转换
+\item
+  将节点/边写入 Neo4j，并满足 \texttt{../80-规范/84-Neo4j实体图谱规范.md} 的唯一键与边属性规范
+\item
+  边必须写入 \texttt{ts\_float}（数值时间戳），支撑时间窗查询与图算法投影
+\end{enumerate}
+
+\begin{quote}
+实现口径（与当前代码对齐）：Step 4 在每个 tick 内固定执行；入图以 \texttt{event.ingested}（中心机入库时间）为窗口边界，确保本 tick 生成的数据不会遗漏
+\end{quote}
+
+\subsubsection{流水线时序图}\label{pipeline-timing-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/outline-40-03.pdf}
+\caption{流水线时序图}
+\label{fig:outline-40-03}
+\end{figure}
+
+流水线按照以下严格顺序执行（每个 tick 内）：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\item \textbf{Step 1: 拉取数据} - 轮询服务从客户机集群拉取 ECS 事件
+\item \textbf{Step 2: 写入 OpenSearch} - 批量存储事件，字段处理与去重
+\item \textbf{Step 3: 检测与融合} - Store-first 检测生成 Raw Findings，融合去重生成 Canonical Findings
+\item \textbf{Step 4: 入图 Neo4j} - 将 Canonical Findings 和 Telemetry 批量写入图谱
+\end{enumerate}
+
+整个流程由定时器（5s 周期）触发，单线程串行执行，确保数据一致性。
+
+\subsection{前端可视化查询链路}\label{frontend-visualization}
+
+\subsubsection{查询边界}\label{query-boundaries}
+
+\begin{itemize}
+\tightlist
+\item
+  Telemetry 与 Findings 的检索由 OpenSearch 提供
+\item
+  图谱可视化（节点/边）与路径查询由 Neo4j 提供
+\item
+  前端不得直连数据库，只通过后端 API 访问
+\end{itemize}
+
+\subsubsection{图可视化最小闭环}\label{graph-visualization-loop}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  前端请求后端图查询接口（动作包含：时间窗边查询、告警边查询、时间窗最短路）
+\item
+  后端调用 Neo4j 模块，返回图数据（nodes/edges）
+\item
+  前端渲染图，允许教师点击节点查看其属性与相关边的证据引用
+\end{enumerate}
+
+对应 API 的对外形状由后端路由定义（实现已存在：\texttt{/api/v1/graph/query}），模块内部规则见 \texttt{../50-详细设计/中心机/64-Neo4j入图与图查询.md}。
+
+\subsection{异步溯源任务（create\_task）}\label{async-trace-tasks}
+
+\subsubsection{为什么必须异步}\label{why-async}
+
+节点溯源可能涉及：
+
+\begin{itemize}
+\tightlist
+\item
+  子图扩展与多跳查询
+\item
+  图算法（最短路、风险权重路径等）
+\item
+  解释性生成（TTP 解释与文本说明）
+\end{itemize}
+
+这些步骤耗时不稳定，必须以异步任务执行，并对前端提供可轮询的进度状态。
+
+\subsubsection{任务模型（状态机）}\label{task-state-machine}
+
+每个溯源任务在 OpenSearch \texttt{analysis-tasks-*} 里保存一条任务文档，任务状态只能取以下值之一：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/outline-40-04.pdf}
+\caption{任务状态机}
+\label{fig:outline-40-04}
+\end{figure}
+
+\textbf{状态说明}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{queued}：已创建，等待执行
+\item
+  \texttt{running}：执行中
+\item
+  \texttt{succeeded}：已完成
+\item
+  \texttt{failed}：失败（含错误信息）
+\end{itemize}
+
+\textbf{状态转移约束}：
+
+\begin{itemize}
+\tightlist
+\item
+  只允许 \texttt{queued\ →\ running\ →\ succeeded/failed} 单向转移
+\item
+  禁止回退与跳转（如 \texttt{running\ →\ queued}、\texttt{queued\ →\ succeeded}）
+\end{itemize}
+
+\subsubsection{创建、执行与结果写回}\label{task-execution-writeback}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  前端在图上选定目标节点后，请求后端创建任务
+\item
+  后端立即返回 \texttt{task\_id}
+\item
+  Analysis 模块异步执行任务：从 Neo4j 读取数据、执行算法、得到关键边集合、风险评分、Technique/Tactic 摘要及解释文本
+\item
+  Analysis 模块把结果写回 Neo4j 边属性，形成被标注的图
+\item
+  前端轮询任务状态，任务完成后再次请求图查询接口，读取边属性并展示溯源结果
+\end{enumerate}
+
+对应后端 API（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  创建任务：\texttt{POST\ /api/v1/analysis/tasks}
+\item
+  查询任务状态：\texttt{GET\ /api/v1/analysis/tasks/\{task\_id\}}
+\item
+  拉取写回边：\texttt{POST /api/v1/graph/query}\\ \hspace*{1.5em}（\texttt{analysis\_edges\_by\_task} 或 \texttt{edges\_in\_window} + 前端过滤）
+\end{itemize}
+
+写回字段命名、覆盖规则与数据类型由 \texttt{../50-详细设计/分析/70-任务模型与状态机.md} 与 \texttt{../50-详细设计/中心机/64-Neo4j入图与图查询.md} 定义。
+
+\subsubsection{KillChain 分析（内部实现）}\label{killchain-analysis}
+
+Analysis 模块的溯源任务内部使用 KillChain 算法重建攻击路径。
+
+KillChain 算法基于 MITRE ATT\&CK 战术分段，通过有限状态自动机 (FSA) 识别攻击阶段，并使用大语言模型 (LLM) 选择最合理的段间连接路径，生成完整攻击链解释。
+
+\textbf{核心能力}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{战术分段}：基于 MITRE ATT\&CK 战术将攻击事件自动分段（Initial Access → Execution → Privilege Escalation → Lateral Movement → C2 → Impact）
+\item
+  \textbf{路径重建}：识别各战术阶段之间的连接路径
+\item
+  \textbf{智能选择}：使用 LLM 从候选路径中选择最合理的攻击链
+\item
+  \textbf{可解释性}：生成 10-20 句中文的全链路解释，包含主谓宾结构
+\item
+  \textbf{置信度评估}：输出可信度评分（0.0-1.0）
+\end{enumerate}
+
+\textbf{输出结果}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{segments{[}{]}}：战术分段列表，每个段包含状态、时间范围、锚点、异常边摘要
+\item
+  \texttt{selected\_paths{[}{]}}：段间连接路径列表
+\item
+  \texttt{explanation}：LLM 生成的完整攻击链解释
+\item
+  \texttt{confidence}：可信度评分
+\end{itemize}
+
+\textbf{持久化方式}：
+
+\begin{itemize}
+\tightlist
+\item
+  Neo4j 边属性：\texttt{custom.killchain.uuid}（ECS 合规字段）
+\item
+  任务文档：\texttt{task.result.killchain\_uuid} 和 \texttt{task.result.killchain}
+\end{itemize}
+
+详细设计见：\texttt{50-详细设计/分析/69-KillChain概览设计.md} 与 \texttt{74-KillChain结果展示规范.md}
+
+\subsection{安全与审计边界（演示）}\label{security-audit}
+
+\begin{itemize}
+\tightlist
+\item
+  运行环境：靶场内网。中心机所有服务与数据库端口只对靶场内可达网络开放
+\item
+  CTI 数据：使用离线 ATT\&CK Enterprise CTI 数据包；运行时不依赖外网
+\item
+  数据留痕：所有结论必须能回溯到 \texttt{event.id}，并能定位到数据源类型与时间窗范围（证据链）
+\end{itemize}

@@ -1,0 +1,279 @@
+\subsection{Neo4j 入图与图查询}\label{center-64-graph-query}
+
+\subsection{模块职责与边界}\label{center-64-module-boundaries}
+
+Neo4j 模块承担``实体关系图（Entity Graph）''的权威存储与图查询职责，具体包括：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Schema 管理}：创建并维护节点唯一约束与常用索引；
+\item
+  \textbf{入图写入}：将输入的 ECS 文档转换为节点或边，并写入 Neo4j；
+\item
+  \textbf{时间窗查询}：支持按时间窗查询边集合，供图可视化与算法使用；
+\item
+  \textbf{图算法查询}：支持基于时间窗投影图的最短路计算（Neo4j GDS）；
+\item
+  \textbf{结果承载}：存储溯源任务写回的边属性，支持``按节点查询溯源结果''。
+\end{enumerate}
+
+本模块不负责：
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch 的检测与融合（见 \texttt{63-检测与告警融合.md}）；
+\item
+  溯源算法的具体执行（见 \texttt{../../50-详细设计/分析/}）；
+\item
+  ECS 字段口径（见 \texttt{../../80-规范/81-ECS字段规范.md}）。
+\end{itemize}
+
+\subsection{Schema 与约束}\label{center-64-schema}
+
+\subsection{节点唯一约束（必须存在）}\label{center-64-constraints}
+
+节点类型与唯一键定义遵循 \texttt{../../80-规范/84-Neo4j实体图谱规范.md}。Neo4j 必须建立以下唯一约束（表达为``Label + 属性键''）：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.30\textwidth}p{0.60\textwidth}@{}}
+\toprule\noalign{}
+Label & 唯一键 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{Host}} & {\scriptsize\texttt{host.id}} \\
+{\scriptsize\texttt{User}} & {\scriptsize\texttt{user.id}} \\
+{\scriptsize\texttt{User}} & {\scriptsize\texttt{host.id + user.name}} \\
+{\scriptsize\texttt{Process}} & {\scriptsize\texttt{process.entity\_id}} \\
+{\scriptsize\texttt{File}} & {\scriptsize\texttt{host.id + file.path}} \\
+{\scriptsize\texttt{Domain}} & {\scriptsize\texttt{domain.name}} \\
+{\scriptsize\texttt{IP}} & {\scriptsize\texttt{ip}} \\
+\end{longtable}
+}
+
+\begin{quote}
+说明：\texttt{User} 与 \texttt{File} 的复合键用于避免跨主机误合并。当事件包含 \texttt{user.id} 时，使用 \texttt{user.id} 作为唯一键；否则使用 \texttt{host.id\ +\ user.name} 作为唯一键。
+\end{quote}
+
+\subsection{图数据模型}\label{center-64-data-model}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-64/center-64-01.pdf}
+\caption{图数据模型}
+\label{fig:center-64-01}
+\end{figure}
+
+\subsection{索引（必须存在）}\label{center-64-indexes}
+
+为支撑展示与排障需求，Neo4j 必须为以下属性建立索引：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{Host.host.name}
+\item
+  \texttt{User.user.name}
+\item
+  \texttt{Process.process.executable}
+\item
+  \texttt{File.file.path}
+\item
+  \texttt{Domain.domain.name}
+\item
+  \texttt{IP.ip}
+\end{itemize}
+
+\subsection{写入：ECS → Graph}\label{center-64-write-ecs}
+
+\subsection{入图输入范围（严格）}\label{center-64-input-scope}
+
+Neo4j 入图仅接受两类 ECS 文档：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Telemetry：\texttt{event.kind="event"}
+\item
+  Canonical Findings：\texttt{event.kind="alert"} 且 \texttt{event.dataset="finding.canonical"}
+\end{enumerate}
+
+Raw Findings（包括传感器原始告警与 Security Analytics 原始 finding）不得直接入图。
+
+\subsection{入图边属性（必须写入）}\label{center-64-edge-props}
+
+每条入图边必须写入以下属性（字段名与来源遵循 \texttt{../../80-规范/81-ECS字段规范.md} 与 \texttt{../../80-规范/84-Neo4j实体图谱规范.md}）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ts} 或 \texttt{@timestamp}：边的事件时间（字符串时间戳）
+\item
+  \texttt{ts\_float}：数值时间戳（秒，float），用于时间窗过滤与 GDS 投影
+\item
+  \texttt{custom.evidence.event\_ids{[}{]}}：证据事件引用列表
+\item
+  \texttt{event.kind} / \texttt{event.dataset} / \texttt{event.id}：用于回溯与区分来源
+\end{itemize}
+
+当边来自 Canonical Finding 时，边必须额外写入：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{is\_alarm=true}
+\item
+  \texttt{rule.*}、\texttt{threat.*}、\texttt{event.severity}、\texttt{custom.finding.*} 等字段（用于解释与可视化）
+\end{itemize}
+
+\subsection{写入幂等边界}\label{center-64-idempotency}
+
+\begin{itemize}
+\tightlist
+\item
+  节点写入必须幂等（MERGE），通过唯一键去重；
+\item
+  边写入采用``按证据追加''语义：允许存在多条相同类型的关系，但每条边必须携带其证据 \texttt{event.id} 与证据列表，便于后续去重或回放。
+\end{itemize}
+
+\begin{quote}
+边去重属于 Analysis 的工作范围，在``展示层''与``任务结果写回层''通过属性过滤实现干净展示。
+\end{quote}
+
+\subsection{批量写入优化（v2.1+）}\label{center-64-batch-write}
+
+自 v2.1 起，Neo4j 模块支持批量写入 API 以提升入图性能：
+
+\textbf{批量 API}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{add\_nodes\_and\_edges(nodes,\ edges)} —— 在单个事务中批量写入节点和边
+\end{itemize}
+
+\textbf{性能优化策略}：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{节点批量写入}：按节点类型分组，使用 UNWIND 批量 MERGE
+\item
+  \textbf{边批量写入}：在单个事务中逐个 MERGE（需匹配起终点）
+\item
+  \textbf{性能提升}：处理 1000 条事件的网络往返从 \textasciitilde16000 次降至 \textasciitilde160 次（提升 100 倍）
+\end{itemize}
+
+\textbf{使用示例}：
+
+\begin{verbatim}
+from app.services.neo4j import db
+
+## 批量写入
+nodes = [host_node(host_id="h-001"), user_node(user_id="u-001")]
+edges = [logon_edge(user, host)]
+db.add_nodes_and_edges(nodes, edges)
+\end{verbatim}
+
+\textbf{向后兼容性}：
+
+\begin{itemize}
+\tightlist
+\item
+  保留 \texttt{add\_node()} 和 \texttt{add\_edge()} 单条 API，确保旧代码无需修改
+\item
+  批量 API 与单条 API 具有相同的幂等性保证
+\end{itemize}
+
+\textbf{实施位置}：
+
+\begin{itemize}
+\tightlist
+\item
+  代码：\texttt{backend/app/services/neo4j/db.py:200-400}
+\item
+  测试：\texttt{backend/tests/unit/test\_services\_neo4j/test\_db\_batch.py}
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-64/center-64-02.pdf}
+\caption{批量写入优化}
+\label{fig:center-64-02}
+\end{figure}
+
+\subsection{查询：可视化与算法的图查询}\label{center-64-query}
+
+\subsection{图查询能力清单（必须支持）}\label{center-64-query-capabilities}
+
+Neo4j 模块必须提供以下查询能力：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{告警边查询}：返回所有 \texttt{is\_alarm=true} 的边集合；
+\item
+  \textbf{时间窗边查询}：给定 \texttt{{[}t\_min,\ t\_max{]}}（秒），返回时间窗内的边集合，并支持按关系类型过滤；
+\item
+  \textbf{时间窗最短路}：给定 \texttt{src\_uid}、\texttt{dst\_uid}、\texttt{{[}t\_min,\ t\_max{]}} 与风险权重表，返回时间窗内的加权最短路边序列。
+\end{enumerate}
+
+\subsection{后端对外 API 绑定（固定）}\label{center-64-api-binding}
+
+后端对外提供统一的图查询接口：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{POST\ /api/v1/graph/query}
+\end{itemize}
+
+该接口支持以下动作：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{alarm\_edges}
+\item
+  \texttt{edges\_in\_window}
+\item
+  \texttt{shortest\_path\_in\_window}
+\item
+  \texttt{analysis\_edges\_by\_task}
+\end{itemize}
+
+接口的请求/响应字段由后端实现定义，Neo4j 模块负责提供稳定的查询语义与返回结构（包括 nodes/edges 的 uid、rtype、props）。
+
+其中：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{analysis\_edges\_by\_task}：按 \texttt{analysis.task\_id} 拉取该任务写回的边集合。当请求参数 \texttt{only\_path=true} 时，仅返回 \texttt{analysis.is\_path\_edge=true} 的关键路径边；当 \texttt{only\_path=false} 时，返回该任务写回的全部边。
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-64/center-64-03.pdf}
+\caption{Neo4j 查询场景}
+\label{fig:center-64-03}
+\end{figure}
+
+\subsection{结果写回：边属性规范}\label{center-64-writeback}
+
+溯源结果写回属于``图谱回标与边属性''模块，其详细设计参见：
+
+\begin{itemize}
+\tightlist
+\item
+  写回数据结构（权威规范）：\texttt{../../80-规范/85-溯源结果写回规范.md}
+\item
+  工程实现与读取规范：\texttt{65-图谱回标与边属性.md}
+\end{itemize}

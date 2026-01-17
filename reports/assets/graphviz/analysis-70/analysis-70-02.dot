@@ -1,0 +1,70 @@
+digraph {
+    rankdir=TB;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial"];
+
+    Task [label="任务文档\nDocument", shape=box, fillcolor="#fce4ec", style="filled,rounded", fontsize=12, fontname="Arial Bold"];
+
+    // Level 1: Main Categories
+    Meta [label="元数据字段", fillcolor="#e3f2fd"];
+    Info [label="基本信息", fillcolor="#e3f2fd"];
+    Time [label="时间窗口", fillcolor="#e3f2fd"];
+    Status [label="状态信息", fillcolor="#e8f5e9"];
+    Result [label="分析结果", fillcolor="#fce4ec"];
+
+    Task -> Meta;
+    Task -> Info;
+    Task -> Time;
+    Task -> Status;
+    Task -> Result;
+
+    // Level 2: Meta
+    TS [label="@timestamp\n创建时间", shape=note, fillcolor="#fff9c4"];
+    Meta -> TS;
+
+    // Level 2: Info
+    ID [label="task.id\n任务ID", shape=note, fillcolor="#fff9c4"];
+    Target [label="task.target.node_uid\n目标节点", shape=note, fillcolor="#fff9c4"];
+    Info -> ID;
+    Info -> Target;
+
+    // Level 2: Time
+    Start [label="task.window.start_ts\n窗口起点", shape=note, fillcolor="#fff9c4"];
+    End [label="task.window.end_ts\n窗口终点", shape=note, fillcolor="#fff9c4"];
+    Time -> Start;
+    Time -> End;
+
+    // Level 2: Status
+    StatusVal [label="task.status\n状态值", shape=note, fillcolor="#fff9c4"];
+    Progress [label="task.progress\n进度 0-100", shape=note, fillcolor="#fff9c4"];
+    Started [label="task.started_at\n开始时间", shape=note, fillcolor="#fff9c4"];
+    Finished [label="task.finished_at\n结束时间", shape=note, fillcolor="#fff9c4"];
+    Error [label="task.error\n失败原因", shape=note, fillcolor="#fff9c4"];
+    Status -> StatusVal;
+    Status -> Progress;
+    Status -> Started;
+    Status -> Finished;
+    Status -> Error;
+
+    // Level 2: Result
+    Summary [label="task.result.summary\n结果摘要", shape=note, fillcolor="#fff9c4"];
+    TTP [label="TTP相似度", fillcolor="#fce4ec"];
+    Trace [label="溯源路径", fillcolor="#fce4ec"];
+    Result -> Summary;
+    Result -> TTP;
+    Result -> Trace;
+
+    // Level 3: TTP
+    Tactics [label="ttp_similarity.attack_tactics", shape=note, fillcolor="#fff9c4"];
+    Techniques [label="ttp_similarity.attack_techniques", shape=note, fillcolor="#fff9c4"];
+    APTs [label="ttp_similarity.similar_apts", shape=note, fillcolor="#fff9c4"];
+    TTP -> Tactics;
+    TTP -> Techniques;
+    TTP -> APTs;
+
+    // Level 3: Trace
+    Updated [label="trace.updated_edges", shape=note, fillcolor="#fff9c4"];
+    Path [label="trace.path_edges", shape=note, fillcolor="#fff9c4"];
+    Trace -> Updated;
+    Trace -> Path;
+}

@@ -1,0 +1,60 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    Timer [label="定时器", shape=box, style="rounded, filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+    Poller [label="轮询服务", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+    Client [label="客户机", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+    Registry [label="client-registry\n(OpenSearch)", shape=cylinder, style="filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+    Pipeline [label="中心机流水线", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+
+    // 正常流程
+    Timer -> Poller [label="1. 触发 tick (每 5 秒)"];
+    Poller -> Registry [label="2. 读取客户机列表"];
+    Registry -> Poller [label="返回客户机信息"];
+    Poller -> Client [label="3. GET /falco"];
+    Client -> Poller [label="返回 falco 事件"];
+    Poller -> Client [label="4. GET /suricata"];
+    Client -> Poller [label="返回 suricata 事件"];
+    Poller -> Client [label="5. GET /filebeat"];
+    Client -> Poller [label="返回 filebeat 事件"];
+    Poller -> Registry [label="6. 更新 poll.status=success\npoll.last_seen=now"];
+    Poller -> Pipeline [label="7. store_events()"];
+    Pipeline -> Registry [label="写入 Telemetry/Raw Findings"];
+    Poller -> Pipeline [label="8. run_data_analysis()"];
+    Pipeline -> Registry [label="写入 Canonical Findings"];
+    Poller -> Pipeline [label="9. ingest_from_opensearch_ingested_window()"];
+    Pipeline -> Pipeline [label="写入 Neo4j 图谱"];
+
+    // 超时故障处理
+    Timer -> Poller [label="10. 触发下一 tick"];
+    Poller -> Registry [label="11. 读取客户机列表"];
+    Poller -> Client [label="12. GET /falco"];
+    Client -> Poller [label="HTTP timeout", style=dashed, color=red];
+    Poller -> Poller [label="13. 捕获超时异常"];
+    Poller -> Registry [label="14. 更新 poll.status=error\npoll.last_error=\"Timeout: falco\""];
+    Poller -> Client [label="15. GET /suricata"];
+    Client -> Poller [label="返回 suricata 事件\n(不因 falco 失败而阻塞)"];
+    Poller -> Client [label="16. GET /filebeat"];
+    Client -> Poller [label="返回 filebeat 事件"];
+    Poller -> Registry [label="17. 更新 poll.status=partial_success\n记录部分成功"];
+    Poller -> Pipeline [label="继续处理已拉取的事件"];
+
+    // 流水线故障处理
+    Timer -> Poller [label="18. 触发新 tick"];
+    Poller -> Registry [label="19. 读取客户机列表"];
+    Poller -> Client [label="20. 拉取所有数据源"];
+    Client -> Poller [label="返回所有事件"];
+    Poller -> Registry [label="21. 更新 poll.status=success"];
+    Poller -> Pipeline [label="22. store_events()"];
+    Pipeline -> Poller [label="成功"];
+    Poller -> Pipeline [label="23. run_data_analysis()"];
+    Pipeline -> Poller [label="OpenSearch 连接失败", style=dashed, color=red];
+    Poller -> Poller [label="24. 检测到必选依赖失败"];
+    Poller -> Timer [label="抛出异常\n停止轮询任务\n不杀死 FastAPI 进程", style=dashed, color=red];
+
+    Note [label="日志记录完整错误堆栈\n用于靶场联调排查", shape=note, style=filled, fillcolor=lightgray];
+    Poller -> Note [style=dotted];
+}

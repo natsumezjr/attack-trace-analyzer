@@ -1,0 +1,40 @@
+digraph {
+    rankdir=LR;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_stage1 {
+        label="阶段1：Filebeat 采集";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e1f5fe";
+
+        LogFiles [label="日志文件\nauth.log\nsyslog\nkern.log", shape=folder, fillcolor="#e1f5fe"];
+        Filebeat [label="Filebeat 容器\nfilebeat-docker.yml", fillcolor="#e1f5fe"];
+        ECSOutput [label="ECS JSON 输出\n/tmp/filebeat-output/\necs_logs.json", shape=folder, fillcolor="#e1f5fe"];
+    }
+
+    subgraph cluster_stage2 {
+        label="阶段2：detector 检测";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#fff3e0";
+
+        JSONReader [label="JSON 读取器\ntail -f 模式\n监听 ecs_logs.json", fillcolor="#fff3e0"];
+        SigmaEngine [label="Sigma 规则引擎\n加载规则文件\nclient/sensor/filebeat/rules.d", fillcolor="#fff3e0"];
+        AuthParser [label="认证日志解析器\nSSH 登录提取\nuser.name/source.ip", fillcolor="#fff3e0"];
+        ECSNormalizer [label="ECS 字段规范化\nhost.id/name 补齐\nevent.dataset 判断", fillcolor="#fff3e0"];
+    }
+
+    RabbitQueue [label="RabbitMQ\n队列: data.filebeat", fillcolor="#f3e5f5"];
+
+    LogFiles -> Filebeat;
+    Filebeat -> ECSOutput;
+    ECSOutput -> JSONReader;
+    JSONReader -> SigmaEngine;
+    JSONReader -> AuthParser;
+    SigmaEngine -> ECSNormalizer;
+    AuthParser -> ECSNormalizer;
+    ECSNormalizer -> RabbitQueue;
+}

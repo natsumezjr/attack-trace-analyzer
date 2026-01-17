@@ -1,0 +1,27 @@
+digraph {
+    rankdir=TB;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    subgraph cluster_level1 {
+        label="第一层: LLM 选择器回退";
+        style=filled;
+        fillcolor="#fff3e0";
+        LLMChooser [label="LLMChooser<br/>(DeepSeek)"];
+        MockChooser [label="MockChooser<br/>(测试模式)"];
+        Fallback1 [label="fallback_choose()<br/>选择 len(steps) 最小<br/>confidence 为 0.5"];
+    }
+
+    subgraph cluster_level2 {
+        label="第二层: killchain.py 内置回退";
+        style=filled;
+        fillcolor="#ffccbc";
+        KillchainFallback [label="select_killchain_with_llm()<br/>选择 len(edges) 最小<br/>confidence 为 0.5"];
+    }
+
+    LLMChooser -> Fallback1 [label="校验失败"];
+    LLMChooser -> Fallback1 [label="API 异常"];
+    MockChooser -> Fallback1;
+    Fallback1 -> KillchainFallback [label="llm_client=None"];
+    Fallback1 -> KillchainFallback [label="选择失败"];
+}

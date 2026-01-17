@@ -1,0 +1,39 @@
+digraph {
+    rankdir=LR;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=9];
+
+    subgraph cluster_input {
+        label="输入";
+        style=filled;
+        fillcolor="#fce4ec";
+        A [label="候选路径 steps 数组"];
+        B [label="滚动上下文 token 集合"];
+    }
+
+    subgraph cluster_scoring {
+        label="评分计算";
+        style=filled;
+        fillcolor="#fff3e0";
+        C [label="hop 等于 len steps<br/>路径跳数"];
+        D [label="base 等于 10.0 / (1.0 + hop)<br/>基础分数"];
+        E [label="overlap 等于 count<br/>候选路径 ∩ 滚动上下文<br/>token 交集数量"];
+        F [label="连续性加分 等于 0.5 × overlap"];
+        G [label="score 等于 base + 0.5 × overlap<br/>综合分数"];
+    }
+
+    subgraph cluster_output {
+        label="输出";
+        style=filled;
+        fillcolor="#c8e6c9";
+        H [label="按 score 降序排序<br/>Top 8 候选路径"];
+    }
+
+    A -> C;
+    B -> E;
+    C -> D;
+    E -> F;
+    D -> G;
+    F -> G;
+    G -> H;
+}

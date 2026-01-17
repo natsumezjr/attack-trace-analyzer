@@ -1,0 +1,50 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled"];
+    edge [fontname="PingFang SC"];
+
+    Center [label="中心机\n轮询器", fillcolor="#e3f2fd"];
+    Backend [label="客户机\nBackend API", fillcolor="#fff3e0"];
+    Queue [label="RabbitMQ\n队列", shape=cylinder, fillcolor="#f3e5f5"];
+    Producer [label="数据生产者\nfalco-ecs/filebeat/suricata", fillcolor="#c8e6c9"];
+
+    // 生产阶段
+    {
+        rank=same;
+        Producer;
+        Queue;
+    }
+
+    // 消费阶段
+    {
+        rank=same;
+        Center;
+        Backend;
+    }
+
+    Producer -> Queue [label="basic_publish(msg1)", fontsize=10];
+    Producer -> Queue [label="basic_publish(msg2)", fontsize=10];
+    Producer -> Queue [label="basic_publish(msg3)", fontsize=10];
+
+    Center -> Backend [label="GET /falco"];
+    Backend -> Queue [label="basic_get(queue)"];
+    Queue -> Backend [label="msg1 (delivery_tag=1)"];
+    Backend -> Queue [label="basic_ack(delivery_tag=1)"];
+
+    Backend -> Queue [label="basic_get(queue)"];
+    Queue -> Backend [label="msg2 (delivery_tag=2)"];
+    Backend -> Queue [label="basic_ack(delivery_tag=2)"];
+
+    Backend -> Queue [label="basic_get(queue)"];
+    Queue -> Backend [label="msg3 (delivery_tag=3)"];
+    Backend -> Queue [label="basic_ack(delivery_tag=3)"];
+
+    Backend -> Queue [label="basic_get(queue)"];
+    Queue -> Backend [label="null (队列为空)"];
+
+    Backend -> Center [label="200 OK\n返回 3 条消息"];
+
+    // Note
+    Note [label="消息已 ack，不再返回", shape=note, fontsize=10, fillcolor="#fff9c4"];
+}

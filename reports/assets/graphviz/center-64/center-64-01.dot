@@ -1,0 +1,30 @@
+digraph "GraphDataModel" {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9];
+
+    // Entity Nodes
+    Host [label="Host\nhost.id\nhost.name", fillcolor="#e1f5fe"];
+    User [label="User\nuser.name\nuser.domain", fillcolor="#e1f5fe"];
+    Process [label="Process\nprocess.pid\nprocess.executable", fillcolor="#e1f5fe"];
+    File [label="File\nfile.path\nfile.directory", fillcolor="#e1f5fe"];
+    IP [label="IP\nip address\nversion:4/6", fillcolor="#e1f5fe"];
+    Domain [label="Domain\ndomain name", fillcolor="#e1f5fe"];
+
+    // Relationship Edge Nodes
+    EXEC [label="EXECUTED_BY\nProcess → User", fillcolor="#c8e6c9", shape=note];
+    SPAWNED [label="SPAWNED\nProcess → Process", fillcolor="#c8e6c9", shape=note];
+    WROTE [label="WROTE\nProcess → File", fillcolor="#c8e6c9", shape=note];
+    CONNECTED [label="CONNECTED_TO\nProcess → IP", fillcolor="#c8e6c9", shape=note];
+    RESOLVED [label="RESOLVES_TO\nDomain → IP", fillcolor="#c8e6c9", shape=note];
+    OPENED [label="OPENED\nProcess → File", fillcolor="#c8e6c9", shape=note];
+
+    // Example relationships
+    Host -> User [label="hostname", style=dashed];
+    Process -> File [label="executable", style=dashed];
+    Process -> IP [label="source_ip", style=dashed];
+    Domain -> IP [label="resolves_to", style=dashed];
+
+    // Group entity nodes
+    {rank=same; Host; User; Process; File; IP; Domain;}
+}

@@ -1,0 +1,79 @@
+digraph {
+    rankdir=TB;
+    node [shape=box, style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    // Phase 1: Task Creation
+    subgraph cluster_phase1 {
+        label="任务创建阶段";
+        style=filled;
+        color="#e3f2fd";
+        fillcolor="#e3f2fd";
+
+        Frontend [label="前端", shape=ellipse, fillcolor="#e8f5e9"];
+        API1 [label="中心机API", fillcolor="#e1f5fe"];
+        OS1 [label="OpenSearch\n写入任务文档\n(status: queued)", fillcolor="#fff9c4"];
+
+        Frontend -> API1 [label="POST /api/v1/analyze/tasks\n(target_node_uid, time_window)"];
+        API1 -> API1 [label="生成 task_id"];
+        API1 -> OS1 [label="写入任务文档\n(status: queued, progress: 0)"];
+        OS1 -> Frontend [label="返回 task_id", style=dashed];
+    }
+
+    // Phase 2: Async Execution
+    subgraph cluster_phase2 {
+        label="异步执行阶段";
+        style=filled;
+        color="#fff3e0";
+        fillcolor="#fff3e0";
+
+        Runner [label="任务执行器", fillcolor="#e1f5fe"];
+        OS2 [label="OpenSearch", fillcolor="#fff9c4"];
+        Neo4j [label="Neo4j图数据库", fillcolor="#c8e6c9"];
+
+        API1 -> Runner [label="提交任务到队列"];
+        Runner -> Runner [label="状态: running, progress: 5"];
+        Runner -> OS2 [label="更新任务状态"];
+
+        Runner -> Neo4j [label="查询目标节点"];
+        Runner -> Neo4j [label="计算关键路径"];
+        Runner -> Runner [label="状态: running, progress: 20"];
+        Runner -> OS2 [label="更新进度"];
+
+        Runner -> Runner [label="TTP相似度分析"];
+        Runner -> Runner [label="状态: running, progress: 70"];
+        Runner -> OS2 [label="写入相似度结果"];
+
+        Runner -> Neo4j [label="写回边属性"];
+        Runner -> Runner [label="状态: running, progress: 95"];
+        Runner -> OS2 [label="更新进度"];
+
+        Runner -> Runner [label="状态: succeeded, progress: 100"];
+        Runner -> OS2 [label="写入完成状态与时间戳"];
+    }
+
+    // Phase 3: Result Reading
+    subgraph cluster_phase3 {
+        label="结果读取阶段";
+        style=filled;
+        color="#e8f5e9";
+        fillcolor="#e8f5e9";
+
+        Frontend2 [label="前端", shape=ellipse, fillcolor="#e8f5e9"];
+        API2 [label="中心机API", fillcolor="#e1f5fe"];
+        OS3 [label="OpenSearch\n任务索引", fillcolor="#fff9c4"];
+        Neo4j2 [label="Neo4j\n图数据库", fillcolor="#c8e6c9"];
+
+        Frontend2 -> API2 [label="GET /api/v1/analyze/tasks/{task_id}"];
+        API2 -> OS3 [label="查询任务状态"];
+        API2 -> Frontend2 [label="返回任务详情", style=dashed];
+
+        Frontend2 -> API2 [label="POST /api/v1/graph/query\n(analysis_edges_by_task)"];
+        API2 -> Neo4j2 [label="查询写回边"];
+        API2 -> Frontend2 [label="返回溯源路径数据", style=dashed];
+    }
+
+    // Connect phases
+    OS1 -> Runner [style=invis];
+    OS2 -> Frontend2 [style=invis];
+}

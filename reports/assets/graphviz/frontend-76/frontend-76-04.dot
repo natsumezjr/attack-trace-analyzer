@@ -1,0 +1,23 @@
+digraph {
+    rankdir=TD;
+    node [fontname="Arial", shape=box, style="rounded"];
+
+    Data [label="Raw Data", shape=cylinder, fillcolor="#e3f2fd"];
+    
+    Sort1 [label="Canonical Findings\n@timestamp UP / event.id UP", fillcolor="#e8f5e9"];
+    Sort2 [label="Graph Nodes\nuid UP", fillcolor="#e8f5e9"];
+    Sort3 [label="Graph Edges\nts_float UP / src_uid / rtype / dst_uid", fillcolor="#e8f5e9"];
+    Sort4 [label="Tactics/Techniques\nString ASC", fillcolor="#e8f5e9"];
+    
+    Stable [label="Stable Output\nExclude server_time", fillcolor="#e0f7fa"];
+
+    Data -> Sort1;
+    Data -> Sort2;
+    Data -> Sort3;
+    Data -> Sort4;
+    
+    Sort1 -> Stable;
+    Sort2 -> Stable;
+    Sort3 -> Stable;
+    Sort4 -> Stable;
+}

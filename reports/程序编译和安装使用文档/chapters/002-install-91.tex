@@ -1,0 +1,158 @@
+\section{靶场部署}\label{range-deployment}
+
+本文件定义演示靶场的固定拓扑、固定地址规划、固定端口规划与固定数据目录规划。
+
+靶场在单机条件下提供 \textbf{≥5 个逻辑节点}，用于满足验收中的``多节点''口径。
+
+\subsection{固定拓扑（6 节点）}\label{fixed-topology}
+
+ATA系统靶场固定由以下 6 个节点构成，全部部署在同一台内网 Linux 宿主机 \texttt{\textless{}CENTER\_IP\textgreater{}} 上：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrll@{}}
+\toprule\noalign{}
+节点 & 数量 & 部署形态 & 作用 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{center-01} & 1 & OpenSearch+Neo4j 为 Docker Compose；后端与前端为宿主进程 & 数据入库、检测融合、图查询与任务执行、前端展示 \\
+\texttt{client-01..04} & 4 & 每个实例一套 Docker Compose & Falco/Filebeat/Suricata 采集 → RabbitMQ 队列缓冲 → Client API 拉取 \\
+\texttt{c2-01} & 1 & Docker macvlan + docker run & CoreDNS + Nginx，提供 DNS+HTTP，用于产生稳定可观测的网络证据 \\
+\end{longtable}
+}
+
+\subsection{固定地址与网卡规划}\label{fixed-address-plan}
+
+靶场网络口径固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  宿主机内网 IP：\texttt{\textless{}CENTER\_IP\textgreater{}}
+\item
+  宿主机物理网卡：\texttt{ens5f1}
+\item
+  宿主机 macvlan 子接口：\texttt{macvlan0}（宿主 IP 固定为 \texttt{\textless{}MACVLAN\_HOST\_IP\textgreater{}/24}）
+\item
+  C2 DNS IP：\texttt{\textless{}C2\_DNS\_IP\textgreater{}}
+\item
+  C2 HTTP IP：\texttt{\textless{}C2\_HTTP\_IP\textgreater{}}
+\item
+  C2 域名：\texttt{\textless{}C2\_DOMAIN\textgreater{}}（固定解析到 \texttt{\textless{}C2\_HTTP\_IP\textgreater{}}）
+\end{itemize}
+
+\begin{quote}
+说明：C2 使用 macvlan 的目标是让 DNS/HTTP 访问具备可观测的二层链路，并能在宿主机 \texttt{macvlan0} 上稳定抓包验收。
+\end{quote}
+
+\subsection{固定端口规划}\label{fixed-port-plan}
+
+\subsubsection{中心机端口（宿主机）}\label{center-ports}
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch：\texttt{9200/tcp}、\texttt{9600/tcp}
+\item
+  Neo4j：\texttt{7474/tcp}、\texttt{7687/tcp}
+\item
+  后端 API：\texttt{8001/tcp}
+\item
+  前端：\texttt{3000/tcp}
+\end{itemize}
+
+\subsubsection{客户机端口（宿主机）}\label{client-ports}
+
+客户机对宿主机暴露的端口固定为 4 个 Client API 端口（容器内端口为 8888）：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrl@{}}
+\toprule\noalign{}
+实例 & 宿主端口 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{client-01} & \texttt{18881/tcp} & \texttt{GET\ /filebeat}、\texttt{GET\ /falco}、\texttt{GET\ /suricata} \\
+\texttt{client-02} & \texttt{18882/tcp} & 同上 \\
+\texttt{client-03} & \texttt{18883/tcp} & 同上 \\
+\texttt{client-04} & \texttt{18884/tcp} & 同上 \\
+\end{longtable}
+}
+
+RabbitMQ 端口固定只在容器网络内部使用：
+
+\begin{itemize}
+\tightlist
+\item
+  AMQP：\texttt{5672/tcp}
+\item
+  管理端口：\texttt{15672/tcp}
+\end{itemize}
+
+\subsubsection{C2 端口（C2 独立 IP）}\label{c2-ports}
+
+由于 C2 拥有独立 IP，不做宿主端口映射，端口固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  DNS：\texttt{\textless{}C2\_DNS\_IP\textgreater{}:53/udp}、\texttt{\textless{}C2\_DNS\_IP\textgreater{}:53/tcp}
+\item
+  HTTP：\texttt{\textless{}C2\_HTTP\_IP\textgreater{}:80/tcp}
+\end{itemize}
+
+\subsection{固定数据目录}\label{fixed-data-dirs}
+
+靶场运行产生的数据固定落在以下位置：
+
+\begin{itemize}
+\tightlist
+\item
+  统一根目录：\texttt{\$BASE=/home/ubuntu/attack-trace-analyzer}
+\item
+  代码目录：\texttt{\$BASE/repo/attack-trace-analyzer/}
+\item
+  运行目录：\texttt{\$BASE/run/}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{client-01/}、\texttt{client-02/}、\texttt{client-03/}、\texttt{client-04/}
+
+    \begin{itemize}
+    \tightlist
+    \item
+      \texttt{docker-compose.yml}：客户机运行编排
+    \item
+      \texttt{.env}：该实例的端口与 Host 标识
+    \item
+      \texttt{sensor}、\texttt{backend}：指向仓库 \texttt{client/} 的软链接，用于 compose 构建
+    \item
+      \texttt{data/}：采集输出（\texttt{falco.jsonl}、\texttt{eve.json} 等）
+    \end{itemize}
+  \item
+    \texttt{c2/}：C2 配置与静态页面（见 \texttt{93-C2部署与证据点.md}）
+  \end{itemize}
+\item
+  OpenSearch/Neo4j 持久化：Docker named volumes（由 \texttt{backend/docker-compose.yml} 创建）
+\end{itemize}
+
+重置与清理步骤见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{95-重置复现与排障.md}
+\end{itemize}
+
+\subsection{下一步}\label{next-steps-91}
+
+一键启动/停止与启动顺序见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{92-一键编排.md}
+\end{itemize}

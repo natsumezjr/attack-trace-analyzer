@@ -18,14 +18,14 @@
 
 ## 1. 模块职责与边界
 
-OpenSearch 模块负责中心机侧“事实/告警/任务元数据”的权威存储与检索能力，具体职责固定为：
+OpenSearch 模块承担中心机侧"事实/告警/任务元数据"的权威存储与检索职责，具体功能包括：
 
-1. **索引体系**：定义索引命名、按日滚动策略、生命周期保留策略；
-2. **入库路由**：根据 `event.kind` 与 `event.dataset` 将文档写入正确索引；
-3. **字段处理**：对 ECS 文档执行三时间字段处理、扁平键兼容、基础校验；
-4. **Store-first 检测**：触发 OpenSearch Security Analytics 扫描 Telemetry 并产出 Findings；
-5. **融合去重**：将 Raw Findings 融合为 Canonical Findings 并写回 OpenSearch；
-6. **任务存储**：保存溯源任务的状态与元数据，供前端轮询。
+1. **索引治理**：定义索引命名规范、按日滚动策略、数据生命周期保留策略；
+2. **智能路由**：根据 `event.kind` 与 `event.dataset` 字段自动将文档路由至正确索引；
+3. **字段规范化**：对 ECS 文档执行三时间字段处理、扁平键兼容、基础字段校验；
+4. **检测触发**：驱动 OpenSearch Security Analytics 扫描 Telemetry 数据并产出 Findings；
+5. **告警融合**：将 Raw Findings 聚合融合为 Canonical Findings 并写回 OpenSearch；
+6. **任务管理**：持久化溯源任务的状态与元数据，支持前端轮询查询。
 
 本模块不负责：
 
@@ -171,20 +171,20 @@ flowchart TD
 ```
 
 **流程说明**：
-1. **客户机采集**：Falco/Filebeat/Suricata 采集数据并写入本地缓冲区
-2. **中心机拉取**：Step1 通过 cursor 机制批量拉取客户机数据
-3. **字段处理**：Step2 执行 ECS 校验、三时间处理、路由判断
-4. **OpenSearch 写入**：按路由规则写入对应索引，使用 `event.id` 幂等去重
-5. **检测与融合**：Step3 触发 Security Analytics 检测并融合告警
-6. **任务管理**：Step4 创建溯源任务并持续更新任务状态
+1. **客户机采集**：Falco/Filebeat/Suricata 传感器采集数据并写入本地缓冲区；
+2. **中心机拉取**：Step1 通过 cursor 机制批量拉取客户机缓冲区数据（1000条/批）；
+3. **字段处理**：Step2 执行 ECS 校验、三时间字段处理、路由判断（`event.kind`）；
+4. **OpenSearch 写入**：按路由规则写入对应索引，使用 `event.id` 实现幂等去重；
+5. **检测与融合**：Step3 触发 Security Analytics 检测引擎，将 Raw Findings 融合为 Canonical Findings；
+6. **任务管理**：Step4 创建溯源任务并持续更新任务状态到 `analysis-tasks-*` 索引。
 
 ### 3.3 三时间字段处理（必须执行）
 
-中心机写入 OpenSearch 前必须保证三时间字段满足 `../../80-规范/81-ECS字段规范.md`：
+中心机在写入 OpenSearch 前必须确保三时间字段符合 `../../80-规范/81-ECS字段规范.md` 规范：
 
-- `@timestamp`：主时间轴。若缺失，必须从 `event.created` 推导；若仍无法得到，中心机必须丢弃该文档。
-- `event.created`：观察时间。若缺失，中心机必须回填为 `@timestamp`。
-- `event.ingested`：入库时间。中心机必须覆盖为"当前入库时间"，不得使用上游携带值。
+- **`@timestamp`**：主时间轴字段。若缺失则从 `event.created` 推导；若仍无法获取有效时间戳，中心机必须丢弃该文档并记录日志。
+- **`event.created`**：事件首次观察时间。若缺失则回填为 `@timestamp` 的值。
+- **`event.ingested`**：中心机入库时间。必须覆盖为当前入库时间（UTC 毫秒时间戳），不得使用上游传递的值。
 
 ### 3.4 ECS 字段映射与处理
 
@@ -192,13 +192,13 @@ flowchart TD
 
 | ECS 字段 | 数据类型 | 必需 | 处理规则 | 说明 |
 |---|---|---|---|---|
-| `@timestamp` | date | ✅ | 优先使用原始值；缺失时从 `event.created` 推导；仍缺失则丢弃文档 | 主时间轴，用于日志检索和时序分析 |
-| `event.id` | keyword | ✅ | 若缺失则生成 UUID：`{client_id}-{sensor_type}-{timestamp}-{seq}` | 幂等去重的唯一标识 |
+| `@timestamp` | date | ✅ | 优先使用原始值；缺失时从 `event.created` 推导；仍缺失则丢弃文档 | 主时间轴字段，用于日志检索和时序分析 |
+| `event.id` | keyword | ✅ | 若缺失则生成 UUID：`{client_id}-{sensor_type}-{timestamp}-{seq}` | 幂等去重的唯一标识符 |
 | `event.kind` | keyword | ✅ | 枚举值：`event` / `alert` / `state` | 路由判断的核心字段 |
-| `event.category` | keyword | ❌ | 映射规则：`file` → `file`，`network` → `network`，`process` → `process` | 用于前端分类展示 |
+| `event.category` | keyword | ❌ | 映射规则：`file` → `file`，`network` → `network`，`process` → `process` | 用于前端分类展示与过滤 |
 | `event.dataset` | keyword | ✅ | 格式：`{sensor}.{type}`，如 `falco.syscall`、`finding.canonical` | 区分数据来源和告警类型 |
-| `event.created` | date | ✅ | 缺失时回填为 `@timestamp` | 事件首次被观察到的时间 |
-| `event.ingested` | date | ✅ | 覆盖为当前入库时间（UTC 毫秒时间戳） | 中心机接收时间，用于监控延迟 |
+| `event.created` | date | ✅ | 缺失时回填为 `@timestamp` | 事件首次被观察的时间 |
+| `event.ingested` | date | ✅ | 覆盖为当前入库时间（UTC 毫秒时间戳） | 中心机接收时间，用于监控数据延迟 |
 | `source.ip` | ip | ❌ | 保持原值，支持 IPv4/IPv6 | 源地址，用于关联分析 |
 | `source.port` | long | ❌ | 范围校验：0-65535 | 源端口 |
 | `destination.ip` | ip | ❌ | 保持原值，支持 IPv4/IPv6 | 目标地址 |
@@ -222,17 +222,19 @@ flowchart TD
 | `tags` | keyword | ❌ | 数组格式，自动去重 | 标签数组，用于快速过滤 |
 
 **字段处理注意事项**：
-1. **扁平键兼容**：保留 `_source` 中的扁平字段（如 `proc_name`），但查询时优先使用嵌套 ECS 字段
-2. **类型校验**：写入前校验字段类型，类型不匹配时记录警告并使用默认值或丢弃
-3. **缺失字段**：必需字段缺失时拒绝入库，非必需字段缺失时使用默认值或留空
-4. **数组字段**：`tags`、`threat.tactic.id` 等数组字段必须去重，避免重复标签
-5. **IP 地址**：支持 IPv4 和 IPv6，自动识别并设置正确的 `ip` 类型
+1. **扁平键兼容**：保留 `_source` 中的扁平字段（如 `proc_name`），但查询时优先使用嵌套 ECS 字段；
+2. **类型校验**：写入前校验字段类型，类型不匹配时记录警告并使用默认值或丢弃文档；
+3. **缺失字段**：必需字段缺失时拒绝入库，非必需字段缺失时使用默认值或留空；
+4. **数组字段**：`tags`、`threat.tactic.id` 等数组字段必须去重，避免重复标签影响查询准确性；
+5. **IP 地址**：支持 IPv4 和 IPv6，自动识别并设置正确的 `ip` 类型。
 
 ### 3.5 幂等与去重（必须满足）
 
-1. 每条文档必须具备 `event.id`。  
-2. 中心机写入必须按 `event.id` 幂等：同一 `event.id` 重复写入不得产生重复文档。  
-3. 对于无法保证 `event.id` 稳定的上游输入，必须在进入中心机前补齐稳定 `event.id`。
+为确保数据一致性与避免重复存储，中心机写入遵循以下幂等性原则：
+
+1. **唯一标识**：每条文档必须具备 `event.id` 作为唯一标识符；
+2. **幂等写入**：中心机按 `event.id` 实现幂等写入，同一 `event.id` 重复写入不得产生重复文档；
+3. **上游补齐**：对于无法保证 `event.id` 稳定的上游输入，必须在进入中心机前补齐稳定的 `event.id`（推荐格式：`{client_id}-{sensor_type}-{timestamp}-{seq}`）。
 
 ## 4. 检测与融合
 
@@ -244,17 +246,16 @@ OpenSearch 的检测触发、Raw Finding 生成与 Canonical Finding 融合去�
 
 ### 5.1 数据保留周期（固定）
 
-保留周期的权威口径见：`../../80-规范/80-数据对象与生命周期.md`。
+数据保留周期的权威口径见：`../../80-规范/80-数据对象与生命周期.md`。
 
 ### 5.2 初始化与运维脚本（入口）
 
-OpenSearch 侧的初始化动作固定为：
+OpenSearch 侧的初始化流程固定为以下步骤：
 
-1) 启动 OpenSearch 容器；  
-2) 启动中心机后端，后端在启动阶段调用 `initialize_indices()` 创建/确保索引存在（包含 mapping）；  
-3) 配置 Security Analytics detector，并导入 Sigma 规则。  
+1. **启动 OpenSearch 容器**：通过 Docker Compose 启动 OpenSearch 服务；
+2. **索引初始化**：中心机后端启动时调用 `initialize_indices()` 自动创建/确保索引存在（包含 mapping 定义）；
+3. **检测器配置**：配置 Security Analytics detector 并导入 Sigma 规则库。
 
 脚本入口固定为以下文件：
-
 - Sigma 规则导入：`backend/app/services/opensearch/scripts/import_sigma_rules.py`
 - Security Analytics detector 配置：`backend/app/services/opensearch/scripts/setup_security_analytics.py`

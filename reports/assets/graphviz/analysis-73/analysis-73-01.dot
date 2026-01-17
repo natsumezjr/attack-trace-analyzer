@@ -1,0 +1,16 @@
+digraph {
+    rankdir=LR;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    Input1 [label="输入: TTP 标签<br/>T1055, T1110, TA0001", fillcolor="#e1f5fe"];
+    Extract [label="特征提取<br/>解析 technique/tactic<br/>去重与标准化", fillcolor="#fff3e0"];
+    Tokenize [label="分词<br/>T1055 → Process Injection<br/>T1110 → Brute Force<br/>TA0001 → Initial Access", fillcolor="#fff3e0"];
+    ComputeIDF [label="计算 IDF<br/>idf(T1055) = 1.2<br/>idf(T1110) = 2.1<br/>idf(TA0001) = 0.8", fillcolor="#fff3e0"];
+    Output1 [label="输出: TF-IDF 向量<br/>1.2, 2.1, 0.8", fillcolor="#e8f5e9"];
+
+    Input1 -> Extract;
+    Extract -> Tokenize;
+    Tokenize -> ComputeIDF;
+    ComputeIDF -> Output1;
+}

@@ -1,0 +1,143 @@
+\section{靶场交付说明}\label{range-delivery-guide}
+
+本文面向组内同学与验收人员，给出靶场登录方式、逻辑拓扑、服务端口与数据目录位置。本文只描述如何连接与如何使用，不讨论实现细节。
+
+\subsection{登录服务器}\label{login-server}
+
+\begin{itemize}
+\tightlist
+\item
+  服务器 IP：\texttt{\textless{}CENTER\_IP\textgreater{}}
+\item
+  用户名：\texttt{ubuntu}
+\item
+  密码：\texttt{{[}请在此处填写SSH密码{]}}
+\item
+  登录命令：
+\end{itemize}
+
+\begin{verbatim}
+ssh ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\begin{quote}
+密码：\#EDCvfr4\%TGB10
+\end{quote}
+
+\begin{quote}
+\textbf{WSL用户注意}：如果你使用WSL环境，详细连接步骤见 \texttt{98-WSL连接服务器指南.md}。
+\end{quote}
+
+\subsection{靶场逻辑拓扑}\label{range-logical-topology}
+
+靶场在单机条件下提供 \textbf{6 个逻辑节点}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{center-01}：中心机（OpenSearch + Neo4j + 后端 API + 前端）
+\item
+  \texttt{client-01..04}：4 套客户机实例（Falco / Filebeat / Suricata → RabbitMQ → Client API）
+\item
+  \texttt{c2-01}：C2（DNS + HTTP，用于产生稳定网络证据）
+\end{itemize}
+
+\subsection{服务与端口}\label{services-ports}
+
+\subsubsection{center-01}\label{31-center-01}
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch：\texttt{https://\textless{}CENTER\_IP\textgreater{}:9200}
+\item
+  OpenSearch perf：\texttt{\textless{}CENTER\_IP\textgreater{}:9600}
+\item
+  Neo4j Browser：\texttt{http://\textless{}CENTER\_IP\textgreater{}:7474}
+\item
+  Neo4j Bolt：\texttt{\textless{}CENTER\_IP\textgreater{}:7687}
+\item
+  后端：\texttt{http://\textless{}CENTER\_IP\textgreater{}:8001}
+\item
+  前端：\texttt{http://\textless{}CENTER\_IP\textgreater{}:3000}
+\end{itemize}
+
+\subsubsection{client-01..04}\label{32-client-0104}
+
+每个 client 对外提供 3 个接口（返回已消费到的数据，便于验收）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{GET\ /filebeat}
+\item
+  \texttt{GET\ /falco}
+\item
+  \texttt{GET\ /suricata}
+\end{itemize}
+
+端口规划固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  client-01：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18881/*}
+\item
+  client-02：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18882/*}
+\item
+  client-03：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18883/*}
+\item
+  client-04：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18884/*}
+\end{itemize}
+
+\subsubsection{c2-01}\label{33-c2-01}
+
+\begin{itemize}
+\tightlist
+\item
+  DNS：\texttt{\textless{}C2\_DNS\_IP\textgreater{}:53/udp}、\texttt{\textless{}C2\_DNS\_IP\textgreater{}:53/tcp}
+\item
+  HTTP：\texttt{http://\textless{}C2\_HTTP\_IP\textgreater{}:80}
+\item
+  域名：\texttt{\textless{}C2\_DOMAIN\textgreater{}\ -\textgreater{}\ \textless{}C2\_HTTP\_IP\textgreater{}}
+\end{itemize}
+
+\subsection{目录与数据位置}\label{directories-data}
+
+靶场宿主机的根目录固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{BASE=/home/ubuntu/attack-trace-analyzer}
+\end{itemize}
+
+目录结构固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  代码：\texttt{\$BASE/repo/attack-trace-analyzer/}
+\item
+  运行目录：\texttt{\$BASE/run/}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{client-01..04/}：每个客户机实例一个目录
+  \item
+    \texttt{c2/}：C2 配置与静态内容
+  \end{itemize}
+\end{itemize}
+
+\subsection{常用操作入口}\label{common-operations}
+
+\begin{itemize}
+\tightlist
+\item
+  启停顺序与命令：\texttt{92-一键编排.md}
+\item
+  验收命令与通过标准：\texttt{94-验证清单.md}
+\item
+  演示前重置与排障：\texttt{95-重置复现与排障.md}
+\end{itemize}

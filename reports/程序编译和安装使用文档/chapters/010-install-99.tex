@@ -1,0 +1,66 @@
+\section{靶场指南对齐说明}\label{range-guide-alignment}
+
+本文件用于说明 \texttt{guide\_docs/} 与 \texttt{docs/90-运维与靶场/} 的关系与口径对齐规则，避免同一主题出现两套互相矛盾的描述。
+
+\subsection{权威入口（固定）}\label{authoritative-entry}
+
+本仓库对外的靶场运维权威入口固定为 \texttt{docs/90-运维与靶场/}，其目录内文件用于交付与现场演示：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{90-编译安装与使用.md}
+\item
+  \texttt{91-靶场部署.md}
+\item
+  \texttt{92-一键编排.md}
+\item
+  \texttt{93-C2部署与证据点.md}
+\item
+  \texttt{94-验证清单.md}
+\item
+  \texttt{95-重置复现与排障.md}
+\item
+  \texttt{96-靶场交付说明.md}
+\item
+  \texttt{97-单机靶场落地步骤.md}
+\end{enumerate}
+
+\subsection{guide-docs 与 docs 对齐规则（固定）}\label{guide-docs-alignment-rules}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{guide\_docs/} 用于靶场负责人交付与过程记录；\texttt{docs/} 用于交付材料与最终口径。
+\item
+  两套文档对同一事实（IP、端口、拓扑、命令、目录）必须保持一致。
+\item
+  SSH 登录凭据直接保存在 \texttt{96-靶场交付说明.md} 和 \texttt{98-WSL连接服务器指南.md} 中。
+\end{enumerate}
+
+\subsection{文件映射（固定）}\label{file-mapping}
+
+\texttt{guide\_docs/} 目录内文件名包含括号与中英文混排，为避免在 \texttt{docs/} 中引入不确定措辞，本节使用 guide-docs 的编号进行映射。
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}rll@{}}
+\toprule\noalign{}
+guide-docs 编号 & docs 文件 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+00 & \texttt{90-编译安装与使用.md} & 指南入口统一到 docs \\
+01 & \texttt{91-靶场部署.md} & 节点、端口、目录统一 \\
+02 & \texttt{92-一键编排.md} & 启停顺序与命令统一 \\
+03 & \texttt{93-C2部署与证据点.md} & C2 的网络与证据点统一 \\
+04 & \texttt{94-验证清单.md} & 验收命令与通过标准统一 \\
+05 & \texttt{95-重置复现与排障.md} & 演示前重置流程统一 \\
+10 & \texttt{97-单机靶场落地步骤.md} & 单机落地步骤固化为 docs \\
+20 & \texttt{96-靶场交付说明.md} & 交付口径与端口表统一；不保存明文口令 \\
+21 & \texttt{92-一键编排.md}、\texttt{94-验证清单.md}、\texttt{95-重置复现与排障.md} & 运行手册拆分到启停、验收、重置 \\
+22 & \texttt{../20-需求与验收/22-攻击场景与复现剧本.md} & 演示剧本统一到验收章节 \\
+\end{longtable}
+}

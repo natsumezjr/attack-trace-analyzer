@@ -1,0 +1,106 @@
+\subsection{拉取接口}\label{25-pull-api}
+
+\subsubsection{路由清单}\label{1-route-list}
+
+客户机对外暴露 3 个 HTTP GET 路由，分别对应 Falco、Filebeat 与 Suricata 数据队列：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+路由 & 队列 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{GET\ /falco} & \texttt{data.falco} & 返回并消费 Falco 队列中的消息 \\
+\texttt{GET\ /filebeat} & \texttt{data.filebeat} & 返回并消费 Filebeat 队列中的消息 \\
+\texttt{GET\ /suricata} & \texttt{data.suricata} & 返回并消费 Suricata 队列中的消息 \\
+\end{longtable}
+}
+
+代码实现：
+
+\begin{itemize}
+\tightlist
+\item
+  路由入口：\texttt{client/backend/main.go}
+\item
+  队列消费：\texttt{client/backend/queue/client.go}
+\end{itemize}
+
+\subsubsection{返回结构}\label{2-response-structure}
+
+接口响应体采用统一格式：
+
+\begin{verbatim}
+{
+  "total": 2,
+  "data": [
+    {"event": {"id": "evt-..."}, "ecs": {"version": "9.2.0"}},
+    {"event": {"id": "evt-..."}, "ecs": {"version": "9.2.0"}}
+  ]
+}
+\end{verbatim}
+
+格式约束：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{data{[}{]}} 中每个元素必须为 JSON 对象
+\item
+  每个元素必须包含稳定的 \texttt{event.id}
+\end{enumerate}
+
+\subsubsection{错误处理}\label{3-error-handling}
+
+RabbitMQ 连接或队列操作失败时，接口返回错误信息并设置 HTTP 状态码 500：
+
+\begin{verbatim}
+{"error": "..."}
+\end{verbatim}
+
+\subsubsection{与轮询的配合}\label{4-polling-integration}
+
+中心机按固定周期轮询客户机，执行以下步骤：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  从 \texttt{client-registry} 读取客户机 \texttt{listen\_url} 与 \texttt{capabilities}
+\item
+  根据能力列表调用 \texttt{GET\ /falco}、\texttt{GET\ /suricata}、\texttt{GET\ /filebeat}
+\item
+  汇总返回的 \texttt{data{[}{]}} 列表并写入中心机存储
+\end{enumerate}
+
+代码实现：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/client\_poller.py}
+\end{itemize}
+
+\subsubsection{event.id 补齐规则}\label{41-event-id-completion-rules}
+
+拉取接口返回前自动补齐 \texttt{event.id}：
+
+\begin{itemize}
+\tightlist
+\item
+  消息体已包含 \texttt{event.id} 时直接透传
+\item
+  消息体缺失 \texttt{event.id} 时，计算消息体 SHA1 哈希值并取前 16 位生成：\texttt{evt-\textless{}sha1{[}:16{]}\textgreater{}}
+\end{itemize}
+
+代码实现：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{client/backend/queue/client.go} 的 \texttt{ensureEventID} 函数
+\end{itemize}

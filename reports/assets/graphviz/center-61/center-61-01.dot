@@ -1,0 +1,94 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    Start [label="定时器触发 tick", shape=ellipse, style="filled", fillcolor=lightgray];
+    ReadRegistry [label="读取 client-registry", shape=box, style="rounded, filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+    CheckEmpty [label="注册表\n是否为空?", shape=diamond, style="filled", fillcolor="#fff3e0", color="#e65100", penwidth=2];
+    End [label="结束本 tick", shape=ellipse, style="filled", fillcolor=lightgray];
+
+    subgraph cluster_loop {
+        label="遍历每个客户机";
+        style=filled;
+        fillcolor="#e1f5fe";
+        color="#0277bd";
+        penwidth=2;
+
+        LoopStart [label="获取 client 信息\nid, listen_url, capabilities", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+
+        subgraph cluster_parse_caps {
+            label="解析 capabilities";
+            style=filled;
+            fillcolor="#e1f5fe";
+
+            CapsContent [label="falco: true/false\nfilebeat: true/false\nsuricata: true/false", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+        }
+
+        subgraph cluster_fetch_routes {
+            label="按 capabilities 拉取路由";
+            style=filled;
+            fillcolor="#e3f2fd";
+            color="#1565c0";
+            penwidth=2;
+
+            F1 [label="GET {listen_url}/falco", shape=box, style="rounded, filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+            F2 [label="GET {listen_url}/filebeat", shape=box, style="rounded, filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+            F3 [label="GET {listen_url}/suricata", shape=box, style="rounded, filled", fillcolor="#e3f2fd", color="#1565c0", penwidth=2];
+            E1 [label="汇总事件", shape=ellipse, style="filled", fillcolor="#fff9c4", color="#f57f17", penwidth=2];
+            E2 [label="汇总事件", shape=ellipse, style="filled", fillcolor="#fff9c4", color="#f57f17", penwidth=2];
+            E3 [label="汇总事件", shape=ellipse, style="filled", fillcolor="#fff9c4", color="#f57f17", penwidth=2];
+        }
+
+        ExtractData [label="提取 data 数组\n汇总事件列表", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+        UpdateStatus [label="更新 poll.*\nlast_seen, status, error", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+        NextClient [label="下一个\n客户机?", shape=diamond, style="filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+        AllDone [label="所有客户机拉取完成", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+    }
+
+    subgraph cluster_pipeline {
+        label="中心机流水线 (严格顺序)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#1b5e20";
+        penwidth=2;
+
+        StoreEvents [label="Step 2: store_events\n写入 OpenSearch\n字段处理/去重/路由", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+
+        subgraph cluster_step3 {
+            label="Step 3: run_data_analysis";
+            style=filled;
+            fillcolor="#e8f5e9";
+
+            Detect [label="Security Analytics\n检测", shape=box, style="rounded, filled", fillcolor="#e8f5e9"];
+            Fusion [label="融合去重\nRaw → Canonical", shape=box, style="rounded, filled", fillcolor="#e8f5e9"];
+        }
+
+        Step4 [label="Step 4: ingest_from_opensearch_ingested_window\nECS → Graph\n写入 Neo4j", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+    }
+
+    Start -> ReadRegistry;
+    ReadRegistry -> CheckEmpty;
+    CheckEmpty -> End [label="是"];
+    CheckEmpty -> LoopStart [label="否"];
+    LoopStart -> CapsContent;
+    CapsContent -> F1;
+    CapsContent -> F2;
+    CapsContent -> F3;
+    F1 -> E1;
+    F2 -> E2;
+    F3 -> E3;
+    E1 -> ExtractData;
+    E2 -> ExtractData;
+    E3 -> ExtractData;
+    ExtractData -> UpdateStatus;
+    UpdateStatus -> NextClient;
+    NextClient -> LoopStart [label="是"];
+    NextClient -> AllDone [label="否"];
+    AllDone -> StoreEvents;
+    StoreEvents -> Detect;
+    Detect -> Fusion;
+    Fusion -> Step4;
+    Step4 -> End;
+}

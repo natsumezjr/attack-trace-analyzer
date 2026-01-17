@@ -1,0 +1,27 @@
+digraph {
+    rankdir=LR;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    Idle [label="Idle", shape=ellipse, style="filled", fillcolor=lightgray];
+    Polling [label="Polling", shape=ellipse, style="filled", fillcolor=lightblue];
+    Fetching [label="Fetching", shape=ellipse, style="filled", fillcolor=lightblue];
+    Processing [label="Processing", shape=ellipse, style="filled", fillcolor=lightblue];
+    Success [label="Success", shape=ellipse, style="filled", fillcolor="#c8e6c9"];
+    Error [label="Error", shape=ellipse, style="filled", fillcolor="#ffcdd2"];
+
+    Idle -> Polling [label="定时器触发\n(每 5 秒)"];
+    Polling -> Fetching [label="读取注册表\n开始遍历客户机"];
+    Fetching -> Processing [label="拉取客户机数据\n(falco/suricata/filebeat)"];
+    Processing -> Success [label="数据拉取成功"];
+    Processing -> Error [label="数据拉取失败"];
+    Success -> Idle [label="更新 poll.status=success\n更新 poll.last_seen\n进入下一轮"];
+    Error -> Idle [label="更新 poll.status=error\n记录 poll.last_error\n下一轮重试"];
+
+    Note1 [label="单定时器 tick\n遍历所有客户机", shape=note, style=filled, fillcolor=lightgray];
+    Note2 [label="失败不阻塞其他客户机\n下一轮自动重试", shape=note, style=filled, fillcolor=lightgray];
+
+    Polling -> Note1 [style=dotted];
+    Error -> Note2 [style=dotted];
+}

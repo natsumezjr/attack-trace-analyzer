@@ -1,0 +1,139 @@
+\section{编译安装与使用}\label{compile-install}
+
+\subsection{文档目的}\label{doc-purpose}
+
+本文件给出从零开始部署并运行ATA系统的固定步骤，包含前置依赖、启动顺序、健康检查、常用操作与停机清理。
+
+\subsection{读者对象}\label{target-audience}
+
+\begin{itemize}
+\tightlist
+\item
+  负责部署与联调的同学
+\item
+  负责现场演示的同学
+\end{itemize}
+
+\subsection{引用关系}\label{references}
+
+\begin{itemize}
+\tightlist
+\item
+  靶场部署：\texttt{91-靶场部署.md}
+\item
+  一键编排：\texttt{92-一键编排.md}
+\item
+  验证清单：\texttt{94-验证清单.md}
+\end{itemize}
+
+\subsection{前置依赖}\label{prerequisites}
+
+ATA系统运行依赖固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  Docker Engine + docker-compose
+\item
+  Node.js + npm（用于前端）
+\item
+  Python 3.12 + uv（用于后端）
+\end{itemize}
+
+\begin{quote}
+说明：Go 用于客户机服务的镜像构建，ATA系统运行时不要求宿主机安装 Go。
+\end{quote}
+
+\subsection{启动顺序}\label{startup-order}
+
+启动顺序固定为：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  启动中心机依赖（OpenSearch、Neo4j）
+\item
+  启动 C2（DNS+HTTP）
+\item
+  启动客户机采集栈
+\item
+  启动中心机后端（FastAPI）
+\item
+  启动中心机前端（Next.js）
+\item
+  注册客户机到中心机
+\item
+  执行证据动作并按验证清单验收
+\end{enumerate}
+
+\subsection{健康检查}\label{health-check}
+
+\subsubsection{后端健康检查}\label{backend-health}
+
+\begin{verbatim}
+curl -sS http://localhost:8001/health
+\end{verbatim}
+
+预期输出固定为：
+
+\begin{verbatim}
+{"status":"ok"}
+\end{verbatim}
+
+\subsubsection{OpenSearch 健康检查}\label{opensearch-health}
+
+\begin{verbatim}
+curl -k -sS -u admin:OpenSearch@2024!Dev https://localhost:9200/_cluster/health
+\end{verbatim}
+
+预期输出包含字段 \texttt{status}，其值为 \texttt{yellow} 或 \texttt{green}。
+
+\subsection{常用操作}\label{common-operations}
+
+\subsubsection{启动全部服务}\label{start-all-services}
+
+启动命令在 \texttt{92-一键编排.md} 定义，本文件不重复。
+
+\subsubsection{服务访问入口（固定）}\label{service-endpoints}
+
+{\small
+\begin{itemize}
+\tightlist
+\item
+  前端：\texttt{http://\textless{}CENTER\_IP\textgreater{}:3000}
+\item
+  后端健康检查：\texttt{http://\textless{}CENTER\_IP\textgreater{}:8001/health}
+\item
+  Neo4j Browser：\texttt{http://\textless{}CENTER\_IP\textgreater{}:7474}
+\item
+  OpenSearch：\texttt{https://\textless{}CENTER\_IP\textgreater{}:9200}
+\item
+  客户机拉取接口（4 个实例）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    client-01：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18881/*}
+  \item
+    client-02：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18882/*}
+  \item
+    client-03：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18883/*}
+  \item
+    client-04：\texttt{http://\textless{}CENTER\_IP\textgreater{}:18884/*}
+  \end{itemize}
+\end{itemize}
+}
+
+\subsubsection{导入 Neo4j 演示数据（固定）}\label{import-neo4j-data}
+
+ATA系统的图查询与溯源任务依赖 Neo4j 图数据。图数据通过固定脚本导入：
+
+\begin{verbatim}
+cd backend
+uv run python scripts/import_test_data.py
+\end{verbatim}
+
+\subsection{停机与清理}\label{shutdown-cleanup}
+
+停机与清理在 \texttt{95-重置复现与排障.md} 定义，本文件不重复。
