@@ -1,0 +1,41 @@
+digraph StoreFirstPipeline {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.38",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="Store-first Detection & Fusion Pipeline"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  telemetry [label="Telemetry\n(ECS events)"];
+  ingest [label="Ingest\n(OpenSearch)"];
+  detect [label="Detect\n(Security Analytics / rules)"];
+  raw [label="Raw Findings\n(single detector)"];
+  merge [label="Dedup & Merge\n(time window / fingerprint)"];
+  canonical [label="Canonical Findings\n(stable alerts)"];
+  neo_ingest [label="Graph Ingest\n(Neo4j)"];
+
+  telemetry -> ingest -> detect -> raw -> merge -> canonical -> neo_ingest;
+}

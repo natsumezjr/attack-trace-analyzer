@@ -1,0 +1,117 @@
+\section{数据流与时序}\label{data-flow-timing}
+
+系统涉及五类核心数据对象：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Telemetry（遥测数据）}：事实事件（ECS 格式，\texttt{event.kind="event"}），\\
+  \hspace*{1.5em}存储于 OpenSearch \texttt{ecs-events-*} 索引。
+\item
+  \textbf{Raw Finding（原始告警）}：原始告警（ECS 格式，\texttt{event.kind="alert"} 且非 canonical），\\
+  \hspace*{1.5em}存储于 OpenSearch \texttt{raw-findings-*} 索引。
+\item
+  \textbf{Canonical Finding（规范告警）}：规范告警（ECS 格式，\texttt{event.kind="alert"} 且\\
+  \hspace*{1.5em}\texttt{event.dataset="finding.canonical"}），存储于 OpenSearch \texttt{canonical-findings-*} 索引。
+\item
+  \textbf{Entity Graph（实体关系图）}：实体关系图（Neo4j），输入数据为 Telemetry 与 Canonical Finding。
+\item
+  \textbf{Trace Task（溯源任务）}：溯源任务（OpenSearch 任务索引 + Neo4j 边属性写回）。
+\end{enumerate}
+
+\subsection{端到端数据流（中心机单定时器流水线）}\label{end-to-end-data-flow}
+
+\subsubsection{客户机侧（每台主机）}\label{client-side-flow}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  \textbf{数据采集}：传感器（Filebeat / Falco / Suricata）采集并输出原始数据。
+\item
+  \textbf{格式转换}：将采集结果转换为 ECS 标准文档（字段规范见 \texttt{../80-规范/81-ECS字段规范.md}）。
+\item
+  \textbf{队列缓冲}：将 ECS 文档写入本地 RabbitMQ 队列进行缓冲。
+\item
+  \textbf{接口暴露}：对外提供数据拉取接口，从队列中取出数据并返回,供中心机轮询调用（接口规范见 \texttt{../80-规范/87-客户机与中心机接口.md}）。
+\end{enumerate}
+
+\subsubsection{中心机侧（每次 tick，严格顺序）}\label{center-side-flow}
+
+中心机定时器每次触发时，均按以下顺序执行：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  \textbf{数据拉取}：从所有已注册客户机拉取新增数据。
+\item
+  \textbf{数据入库}：将数据写入 OpenSearch（包括 Telemetry/Raw Findings 路由、三时间字段处理及幂等去重）。
+\item
+  \textbf{检测与融合}：通过 Store-first 检测机制产出 Raw Findings，并融合生成 Canonical Findings 后写回 OpenSearch。
+\item
+  \textbf{图谱构建}：以 Canonical Findings 为主体，辅以必要的 Telemetry 数据，转换为图结构并写入 Neo4j。
+\end{enumerate}
+
+上述四个步骤由同一定时器驱动，形成"顺序流水线"架构，详细系统规格见 \texttt{40-概要设计报告.md}。
+
+\begin{quote}
+\textbf{实现细节}（与当前代码对齐）：
+
+\begin{itemize}
+\tightlist
+\item
+  后端在每个 tick 固定执行 Step 1/2/3/4，构成"单定时器顺序流水线"架构；
+\item
+  Step 4 入图时以本 tick 的 \texttt{event.ingested} 时间窗为边界，确保"本 tick 生成的 Canonical Finding"不会因 \texttt{@timestamp} 较早而遗漏。
+\end{itemize}
+\end{quote}
+
+\subsection{前端可视化数据流}\label{frontend-visualization-flow}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  \textbf{页面访问}：用户打开前端页面。
+\item
+  \textbf{数据请求}：前端向后端发起请求：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    查询事件/告警：后端查询 OpenSearch；
+  \item
+    查询图谱：后端查询 Neo4j。
+  \end{itemize}
+\item
+  \textbf{页面渲染}：前端进行可视化渲染：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    事件时间线（数据来源：OpenSearch）；
+  \item
+    实体关系图谱（数据来源：Neo4j 返回的 nodes/edges）。
+  \end{itemize}
+\end{enumerate}
+
+\subsection{溯源任务数据流}\label{trace-task-flow}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  \textbf{节点选择}：用户在图谱上选定一个节点（node uid）。
+\item
+  \textbf{任务创建}：前端请求后端创建溯源任务，后端立即返回 \texttt{task\_id}。
+\item
+  \textbf{异步分析}：Analysis 模块异步执行：读取 Neo4j 子图 → 执行算法分析 → 生成关键路径与解释。
+\item
+  \textbf{结果写回}：Analysis 模块将分析结果写回 Neo4j 边属性（字段规范见 \texttt{32/33}）。
+\item
+  \textbf{结果展示}：前端轮询任务状态，任务完成后再次请求图查询接口，读取边属性并展示溯源结果。
+\item
+  \textbf{报告导出}：前端导出报告，包含告警信息、图谱与溯源结果。
+\end{enumerate}

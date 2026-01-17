@@ -1,0 +1,21 @@
+digraph {
+    rankdir=TD;
+    node [fontname="Arial"];
+
+    Start [label="Check Edge Properties", shape=ellipse, fillcolor="#e0f7fa"];
+    Check1 [label="analysis.is_path_edge\nis true?", shape=diamond, fillcolor="#fff9c4"];
+    PathStyle [label="Apply Path Style\nColor: #1890ff\nWidth: 3px", shape=box, fillcolor="#e3f2fd"];
+    Check2 [label="is_alarm\nis true?", shape=diamond, fillcolor="#fff9c4"];
+    AlarmStyle [label="Apply Alarm Style\nColor: #ff4d4f\nWidth: 3px", shape=box, fillcolor="#ffebee"];
+    DefaultStyle [label="Apply Default Style\nColor: #d9d9d9\nWidth: 1px", shape=box, fillcolor="#f5f5f5"];
+    End [label="Render Edge", shape=ellipse, fillcolor="#e0f7fa"];
+
+    Start -> Check1;
+    Check1 -> PathStyle [label="Yes"];
+    Check1 -> Check2 [label="No"];
+    Check2 -> AlarmStyle [label="Yes"];
+    Check2 -> DefaultStyle [label="No"];
+    PathStyle -> End;
+    AlarmStyle -> End;
+    DefaultStyle -> End;
+}

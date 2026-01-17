@@ -1,0 +1,383 @@
+\section{附录A：验收标准与验收用例}\label{appendix-a-acceptance-criteria}
+
+\subsection{文档目的}\label{doc-purpose-21}
+
+本文件将需求文档中的验收目标转化为可执行的验收用例，给出固定的验收步骤、证据点与失败判定标准。
+
+\subsection{读者对象}\label{target-audience-21}
+
+\begin{itemize}
+\tightlist
+\item
+  团队内部测试负责人（用于准备验收材料）
+\item
+  负责演示的同学（用于演示脚本对齐）
+\end{itemize}
+
+\subsection{引用关系}\label{references-21}
+
+\begin{itemize}
+\tightlist
+\item
+  需求分析：\texttt{20-需求分析报告.md}
+\item
+  攻击复现剧本：\texttt{22-攻击场景与复现剧本.md}
+\item
+  运维与验证：\texttt{../90-运维与靶场/94-验证清单.md}
+\end{itemize}
+
+\subsection{验收总则}\label{acceptance-general-principles}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  验收以``可演示、可解释、可复现''为准。
+\item
+  任意结论必须可回溯到证据事件 \texttt{event.id}。
+\item
+  现场验收严格按本文件步骤执行，不允许临时更换流程或更换数据口径。
+\end{enumerate}
+
+\subsection{用例清单}\label{acceptance-case-list}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+用例编号 & 用例名称 & 关联需求 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+AC-01 & 多节点在线与轮询拉取 & FR-01、FR-03 \\
+AC-02 & 多源事件入库与字段口径 & FR-02、NFR-02 \\
+AC-03 & 告警产生与融合生成 Canonical & FR-04、FR-03 \\
+AC-04 & 图谱可视化查询 & FR-05 \\
+AC-05 & 创建溯源任务与状态轮询 & FR-06 \\
+AC-06 & 溯源结果写回与可解释展示 & FR-07、NFR-01 \\
+AC-07 & APT 相似度匹配输出 & FR-08 \\
+AC-08 & 报告导出可复现 & FR-09、NFR-04 \\
+\end{longtable}
+}
+
+\subsection{验收用例}\label{acceptance-cases}
+
+\subsubsection{AC-01 多节点在线与轮询拉取}\label{ac-01-multi-node-polling}
+
+\textbf{前置条件}
+
+\begin{itemize}
+\tightlist
+\item
+  按 \texttt{../90-运维与靶场/90-编译安装与使用.md} 启动中心机与至少 5 个客户机节点
+\item
+  客户机已在中心机注册表中存在
+\end{itemize}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在中心机查看客户机注册表，确认至少 5 个客户机条目存在。
+\item
+  等待一个轮询周期后，确认每个客户机的 \texttt{poll.status} 为正常或部分正常。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  客户机列表截图
+\item
+  每个客户机的 \texttt{poll.last\_seen} 更新时间截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  客户机数量不足 5 个
+\item
+  任意客户机持续处于 \texttt{timeout} 或 \texttt{error} 状态超过 3 个轮询周期
+\end{itemize}
+
+\subsubsection{AC-02 多源事件入库与字段口径}\label{ac-02-multi-source-ingestion}
+
+\textbf{前置条件}
+
+\begin{itemize}
+\tightlist
+\item
+  运行固定攻击复现：\texttt{22-攻击场景与复现剧本.md}
+\end{itemize}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在 OpenSearch 中查询时间窗内的 Telemetry 事件。
+\item
+  抽样检查每个数据源至少存在一条事件：Falco、Filebeat、Suricata。
+\item
+  抽样检查字段口径：\texttt{event.id}、三时间字段、\texttt{event.kind}、\texttt{event.dataset}、\texttt{host.id}。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  Telemetry 查询结果截图
+\item
+  抽样事件 JSON 截图（含字段）
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  任一数据源无数据
+\item
+  事件缺少 \texttt{event.id} 或三时间字段
+\end{itemize}
+
+\subsubsection{AC-03 告警产生与融合生成 Canonical}\label{ac-03-alert-fusion-canonical}
+
+\textbf{前置条件}
+
+\begin{itemize}
+\tightlist
+\item
+  中心机已启用告警分析与融合机制
+\end{itemize}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  查询 Raw Finding 索引，确认存在告警文档。
+\item
+  查询 Canonical Finding 索引，确认存在 \texttt{event.dataset="finding.canonical"} 的文档。
+\item
+  抽样检查 Canonical 的证据引用 \texttt{custom.evidence.event\_ids} 可回溯到 Telemetry。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  Raw 与 Canonical 查询结果截图
+\item
+  Canonical 文档中证据引用字段截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  只有 Raw 无 Canonical
+\item
+  Canonical 不包含证据引用
+\end{itemize}
+
+\subsubsection{AC-04 图谱可视化查询}\label{ac-04-graph-visualization}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在前端选择固定时间窗，发起图查询。
+\item
+  图中出现节点与边，并可点击查看边属性。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  图谱截图
+\item
+  边属性中 \texttt{event.id} 与证据引用字段截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  图查询无返回或返回为空
+\item
+  图边缺少时间窗字段或证据字段
+\end{itemize}
+
+\subsubsection{AC-05 创建溯源任务与状态轮询}\label{ac-05-task-creation-polling}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在前端点选一个图节点，创建溯源任务。
+\item
+  前端获得 \texttt{task\_id} 并开始轮询。
+\item
+  任务状态按 \texttt{queued\ -\textgreater{}\ running\ -\textgreater{}\ succeeded/failed} 变化。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  创建任务返回 \texttt{task\_id} 的截图
+\item
+  任务状态轮询变化截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  无法创建任务
+\item
+  任务状态不符合状态机
+\end{itemize}
+
+\subsubsection{AC-06 溯源结果写回与可解释展示}\label{ac-06-traceback-results}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  等待任务完成。
+\item
+  重新查询图数据，筛选 \texttt{analysis.task\_id} 等于当前任务。
+\item
+  展示关键路径边与解释字段。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  关键边高亮截图
+\item
+  边属性 \texttt{analysis.*} 字段截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  任务完成但边属性无写回
+\item
+  写回字段不包含 \texttt{analysis.task\_id}
+\end{itemize}
+
+\subsubsection{AC-07 APT 相似度匹配输出}\label{ac-07-apt-similarity}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  创建溯源任务并等待完成。
+\item
+  调用 \texttt{GET\ /api/v1/analysis/tasks/\{task\_id\}} 获取任务文档。
+\item
+  检查任务结果字段存在且可读：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{task.result.ttp\_similarity.attack\_tactics}
+  \item
+    \texttt{task.result.ttp\_similarity.attack\_techniques}
+  \item
+    \texttt{task.result.ttp\_similarity.similar\_apts}
+  \end{itemize}
+\item
+  检查 \texttt{task.result.ttp\_similarity.similar\_apts} 至少包含 1 项，且每项包含：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{intrusion\_set.id}
+  \item
+    \texttt{intrusion\_set.name}
+  \item
+    \texttt{similarity\_score}
+  \item
+    \texttt{top\_tactics}
+  \item
+    \texttt{top\_techniques}
+  \end{itemize}
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  任务文档中 \texttt{task.result.ttp\_similarity.*} 字段截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{task.result.ttp\_similarity.*} 任一字段缺失
+\item
+  \texttt{task.result.ttp\_similarity.similar\_apts} 为空数组
+\end{itemize}
+
+\subsubsection{AC-08 报告导出可复现}\label{ac-08-report-export}
+
+\textbf{验收步骤}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  使用相同时间窗导出两次报告。
+\item
+  两次报告的关键内容一致：时间线摘要、关键图数据、Technique 覆盖、溯源结果摘要。
+\end{enumerate}
+
+\textbf{证据点}
+
+\begin{itemize}
+\tightlist
+\item
+  两次导出文件的对比截图
+\end{itemize}
+
+\textbf{失败判定}
+
+\begin{itemize}
+\tightlist
+\item
+  同输入导出内容差异明显且无法解释
+\end{itemize}

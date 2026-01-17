@@ -1,0 +1,697 @@
+\subsubsection{KillChain 结果展示规范}\label{subsec:killchain-display-specs}
+
+\paragraph{1. 展示模式}\label{para:display-modes}
+
+\subparagraph{1.1 基础版视图（默认展开）}\label{subpara:basic-view}
+
+基础版视图呈现 KillChain 核心信息的精要概览，包括以下内容：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{可信度评分条}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    可视化评分条（0.0 - 1.0）
+  \item
+    颜色规则：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      \texttt{\textgreater{}\ 0.7}：绿色（高可信度）
+    \item
+      \texttt{0.4\ -\ 0.7}：黄色（中等可信度）
+    \item
+      \texttt{\textless{}\ 0.4}：红色（低可信度）
+    \end{itemize}
+  \item
+    显示数值百分比
+  \end{itemize}
+\item
+  \textbf{MITRE ATT\&CK 战术时间线}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    横向流程图展示各战术阶段
+  \item
+    格式：\texttt{{[}Initial\ Access{]}\ →\ {[}Execution{]}\ →\ {[}...{]}\ →\ {[}Impact{]}}
+  \item
+    每个阶段显示：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      战术名称（中文）
+    \item
+      时间范围（可选 hover 显示）
+    \end{itemize}
+  \end{itemize}
+\item
+  \textbf{LLM 解释摘要}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    显示 explanation 的前 3 句话
+  \item
+    省略号提示有更多内容
+  \item
+    "查看详情"按钮
+  \end{itemize}
+\item
+  \textbf{操作按钮}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    "查看详情"（展开完整版）
+  \item
+    "导出 KillChain"（导出为 Markdown）
+  \end{itemize}
+\end{enumerate}
+
+\subparagraph{1.2 完整版视图（点击展开）}\label{subpara:full-view}
+
+完整版视图展示 KillChain 的完整分析细节，包含以下信息：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{概览卡片}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    kc\_uuid（可复制）
+  \item
+    confidence（评分条）
+  \item
+    segment\_count（段数量）
+  \item
+    selected\_path\_count（路径数量）
+  \end{itemize}
+\item
+  \textbf{完整 MITRE ATT\&CK 战术时间线}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    可交互的时间线
+  \item
+    点击阶段展开查看详情
+  \item
+    每个阶段显示：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      战术状态（state）
+    \item
+      时间范围（t\_start, t\_end）
+    \item
+      入口/出口锚点（anchor\_in\_uid, anchor\_out\_uid）
+    \item
+      异常边数量（abnormal\_edge\_count）
+    \end{itemize}
+  \end{itemize}
+\item
+  \textbf{完整 LLM 解释文本}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    10-20 句中文完整解释
+  \item
+    可折叠/展开
+  \item
+    关键信息高亮（实体、IP、进程等）
+  \item
+    "复制"按钮
+  \item
+    "导出为 Markdown"按钮
+  \end{itemize}
+\item
+  \textbf{段间连接路径列表}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    每条路径显示：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      path\_id
+    \item
+      源锚点 → 目标锚点
+    \item
+      hop 数量
+    \item
+      边 ID 列表（可折叠）
+    \item
+      "在图谱中高亮"按钮
+    \end{itemize}
+  \end{itemize}
+\item
+  \textbf{返回基础版}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    "收起详情"按钮
+  \end{itemize}
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{2. API 接口规范}\label{para:api-interface-specs}
+
+\subparagraph{2.1 通过任务 ID 查询（主接口）}\label{subpara:query-by-task-id}
+
+\textbf{接口}：\texttt{GET\ /api/v1/analysis/tasks/\{task\_id\}}
+
+\textbf{响应扩展}
+
+\begin{verbatim}
+{
+  "status": "ok",
+  "task": {
+    "task.id": "trace-abc-123",
+    "task.status": "succeeded",
+    "task.result": {
+      "killchain_uuid": "uuid-xxx-yyy",  // 新增：KillChain UUID
+      "killchain": {                      // 新增（可选）：完整数据
+        "kc_uuid": "uuid-xxx-yyy",
+        "confidence": 0.85,
+        "segments": [
+          {
+            "seg_idx": 0,
+            "state": "INITIAL_ACCESS",
+            "t_start": 1234567890.0,
+            "t_end": 1234567900.0,
+            "anchor_in_uid": "Process:pid=1234",
+            "anchor_out_uid": "Host:host.id=web-001",
+            "abnormal_edge_count": 3
+          }
+        ],
+        "selected_paths": [
+          {
+            "path_id": "p-abc123",
+            "src_anchor": "Host:host.id=web-001",
+            "dst_anchor": "Process:pid=5678",
+            "hop_count": 3,
+            "edge_ids": ["event-id-1", "event-id-2", "event-id-3"]
+          }
+        ],
+        "explanation": "攻击者进程 p_c2 (pid:1234) 从外部 IP 1.2.3.4..."
+      }
+    }
+  }
+}
+\end{verbatim}
+
+\subparagraph{2.2 通过 kc\_uuid 直接查询（可选）}\label{subpara:query-by-kc-uuid}
+
+\textbf{接口}：\texttt{GET\ /api/v1/analysis/killchain/\{kc\_uuid\}}
+
+\textbf{响应结构}
+
+\begin{verbatim}
+{
+  "status": "ok",
+  "killchain": {
+    "kc_uuid": "uuid-xxx-yyy",
+    "confidence": 0.85,
+    "segments": [...],
+    "selected_paths": [...],
+    "explanation": "..."
+  }
+}
+\end{verbatim}
+
+\textbf{错误响应}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{404\ Not\ Found}：kc\_uuid 不存在
+\item
+  \texttt{500\ Internal\ Server\ Error}：查询失败
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{3. 数据字段映射}\label{para:data-field-mapping}
+
+\subparagraph{3.1 Segment 字段映射}\label{subpara:segment-field-mapping}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+API 字段 & 显示名称 & 格式 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{seg\_idx} & 段索引 & 整数 & 从 0 开始 \\
+\texttt{state} & 战术状态 & 枚举字符串 & 对应中文见下表 \\
+\texttt{t\_start} & 起始时间 & ISO 8601 & 可转换为本地时间 \\
+\texttt{t\_end} & 结束时间 & ISO 8601 & 可转换为本地时间 \\
+\texttt{anchor\_in\_uid} & 入口锚点 & UID 字符串 & 可截取显示 \\
+\texttt{anchor\_out\_uid} & 出口锚点 & UID 字符串 & 可截取显示 \\
+\texttt{abnormal\_edge\_count} & 异常边数 & 整数 & top 6 异常边 \\
+\end{longtable}
+}
+
+\subparagraph{3.2 战术状态中英文映射}\label{subpara:tactic-state-mapping}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.35\textwidth}p{0.55\textwidth}@{}}
+\toprule\noalign{}
+state (英文) & 中文显示 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{INITIAL\_ACCESS} & 初始入侵 \\
+\texttt{EXECUTION} & 执行 \\
+\texttt{PRIVILEGE\_ESCALATION} & 权限提升 \\
+\texttt{LATERAL\_MOVEMENT} & 横向移动 \\
+\texttt{COMMAND\_AND\_CONTROL} & 命令与控制 \\
+\texttt{DISCOVERY} & 发现 \\
+\texttt{IMPACT} & 影响 \\
+\end{longtable}
+}
+
+\subparagraph{3.3 Path 字段映射}\label{subpara:path-field-mapping}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+API 字段 & 显示名称 & 格式 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{path\_id} & 路径 ID & 字符串 & 可复制 \\
+\texttt{src\_anchor} & 源锚点 & UID 字符串 & 简化显示 \\
+\texttt{dst\_anchor} & 目标锚点 & UID 字符串 & 简化显示 \\
+\texttt{hop\_count} & 跳数 & 整数 & 边的数量 \\
+\texttt{edge\_ids} & 边 ID 列表 & 字符串数组 & 可折叠显示 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{4. 图谱高亮规则}\label{para:graph-highlighting-rules}
+
+\subparagraph{4.1 高亮触发方式}\label{subpara:highlight-trigger-modes}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{自动高亮}：当 KillChain 面板展开时，自动高亮所有 killchain 路径
+\item
+  \textbf{手动高亮}：点击"在图谱中高亮"按钮，高亮特定路径
+\item
+  \textbf{清除高亮}：关闭 KillChain 面板时，清除所有高亮
+\end{enumerate}
+
+\subparagraph{4.2 高亮样式规范}\label{subpara:highlight-style-specs}
+
+KillChain 路径边采用以下固定样式：
+
+\begin{verbatim}
+// 边样式
+{
+  stroke: '#FF6B6B',      // 红色
+  lineWidth: 3,           // 线宽
+  lineDash: [5, 5],       // 虚线
+  opacity: 0.9            // 不透明度
+}
+
+// 节点样式（路径上的节点）
+{
+  fill: '#FFE5E5',        // 浅红色填充
+  stroke: '#FF6B6B',      // 红色边框
+  lineWidth: 2            // 边框宽度
+}
+\end{verbatim}
+
+\subparagraph{4.3 高亮性能优化}\label{subpara:highlight-performance-optimization}
+
+为防止性能瓶颈，高亮功能需满足以下约束：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{最大高亮边数}：限制为 100 条
+\item
+  \textbf{延迟渲染}：使用 \texttt{requestAnimationFrame} 分批渲染
+\item
+  \textbf{虚拟滚动}：对于大量节点，使用虚拟滚动
+\item
+  \textbf{取消机制}：高亮请求可被后续请求取消
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{5. UI 组件规范}\label{para:ui-component-specs}
+
+\subparagraph{5.1 组件接口}\label{subpara:component-interfaces}
+
+\begin{verbatim}
+interface KillChainPanelProps {
+  task: AnalysisTaskItem;           // 分析任务数据
+  onHighlightPath?: (pathIds: string[]) => void;  // 图谱高亮回调
+  onExport?: (killchain: KillChainData) => void;  // 导出回调
+}
+
+interface KillChainData {
+  kc_uuid: string;
+  confidence: number;
+  segments: SegmentData[];
+  selected_paths: PathData[];
+  explanation: string;
+}
+
+interface SegmentData {
+  seg_idx: number;
+  state: string;
+  t_start: string;  // ISO 8601
+  t_end: string;
+  anchor_in_uid: string;
+  anchor_out_uid: string;
+  abnormal_edge_count: number;
+}
+
+interface PathData {
+  path_id: string;
+  src_anchor: string;
+  dst_anchor: string;
+  hop_count: number;
+  edge_ids: string[];
+}
+\end{verbatim}
+
+\subparagraph{5.2 组件状态}\label{subpara:component-state}
+
+\begin{verbatim}
+interface KillChainPanelState {
+  isExpanded: boolean;           // 是否展开完整版
+  isLoading: boolean;            // 是否正在加载
+  error: string | null;          // 错误信息
+  highlightedPathId: string | null;  // 当前高亮的路径 ID
+}
+\end{verbatim}
+
+\subparagraph{5.3 交互行为}\label{subpara:interaction-behaviors}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{默认状态}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    显示基础版视图
+  \item
+    \texttt{isExpanded\ =\ false}
+  \end{itemize}
+\item
+  \textbf{点击"查看详情"}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    展开完整版视图
+  \item
+    \texttt{isExpanded\ =\ true}
+  \item
+    自动高亮图谱上的所有 killchain 路径
+  \item
+    触发 \texttt{onHighlightPath(allPathIds)}
+  \end{itemize}
+\item
+  \textbf{点击"收起详情"}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    折叠到基础版视图
+  \item
+    \texttt{isExpanded\ =\ false}
+  \item
+    清除图谱高亮
+  \item
+    触发 \texttt{onHighlightPath({[}{]})}
+  \end{itemize}
+\item
+  \textbf{点击特定路径的"在图谱中高亮"}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    高亮该路径的边
+  \item
+    触发 \texttt{onHighlightPath({[}pathId{]})}
+  \end{itemize}
+\item
+  \textbf{点击"导出 KillChain"}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    生成 Markdown 格式的 killchain 报告
+  \item
+    触发文件下载
+  \item
+    触发 \texttt{onExport(killchainData)}
+  \end{itemize}
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{6. 报告导出格式}\label{para:report-export-format}
+
+\subparagraph{6.1 Markdown 章节}\label{subpara:markdown-sections}
+
+导出的 KillChain 章节格式规范如下：
+
+\begin{verbatim}
+## 6. KillChain 攻击链分析
+## 6.1 概览
+- kc_uuid: `uuid-xxx-yyy`
+- confidence: `0.85`
+- segment_count: `6`
+- selected_path_count: `5`
+
+## 6.2 MITRE ATT&CK 战术分段
+[初始入侵] → [执行] → [权限提升] → [横向移动] → [命令与控制] → [影响]
+
+##### 分段详情
+**1. 初始入侵 (INITIAL_ACCESS)**
+- 时间范围：2025-01-16T10:00:00Z → 2025-01-16T10:05:00Z
+- 入口锚点：Process:pid=1234
+- 出口锚点：Host:host.id=web-001
+- 异常边数：3
+
+**2. 执行 (EXECUTION)**
+...
+
+## 6.3 LLM 全链解释
+攻击者进程 p_c2 (pid:1234) 从外部 IP 1.2.3.4 连接到受害主机 host_web (host.id:host-001)...
+（完整 10-20 句解释）
+
+## 6.4 段间连接路径
+**路径 1**: p-abc123
+- 源锚点：Host:host.id=web-001
+- 目标锚点：Process:pid=5678
+- hop 数量：3
+- 边 ID 列表：event-id-1, event-id-2, event-id-3
+
+**路径 2**: ...
+\end{verbatim}
+
+\subparagraph{6.2 导出触发条件}\label{subpara:export-trigger-conditions}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{手动导出}：点击"导出 KillChain"按钮
+\item
+  \textbf{自动包含}：在完整溯源报告导出时自动包含该章节
+\item
+  \textbf{可选包含}：在报告导出设置中提供"包含 KillChain 分析"勾选项
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{7. 实现绑定点}\label{para:implementation-binding-points}
+
+\subparagraph{7.1 前端组件}\label{subpara:frontend-components}
+
+\begin{itemize}
+\tightlist
+\item
+  组件文件：\texttt{frontend/components/killchain/killchain-panel.tsx}
+\item
+  集成位置：\texttt{frontend/app/trace/page.tsx}
+\item
+  样式文件：\texttt{frontend/components/killchain/killchain-panel.css}（可选）
+\end{itemize}
+
+\subparagraph{7.2 API 客户端}\label{subpara:api-client}
+
+\begin{itemize}
+\tightlist
+\item
+  API 函数：\texttt{frontend/lib/api/analysis.ts}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{fetchKillChainByTaskId(taskId:\ string)}
+  \item
+    \texttt{fetchKillChainByUUID(kcUuid:\ string)}（可选）
+  \end{itemize}
+\end{itemize}
+
+\subparagraph{7.3 报告生成}\label{subpara:report-generation}
+
+\begin{itemize}
+\tightlist
+\item
+  报告生成器：\texttt{frontend/lib/export/report-generator.ts}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    在 \texttt{generateMarkdownReport()} 中添加 killchain 章节
+  \end{itemize}
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\paragraph{8. 测试验收标准}\label{para:test-acceptance-criteria}
+
+\subparagraph{8.1 功能测试}\label{subpara:functional-tests}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{基础版视图}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    ✅ 可信度评分条颜色正确
+  \item
+    ✅ 战术时间线显示完整
+  \item
+    ✅ LLM 解释摘要显示前 3 句
+  \end{itemize}
+\item
+  \textbf{完整版视图}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    ✅ 展开/折叠功能正常
+  \item
+    ✅ 所有 segment 显示完整
+  \item
+    ✅ 所有 path 显示完整
+  \item
+    ✅ LLM 解释完整显示
+  \end{itemize}
+\item
+  \textbf{图谱高亮}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    ✅ 展开面板时自动高亮
+  \item
+    ✅ 点击路径高亮功能正常
+  \item
+    ✅ 收起面板时清除高亮
+  \end{itemize}
+\item
+  \textbf{报告导出}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    ✅ 导出的 Markdown 格式正确
+  \item
+    ✅ 包含所有必要信息
+  \item
+    ✅ 文件下载成功
+  \end{itemize}
+\end{enumerate}
+
+\subparagraph{8.2 性能测试}\label{subpara:performance-tests}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{渲染性能}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    基础版渲染时间 \textless{} 100ms
+  \item
+    完整版展开时间 \textless{} 300ms
+  \end{itemize}
+\item
+  \textbf{高亮性能}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    高亮 100 条边不卡顿
+  \item
+    高亮操作响应时间 \textless{} 200ms
+  \end{itemize}
+\end{enumerate}
+
+\subparagraph{8.3 兼容性测试}\label{subpara:compatibility-tests}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{向后兼容}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    不包含 killchain 的任务正常显示
+  \item
+    旧版本任务不报错
+  \end{itemize}
+\item
+  \textbf{边界情况}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    空segments处理
+  \item
+    超长explanation换行处理
+  \item
+    特殊字符转义
+  \end{itemize}
+\end{enumerate}

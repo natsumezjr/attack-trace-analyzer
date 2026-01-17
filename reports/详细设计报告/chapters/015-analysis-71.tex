@@ -1,0 +1,172 @@
+\subsection{候选路径构造与评分}\label{candidate-path-construction}
+
+\subsubsection{输入子图定义}\label{candidate-path-input}
+
+溯源算法从 Neo4j 获取两类输入参数：
+
+\begin{itemize}
+\tightlist
+\item
+  目标节点 UID：\texttt{task.target.node\_uid}
+\item
+  时间窗：\texttt{{[}task.window.start\_ts,\ task.window.end\_ts{]}}
+\end{itemize}
+
+算法基于目标节点的 1-hop incident edges 提取边集合。
+
+\paragraph{算法总览}\label{candidate-path-algorithm-overview}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-71/analysis-71-01.pdf}
+\caption{算法总览}
+\label{fig:analysis-71-01}
+\end{figure}
+
+\paragraph{输入配置示例}\label{candidate-path-input-example}
+
+\begin{verbatim}
+{
+  "target": {
+    "node_uid": "process-12345"
+  },
+  "window": {
+    "start_ts": 1704067200.0,
+    "end_ts": 1704153600.0
+  }
+}
+\end{verbatim}
+
+代码实现位于 \texttt{backend/app/services/analyze/trace.py} 的 \texttt{compute\_trace()} 函数。
+
+\subsubsection{时间窗过滤（固定）}\label{candidate-path-time-window}
+
+输入边集合按 \texttt{ts\_float} 字段过滤至时间窗内（闭区间）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{task.window.start\_ts\ \textless{}=\ edge.ts\_float\ \textless{}=\ task.window.end\_ts}
+\end{itemize}
+
+时间窗单位与转换由 Neo4j 模块统一处理，算法层仅对 \texttt{ts\_float} 数值进行比较。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-71/analysis-71-02.pdf}
+\caption{时间窗过滤}
+\label{fig:analysis-71-02}
+\end{figure}
+
+\subsubsection{锚点与段划分（固定）}\label{candidate-path-segments}
+
+当前实现不执行攻击阶段划分，边集合按事件时间排序后直接用于数据写回与前端展示。
+
+\subsubsection{风险评分与排序（固定）}\label{candidate-path-scoring}
+
+风险评分采用固定的兜底策略：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  若边属性包含 \texttt{event.severity}，取其数值作为风险分；
+\item
+  若 \texttt{is\_alarm=true}，风险分取 \texttt{50.0}；
+\item
+  其他情况风险分取 \texttt{0.0}。
+\end{enumerate}
+
+\paragraph{评分规则可视化}\label{candidate-path-scoring-visual}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-71/analysis-71-03.pdf}
+\caption{评分规则}
+\label{fig:analysis-71-03}
+\end{figure}
+
+\paragraph{评分示例}\label{candidate-path-scoring-example}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+场景 & event.severity & is\_alarm & 风险评分 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+高危事件 & 90.0 & false & \textbf{90.0} \\
+告警边（无 severity） & null & true & \textbf{50.0} \\
+普通事件 & null & false & \textbf{0.0} \\
+中危事件 & 60.0 & true & \textbf{60.0} \\
+\end{longtable}
+}
+
+\paragraph{代码示例}\label{candidate-path-code-example}
+
+\begin{verbatim}
+def _derive_risk_score(edge: Edge) -> float:
+    """计算边的风险评分"""
+    if hasattr(edge, 'event') and edge.event.severity is not None:
+        return float(edge.event.severity)
+    if edge.is_alarm:
+        return 50.0
+    return 0.0
+\end{verbatim}
+
+代码实现位于 \texttt{backend/app/services/analyze/trace.py} 的 \texttt{\_derive\_risk\_score()} 函数。
+
+\subsubsection{同分处理规则}\label{candidate-path-tiebreaking}
+
+同分处理采用固定的排序策略：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  首先按 \texttt{ts\_float} 时间升序排序；
+\item
+  时间相同则按边的 \texttt{src\_uid} 与 \texttt{dst\_uid} 字典序排序，确保输出稳定。
+\end{enumerate}
+
+\paragraph{排序流程}\label{candidate-path-sorting-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-71/analysis-71-04.pdf}
+\caption{排序流程}
+\label{fig:analysis-71-04}
+\end{figure}
+
+\paragraph{排序示例}\label{candidate-path-sorting-example}
+
+假设边集合如下：
+
+\begin{verbatim}
+edges = [
+    Edge(ts_float=1000, src_uid="B", dst_uid="D"),
+    Edge(ts_float=900, src_uid="A", dst_uid="C"),
+    Edge(ts_float=1000, src_uid="A", dst_uid="B"),
+    Edge(ts_float=1000, src_uid="A", dst_uid="C"),
+]
+\end{verbatim}
+
+排序结果如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.18\textwidth}p{0.10\textwidth}p{0.20\textwidth}p{0.20\textwidth}p{0.22\textwidth}@{}}
+\toprule\noalign{}
+顺序 & ts\_float & src\_uid & dst\_uid & 排序依据 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & 900 & A & C & 时间戳最小 \\
+2 & 1000 & A & B & 时间相同，src\_uid 最小 \\
+3 & 1000 & A & C & 时间相同，src\_uid 相同，dst\_uid 排序 \\
+4 & 1000 & B & D & 时间相同，src\_uid 较大 \\
+\end{longtable}
+}

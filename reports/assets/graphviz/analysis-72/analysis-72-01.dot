@@ -1,0 +1,29 @@
+digraph {
+    rankdir=LR;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=9];
+
+    subgraph cluster_original {
+        label="原始 Payload (build_llm_payload)";
+        style=filled;
+        fillcolor="#fce4ec";
+        A [label="constraints<br/>segments 数组<br/>pairs 数组", shape=box];
+    }
+
+    subgraph cluster_reduced {
+        label="Reduced Payload (PayloadReducer)";
+        style=filled;
+        fillcolor="#fff3e0";
+        B [label="constraints ✓<br/>segments 数组<br/>  • 保留元信息<br/>  • 裁剪 abnormal_edge_summaries<br/>pairs 数组<br/>  • 保留元信息<br/>  • 裁剪 candidates 数组.steps 数组<br/>    • max_steps_per_path 为 10<br/>    • key_props 只保留 20 字段<br/>    • max_str_len 为 200", shape=box];
+    }
+
+    subgraph cluster_preselected {
+        label="Preselected Payload (HeuristicPreselector)";
+        style=filled;
+        fillcolor="#c8e6c9";
+        C [label="constraints ✓<br/>segments 数组 ✓<br/>pairs 数组<br/>  • 每个 pair 保留 Top 8<br/>  • 按 hop 与 token 交集评分<br/>  • 写入 heuristic_ranking 数组", shape=box];
+    }
+
+    A -> B [label="文本截断"];
+    B -> C [label="启发式评分"];
+}

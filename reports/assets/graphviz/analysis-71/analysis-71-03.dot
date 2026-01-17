@@ -1,0 +1,22 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    EdgeObj [label="边对象", fillcolor="#fce4ec"];
+    Check1 [label="包含 severity?", shape=diamond, fillcolor="#fff9c4"];
+    Severity [label="使用 severity 值", fillcolor="#e3f2fd"];
+    Check2 [label="is_alarm 为 true?", shape=diamond, fillcolor="#fff9c4"];
+    Alarm [label="固定分 50.0", fillcolor="#e3f2fd"];
+    Default [label="固定分 0.0", fillcolor="#e3f2fd"];
+    Score [label="风险评分", fillcolor="#fce4ec"];
+
+    EdgeObj -> Check1 [label="是"];
+    Check1 -> Severity;
+    Check1 -> Check2 [label="否"];
+    Check2 -> Alarm [label="是"];
+    Check2 -> Default [label="否"];
+    Severity -> Score;
+    Alarm -> Score;
+    Default -> Score;
+}

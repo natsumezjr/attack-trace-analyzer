@@ -1,0 +1,24 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    Input [label="输入: 关键路径边<br/>Canonical Findings", fillcolor="#e1f5fe"];
+    Extract [label="提取特征<br/>TTP tags<br/>tactics & techniques", fillcolor="#fff3e0"];
+    Vectorize [label="向量化<br/>TF-IDF<br/>二值 TF", fillcolor="#fff3e0"];
+    Load [label="加载 TTP 知识库<br/>MITRE ATT&CK<br/>Enterprise CTI", fillcolor="#fff3e0"];
+    Match [label="相似度匹配<br/>cosine similarity<br/>tech + tactic score", fillcolor="#fff3e0"];
+    Filter [label="过滤候选<br/>score > 0.0", fillcolor="#fff3e0"];
+    Rank [label="排序<br/>Top3 APTs", fillcolor="#fff3e0"];
+    Explain [label="生成解释<br/>Top5 techniques<br/>Top5 tactics", fillcolor="#fff3e0"];
+    Output [label="输出匹配结果<br/>similar_apts 数组", fillcolor="#e8f5e9"];
+
+    Input -> Extract;
+    Extract -> Vectorize;
+    Vectorize -> Load;
+    Load -> Match;
+    Match -> Filter;
+    Filter -> Rank;
+    Rank -> Explain;
+    Explain -> Output;
+}

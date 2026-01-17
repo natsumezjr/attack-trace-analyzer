@@ -1,0 +1,193 @@
+.........................................FF....F...FF..F                 [100%]
+=================================== FAILURES ===================================
+_ TestFullWorkflowWithIncremental.test_complete_workflow_with_incremental_processing _
+tests/integration/test_services_opensearch/test_full_workflow.py:65: in test_complete_workflow_with_incremental_processing
+    assert last_timestamp is not None
+E   assert None is not None
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 3 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T18:49:50.350269Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-0
+[DEBUG] Event 0 checking event.id: event_id=f-full-0, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] Event 1: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 1 after normalize: has_timestamp=True, timestamp=2026-01-16T17:49:50.350269Z
+[DEBUG] Event 1 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-1
+[DEBUG] Event 1 checking event.id: event_id=f-full-1, has_event_id=True
+[DEBUG] Event 1 checking event.kind: kind=alert, is_valid=True
+[DEBUG] Event 2: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 2 after normalize: has_timestamp=True, timestamp=2026-01-16T16:49:50.350269Z
+[DEBUG] Event 2 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-2
+[DEBUG] Event 2 checking event.id: event_id=f-full-2, has_event_id=True
+[DEBUG] Event 2 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 3, 'success': 3, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 3, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-0 [status:404 request:0.013s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-1 [status:404 request:0.015s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-2 [status:404 request:0.011s]
+_ TestFullWorkflowWithIncremental.test_incremental_processing_avoids_duplicates _
+tests/integration/test_services_opensearch/test_full_workflow.py:127: in test_incremental_processing_avoids_duplicates
+    assert len(filtered) == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = len([{'@timestamp': '2026-01-16T17:49:51.569451Z', 'custom': {'confidence': 0.8, 'evidence': {'event_ids': ['f-dedup-1']},...tegory': ['intrusion_detection'], 'created': '2026-01-16T17:49:51.569451Z', 'dataset': 'finding.raw.falco', ...}, ...}])
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T17:49:51.569451Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-dedup-1
+[DEBUG] Event 0 checking event.id: event_id=f-dedup-1, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-dedup-1 [status:404 request:0.006s]
+_____________ TestAnalysisHelperFunctions.test_should_trigger_scan _____________
+tests/integration/test_services_opensearch/test_incremental_analysis.py:42: in test_should_trigger_scan
+    from app.services.opensearch.analysis import _should_trigger_scan
+E   ImportError: cannot import name '_should_trigger_scan' from 'app.services.opensearch.analysis' (/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/app/services/opensearch/analysis.py)
+_ TestAnalysisHelperFunctions.test_get_last_processed_timestamp_with_findings __
+tests/integration/test_services_opensearch/test_incremental_analysis.py:134: in test_get_last_processed_timestamp_with_findings
+    assert timestamp is not None
+E   assert None is not None
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 2 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T16:49:54.575922Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f1
+[DEBUG] Event 0 checking event.id: event_id=f1, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] Event 1: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 1 after normalize: has_timestamp=True, timestamp=2026-01-16T17:49:54.575942Z
+[DEBUG] Event 1 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f2
+[DEBUG] Event 1 checking event.id: event_id=f2, has_event_id=True
+[DEBUG] Event 1 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 2, 'success': 2, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 2, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f1 [status:404 request:0.007s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f2 [status:404 request:0.006s]
+_____ TestIncrementalProcessing.test_fetch_and_store_findings_incremental ______
+tests/integration/test_services_opensearch/test_incremental_analysis.py:183: in test_fetch_and_store_findings_incremental
+    assert last_timestamp is not None
+E   assert None is not None
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T16:49:55.720754Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-inc-1
+[DEBUG] Event 0 checking event.id: event_id=f-inc-1, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T18:49:55.817410Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-inc-2
+[DEBUG] Event 0 checking event.id: event_id=f-inc-2, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-inc-1 [status:404 request:0.014s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-inc-2 [status:404 request:0.013s]
+________ TestAnalysisRefactoredFunctions.test_poll_for_scan_completion _________
+tests/integration/test_services_opensearch/test_incremental_analysis.py:269: in test_poll_for_scan_completion
+    scan_completed, scan_wait_ms = _poll_for_scan_completion(
+E   TypeError: _poll_for_scan_completion() missing 1 required positional argument: 'baseline_timestamp_ms'
+=============================== warnings summary ===============================
+tests/integration/test_api/test_clients.py: 1 warning
+tests/integration/test_api/test_events.py: 1 warning
+tests/integration/test_api/test_findings.py: 1 warning
+tests/integration/test_api/test_targets.py: 1 warning
+tests/integration/test_services_opensearch/test_full_workflow.py: 3 warnings
+tests/integration/test_services_opensearch/test_incremental_analysis.py: 8 warnings
+  /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/.venv/lib/python3.12/site-packages/urllib3/connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'localhost'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.12.12-final-0 _______________
+
+Name                                              Stmts   Miss Branch BrPart   Cover   Missing
+----------------------------------------------------------------------------------------------
+app/__init__.py                                       0      0      0      0 100.00%
+app/api/__init__.py                                   0      0      0      0 100.00%
+app/api/router.py                                    13      0      0      0 100.00%
+app/api/routes/__init__.py                            0      0      0      0 100.00%
+app/api/routes/analysis_tasks.py                    121     75     36      6  33.12%   36-53, 77, 79, 81-86, 89, 120-121, 132-134, 140-154, 159-187, 206-269
+app/api/routes/clients.py                            69     27      6      1  57.33%   23-28, 33-34, 58-106, 127-128, 139-141
+app/api/routes/events.py                             65     20     22      7  59.77%   38, 42-44, 49, 54-59, 62, 64, 67, 70-72, 77, 97-99
+app/api/routes/findings.py                           68     18     24     10  65.22%   42, 47, 52-57, 60, 63, 65, 67, 69, 72, 77, 83, 101-102
+app/api/routes/graph.py                              88     12     36      6  82.26%   99, 113, 136, 148-150, 169-171, 178-183
+app/api/routes/health.py                              5      0      0      0 100.00%
+app/api/routes/root.py                                5      0      0      0 100.00%
+app/api/routes/targets.py                            61     38     14      1  32.00%   20-70, 85-86, 94-102, 109-110
+app/api/utils.py                                     11      0      0      0 100.00%
+app/core/__init__.py                                  1      0      0      0 100.00%
+app/core/config.py                                   36     15     10      1  47.83%   9-11, 16-27
+app/core/deps.py                                      3      3      0      0   0.00%   1-5
+app/core/logging.py                                   3      0      0      0 100.00%
+app/core/time.py                                     47     10     24      6  71.83%   13, 22-24, 27-29, 34, 42, 56
+app/dto/__init__.py                                   2      0      0      0 100.00%
+app/dto/targets.py                                    3      0      0      0 100.00%
+app/schemas/__init__.py                               0      0      0      0 100.00%
+app/schemas/common.py                                 9      9      0      0   0.00%   1-15
+app/services/analyze/__init__.py                     82     72     26      0   9.26%   12-64, 80-122, 132-157
+app/services/analyze/attack_fsa.py                  316    205     92      0  27.21%   113-185, 201, 205, 209, 213, 217, 221, 230-231, 236, 241-244, 257-259, 263, 267, 283, 287, 292, 297, 319-334, 338, 342, 362-364, 368, 390-393, 397, 407-410, 415, 424, 428-431, 435-438, 449-455, 463-471, 495-566, 583-634, 650-676, 685-691, 709-726, 740-751, 760-770
+app/services/analyze/killchain.py                   646    512    294      0  14.26%   55-68, 220, 229-239, 244-246, 251-252, 260-268, 276-280, 392-394, 397, 400-407, 417-419, 474-487, 495-534, 555-611, 620-625, 634, 645-662, 689-699, 708-717, 725-729, 734-740, 749-758, 780-831, 849-904, 925-1034, 1051-1251, 1278-1290, 1304-1335, 1375-1431, 1443-1462, 1489-1537, 1548, 1553, 1574-1627
+app/services/analyze/killchain_llm.py               278    237    104      0  10.73%   30, 78-80, 86, 89-159, 181, 184-208, 215-269, 281-334, 347-396, 405-420, 428-437, 469-474, 482-532, 543-545, 548-551, 569-636, 680-721
+app/services/analyze/pipeline.py                    133     99     30      0  20.86%   30, 49-51, 56, 66-93, 97-107, 123-126, 151-317
+app/services/analyze/runner.py                       68     39      8      0  38.16%   33-35, 40, 57-74, 86-96, 100-109, 114-118, 123-133
+app/services/analyze/trace.py                        83     65     36      0  15.13%   19-21, 26-30, 34-35, 44-52, 62-67, 71-85, 103-136
+app/services/analyze/ttp_similarity/__init__.py       3      0      0      0 100.00%
+app/services/analyze/ttp_similarity/router.py        37     10      2      0  69.23%   46-64
+app/services/analyze/ttp_similarity/service.py      374    321    176      0   9.64%   23-25, 29-34, 38-49, 53-64, 74-80, 84-87, 92-95, 99-100, 107-118, 122-133, 137-148, 187, 191-196, 200-345, 373-553, 563-573, 591-657, 671-692
+app/services/client_poller.py                       165    133     30      0  16.41%   29-31, 35-36, 40-45, 49-54, 58-78, 82-96, 100, 104-121, 125-134, 143-162, 166-223, 228-232, 236-250, 255-264
+app/services/neo4j/__init__.py                        3      0      0      0 100.00%
+app/services/neo4j/db.py                            534    334    184     12  35.65%   73, 156-159, 193, 253-255, 260-272, 287-301, 310->312, 313, 366, 423, 430->438, 433-435, 487-489, 510-518, 523-534, 546-559, 564-577, 589-619, 624-632, 641-654, 659-666, 702, 705-706, 724-742, 747-757, 768-784, 805, 817, 820-821, 879-880, 885-891, 922-929, 945-952, 967-1094, 1099, 1127, 1134-1146, 1151-1170, 1175-1210, 1220-1227, 1232-1281, 1290-1313
+app/services/neo4j/ecs_ingest.py                    268     31    156     28  82.78%   49->48, 63->58, 69->68, 77, 83-85, 96, 116, 120, 124, 138, 147->149, 149->151, 164, 189, 200, 220, 236, 324-325, 332->345, 334-342, 348->347, 364->366, 366->368, 369, 371, 376, 390, 393-396, 401->400
+app/services/neo4j/ingest.py                        152    130     80      1  10.78%   10-11, 35-43, 68, 85-125, 130-150, 155-159, 187-234, 261-324
+app/services/neo4j/internal.py                       11      0      0      0 100.00%
+app/services/neo4j/models.py                        220     55     88     29  70.13%   62, 66, 69-70, 79, 90, 94-95, 101, 105, 108-109, 127->126, 141, 145, 149, 153, 157-162, 188, 190, 207, 210->212, 214->216, 224, 226, 254-256, 267->269, 285, 287, 292, 294, 296, 302, 310, 326-331, 338, 341, 344, 363->366, 366->368, 369, 381, 385, 389, 393, 397, 401, 405, 409
+app/services/neo4j/utils.py                          86     39     42      9  46.88%   21, 31, 33, 68, 75-77, 91, 96-99, 103->105, 108-111, 122-124, 132-159
+app/services/opensearch/__init__.py                   4      0      0      0 100.00%
+app/services/opensearch/analysis.py                1740   1610    790      5   5.73%   142-143, 148-153, 158, 163, 171-204, 209-220, 225-298, 323-364, 371-376, 381, 386, 393-554, 571-758, 784-838, 855-856, 876-906, 911-919, 927->930, 934-935, 954, 975-981, 1005-1013, 1037-1038, 1043-1047, 1052-1078, 1089-1117, 1129-1188, 1206-1308, 1327-1455, 1487-1668, 1695-1743, 1755-1765, 1792-1899, 1926-1980, 2007-2066, 2093-2146, 2173-2222, 2244-2335, 2369-2430, 2448-2708, 2734-3139, 3165-3355, 3383-3510, 3528-3665, 3702-3880, 3905-3934, 3944-4124, 4131, 4156-4177
+app/services/opensearch/client.py                   153     66     38     10  53.93%   9-10, 23, 25, 56->60, 60->64, 83->101, 97-99, 102-104, 131-138, 146-148, 169-171, 180-200, 209, 214-215, 224-234, 243-256, 261-265, 286, 299->301, 311, 318-320
+app/services/opensearch/index.py                     21      2      2      1  86.96%   35, 43
+app/services/opensearch/internal.py                   6      0      0      0 100.00%
+app/services/opensearch/mappings.py                   5      0      0      0 100.00%
+app/services/opensearch/query.py                    136    126     54      0   5.26%   37-114, 135-186, 207-258, 322-433, 483-517
+app/services/opensearch/storage.py                  415    208    228     68  43.70%   22-106, 118-129, 133, 146-174, 189-190, 229-233, 235, 243-244, 249-258, 264-268, 271, 276-283, 288-289, 294, 297->301, 303-304, 308, 314, 322, 325->493, 328-329, 333-334, 339->346, 341->343, 343->346, 347->351, 352->354, 359->361, 366, 369-370, 372, 378-379, 381, 383, 388-389, 402->406, 407->417, 409->417, 411-414, 421-437, 441-446, 451-464, 469-470, 473-474, 481-482, 485-487, 495-509, 512-523, 537, 547-548, 572, 576, 582, 592-595, 601, 631, 642->645, 646-648, 652->656, 657-663, 665->670, 672-680, 685->688, 689-695, 704->707, 708-714, 720-721, 748-755
+----------------------------------------------------------------------------------------------
+TOTAL                                              6549   4521   2632    201  26.54%
+Coverage HTML written to dir htmlcov
+=========================== short test summary info ============================
+FAILED tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_complete_workflow_with_incremental_processing
+FAILED tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_incremental_processing_avoids_duplicates
+FAILED tests/integration/test_services_opensearch/test_incremental_analysis.py::TestAnalysisHelperFunctions::test_should_trigger_scan
+FAILED tests/integration/test_services_opensearch/test_incremental_analysis.py::TestAnalysisHelperFunctions::test_get_last_processed_timestamp_with_findings
+FAILED tests/integration/test_services_opensearch/test_incremental_analysis.py::TestIncrementalProcessing::test_fetch_and_store_findings_incremental
+FAILED tests/integration/test_services_opensearch/test_incremental_analysis.py::TestAnalysisRefactoredFunctions::test_poll_for_scan_completion
+6 failed, 50 passed, 15 warnings in 29.62s

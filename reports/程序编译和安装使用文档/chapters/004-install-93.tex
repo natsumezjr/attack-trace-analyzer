@@ -1,0 +1,206 @@
+\section{C2部署与证据点}\label{c2-deployment-evidence}
+
+本文件定义 C2（DNS+HTTP）在靶场中的固定部署方式与固定证据生成方式，用于稳定生成 DNS 与 HTTP 两类网络证据，并可在宿主机抓包验收。
+
+\subsection{固定约定}\label{fixed-conventions}
+
+ATA系统靶场对 C2 的固定约定如下：
+
+\begin{itemize}
+\tightlist
+\item
+  Docker macvlan 网络：\texttt{c2-macvlan}
+\item
+  C2 DNS IP：\texttt{\textless{}C2\_DNS\_IP\textgreater{}}
+\item
+  C2 HTTP IP：\texttt{\textless{}C2\_HTTP\_IP\textgreater{}}
+\item
+  C2 域名：\texttt{\textless{}C2\_DOMAIN\textgreater{}}（固定解析到 \texttt{\textless{}C2\_HTTP\_IP\textgreater{}}）
+\item
+  HTTP 路径：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{http://\textless{}C2\_HTTP\_IP\textgreater{}/health}
+  \item
+    \texttt{http://\textless{}C2\_HTTP\_IP\textgreater{}/payload}
+  \end{itemize}
+\end{itemize}
+
+\subsection{macvlan 前置条件（必须满足）}\label{macvlan-prerequisites}
+
+\begin{itemize}
+\tightlist
+\item
+  宿主机内网网卡：\texttt{ens5f1}
+\item
+  内网网段：\texttt{\textless{}LAN\_CIDR\textgreater{}}
+\item
+  C2 IP \texttt{\textless{}C2\_DNS\_IP\textgreater{}} 与 \texttt{\textless{}C2\_HTTP\_IP\textgreater{}} 未被占用
+\end{itemize}
+
+\subsection{创建 Docker macvlan 网络（固定命令）}\label{create-macvlan-network}
+
+在宿主机执行：
+
+\begin{verbatim}
+sudo docker network create -d macvlan \
+  --subnet=<LAN_CIDR> \
+  --gateway=<LAN_GW_IP> \
+  -o parent=ens5f1 \
+  c2-macvlan
+\end{verbatim}
+
+\subsection{宿主机创建 macvlan0 并添加路由（固定命令）}\label{create-macvlan0-routing}
+
+macvlan 的默认行为会导致宿主机无法直接访问 macvlan 容器 IP。ATA系统固定通过创建宿主机 \texttt{macvlan0} 并添加两条 \texttt{/32} 路由解决该问题。
+
+宿主机 \texttt{macvlan0} 的 IP 固定为 \texttt{\textless{}MACVLAN\_HOST\_IP\textgreater{}/24}：
+
+\begin{verbatim}
+sudo ip link add macvlan0 link ens5f1 type macvlan mode bridge
+sudo ip addr add <MACVLAN_HOST_IP>/24 dev macvlan0
+sudo ip link set macvlan0 up
+
+sudo ip route add <C2_DNS_IP>/32 dev macvlan0 || true
+sudo ip route add <C2_HTTP_IP>/32 dev macvlan0 || true
+\end{verbatim}
+
+\subsection{准备 C2 配置与静态内容（固定命令）}\label{prepare-c2-config}
+
+ATA系统固定将 C2 的配置与静态文件放在：\texttt{\$BASE/run/c2/}。
+
+仓库内同时包含 \texttt{scripts/靶场编排/c2\_config/} 目录，其内容用于保存 C2 的配置文件模板。靶场运行命令以本文第 6 节为准。
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+mkdir -p "$BASE"/run/c2/html
+\end{verbatim}
+
+CoreDNS 配置文件固定为：\texttt{\$BASE/run/c2/Corefile}
+
+\begin{verbatim}
+cat > "$BASE"/run/c2/Corefile <<'EOF'
+.:53 {
+  log
+  errors
+  hosts /etc/coredns/hosts {
+    reload 1s
+    fallthrough
+  }
+  forward . 223.5.5.5 114.114.114.114
+}
+EOF
+\end{verbatim}
+
+hosts 记录固定为：\texttt{\$BASE/run/c2/hosts}
+
+\begin{verbatim}
+cat > "$BASE"/run/c2/hosts <<'EOF'
+<C2_HTTP_IP> <C2_DOMAIN>
+EOF
+\end{verbatim}
+
+HTTP 静态内容固定为两个文件：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{\$BASE/run/c2/html/health}
+\item
+  \texttt{\$BASE/run/c2/html/payload}
+\end{itemize}
+
+\begin{verbatim}
+printf "ok\n" > "$BASE"/run/c2/html/health
+printf "hello from c2 (benign)\n" > "$BASE"/run/c2/html/payload
+\end{verbatim}
+
+\subsection{启动 C2（固定命令）}\label{start-c2-containers}
+
+ATA系统固定启动两个容器：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{c2-dns}：CoreDNS（IP=\textless C2\_DNS\_IP\textgreater）
+\item
+  \texttt{c2-http}：Nginx（IP=\textless C2\_HTTP\_IP\textgreater）
+\end{itemize}
+
+\begin{verbatim}
+docker rm -f c2-dns c2-http || true
+
+docker run -d --name c2-dns \
+  --network c2-macvlan --ip <C2_DNS_IP> \
+  -v "$BASE"/run/c2/Corefile:/etc/coredns/Corefile:ro \
+  -v "$BASE"/run/c2/hosts:/etc/coredns/hosts:ro \
+  coredns/coredns:latest
+
+docker run -d --name c2-http \
+  --network c2-macvlan --ip <C2_HTTP_IP> \
+  -v "$BASE"/run/c2/html:/usr/share/nginx/html:ro \
+  nginx:latest
+\end{verbatim}
+
+\subsection{验证 C2（固定命令 + 固定预期）}\label{verify-c2}
+
+\subsubsection{DNS 验证}\label{dns-verification}
+
+\begin{verbatim}
+dig @<C2_DNS_IP> <C2_DOMAIN> +short
+\end{verbatim}
+
+预期输出固定为：
+
+\begin{verbatim}
+<C2_HTTP_IP>
+\end{verbatim}
+
+\subsubsection{HTTP 验证}\label{http-verification}
+
+\begin{verbatim}
+curl -s http://<C2_HTTP_IP>/health && echo
+curl -s http://<C2_HTTP_IP>/payload && echo
+\end{verbatim}
+
+预期输出固定包含：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ok}
+\item
+  \texttt{hello\ from\ c2\ (benign)}
+\end{itemize}
+
+\subsubsection{抓包验收（固定）}\label{packet-capture-verification}
+
+\begin{verbatim}
+sudo timeout 3 tcpdump -i macvlan0 -nn '(host <C2_DNS_IP> and (udp port 53 or tcp port 53)) or (host <C2_HTTP_IP> and tcp port 80)' &
+sleep 0.2
+dig @<C2_DNS_IP> <C2_DOMAIN> +noall +answer +time=1 +tries=1
+curl -s http://<C2_HTTP_IP>/health && echo
+wait
+\end{verbatim}
+
+\subsection{证据点（固定生成方式）}\label{evidence-points}
+
+执行第 7 节的 DNS 与 HTTP 命令会固定产生：
+
+\begin{itemize}
+\tightlist
+\item
+  DNS 查询：\texttt{\textless{}CENTER\_IP\textgreater{}\ -\textgreater{}\ \textless{}C2\_DNS\_IP\textgreater{}:53}（包含 \texttt{\textless{}C2\_DOMAIN\textgreater{}}）
+\item
+  HTTP 访问：\texttt{\textless{}CENTER\_IP\textgreater{}\ -\textgreater{}\ \textless{}C2\_HTTP\_IP\textgreater{}:80}（包含 \texttt{/health}、\texttt{/payload}）
+\end{itemize}
+
+这些证据的验证步骤见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{94-验证清单.md}
+\end{itemize}

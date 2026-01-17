@@ -1,0 +1,258 @@
+EEEEEEEEEEEs.........................FF..F                               [100%]
+==================================== ERRORS ====================================
+_____ ERROR at setup of TestEndToEndWorkflow.test_complete_event_lifecycle _____
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 34
+      def test_complete_event_lifecycle(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:34
+_ ERROR at setup of TestEndToEndWorkflow.test_complete_finding_deduplication_workflow _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 65
+      def test_complete_finding_deduplication_workflow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:65
+______ ERROR at setup of TestEndToEndWorkflow.test_multi_index_data_flow _______
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 112
+      def test_multi_index_data_flow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:112
+_ ERROR at setup of TestEndToEndWorkflow.test_data_analysis_complete_workflow __
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 149
+      def test_data_analysis_complete_workflow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:149
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_multiple_attack_techniques _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 185
+      def test_scenario_multiple_attack_techniques(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:185
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_same_attack_multiple_hosts _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 215
+      def test_scenario_same_attack_multiple_hosts(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:215
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_time_window_deduplication _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 246
+      def test_scenario_time_window_deduplication(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:246
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_fingerprint_variations _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 286
+      def test_scenario_fingerprint_variations(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:286
+_ ERROR at setup of TestPerformanceAndScalability.test_bulk_store_large_dataset _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 312
+      def test_bulk_store_large_dataset(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:312
+_ ERROR at setup of TestPerformanceAndScalability.test_search_with_pagination __
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 325
+      def test_search_with_pagination(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:325
+___ ERROR at setup of TestErrorHandling.test_handle_invalid_event_structure ____
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 347
+      def test_handle_invalid_event_structure(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:347
+=================================== FAILURES ===================================
+_ TestFullWorkflowWithIncremental.test_complete_workflow_with_incremental_processing _
+tests/integration/test_services_opensearch/test_full_workflow.py:65: in test_complete_workflow_with_incremental_processing
+    assert last_timestamp is not None
+E   assert None is not None
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 3 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T18:48:59.954429Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-0
+[DEBUG] Event 0 checking event.id: event_id=f-full-0, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] Event 1: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 1 after normalize: has_timestamp=True, timestamp=2026-01-16T17:48:59.954429Z
+[DEBUG] Event 1 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-1
+[DEBUG] Event 1 checking event.id: event_id=f-full-1, has_event_id=True
+[DEBUG] Event 1 checking event.kind: kind=alert, is_valid=True
+[DEBUG] Event 2: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 2 after normalize: has_timestamp=True, timestamp=2026-01-16T16:48:59.954429Z
+[DEBUG] Event 2 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-full-2
+[DEBUG] Event 2 checking event.id: event_id=f-full-2, has_event_id=True
+[DEBUG] Event 2 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 3, 'success': 3, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 3, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-0 [status:404 request:0.004s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-1 [status:404 request:0.006s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-full-2 [status:404 request:0.003s]
+_ TestFullWorkflowWithIncremental.test_incremental_processing_avoids_duplicates _
+tests/integration/test_services_opensearch/test_full_workflow.py:127: in test_incremental_processing_avoids_duplicates
+    assert len(filtered) == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = len([{'@timestamp': '2026-01-16T17:49:00.431627Z', 'custom': {'confidence': 0.8, 'evidence': {'event_ids': ['f-dedup-1']},...tegory': ['intrusion_detection'], 'created': '2026-01-16T17:49:00.431627Z', 'dataset': 'finding.raw.falco', ...}, ...}])
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T17:49:00.431627Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-dedup-1
+[DEBUG] Event 0 checking event.id: event_id=f-dedup-1, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-dedup-1 [status:404 request:0.005s]
+_____ TestIncrementalProcessing.test_fetch_and_store_findings_incremental ______
+tests/integration/test_services_opensearch/test_incremental_analysis.py:183: in test_fetch_and_store_findings_incremental
+    assert last_timestamp is not None
+E   assert None is not None
+---------------------------- Captured stdout setup -----------------------------
+索引 ecs-events-2026-01-16 创建成功
+索引 raw-findings-2026-01-16 创建成功
+索引 canonical-findings-2026-01-16 创建成功
+所有索引初始化完成
+----------------------------- Captured stdout call -----------------------------
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T16:49:01.325249Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-inc-1
+[DEBUG] Event 0 checking event.id: event_id=f-inc-1, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+[DEBUG] store_events called with 1 events
+[DEBUG] Event 0: type=<class 'dict'>, is_dict=True, keys=['ecs', '@timestamp', 'event', 'rule', 'threat', 'custom', 'host', 'message']
+[DEBUG] Event 0 after normalize: has_timestamp=True, timestamp=2026-01-16T18:49:01.371698Z
+[DEBUG] Event 0 before ensure_required_fields: event.kind=alert, event.dataset=finding.raw.falco, host.name=test-host, event.id=f-inc-2
+[DEBUG] Event 0 checking event.id: event_id=f-inc-2, has_event_id=True
+[DEBUG] Event 0 checking event.kind: kind=alert, is_valid=True
+[DEBUG] store_events result: {'total': 1, 'success': 1, 'failed': 0, 'duplicated': 0, 'dropped': 0, 'details': {'raw-findings-2026-01-16': {'success': 1, 'failed': 0, 'duplicated': 0}}}
+[DEBUG] drop_reasons breakdown: {'not_dict': 0, 'no_timestamp': 0, 'no_required_fields': 0, 'no_event_id': 0, 'invalid_kind': 0}
+------------------------------ Captured log call -------------------------------
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-inc-1 [status:404 request:0.005s]
+WARNING  opensearch:base.py:280 GET https://localhost:9200/raw-findings-2026-01-16/_doc/f-inc-2 [status:404 request:0.004s]
+=============================== warnings summary ===============================
+tests/integration/test_api/test_clients.py::TestClientsAPI::test_list_clients
+tests/integration/test_api/test_events.py::TestEventsAPI::test_search_events_success
+tests/integration/test_api/test_findings.py::TestFindingsAPI::test_search_findings_success
+tests/integration/test_api/test_targets.py::TestTargetsAPI::test_list_targets
+tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_complete_workflow_with_incremental_processing
+tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_incremental_processing_avoids_duplicates
+tests/integration/test_services_opensearch/test_full_workflow.py::TestErrorHandling::test_handle_missing_detector
+tests/integration/test_services_opensearch/test_incremental_analysis.py::TestIncrementalProcessing::test_fetch_and_store_findings_incremental
+  /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/.venv/lib/python3.12/site-packages/urllib3/connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'localhost'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.12.12-final-0 _______________
+
+Name                                              Stmts   Miss Branch BrPart   Cover   Missing
+----------------------------------------------------------------------------------------------
+app/__init__.py                                       0      0      0      0 100.00%
+app/api/__init__.py                                   0      0      0      0 100.00%
+app/api/router.py                                    13      0      0      0 100.00%
+app/api/routes/__init__.py                            0      0      0      0 100.00%
+app/api/routes/analysis_tasks.py                    121     75     36      6  33.12%   36-53, 77, 79, 81-86, 89, 120-121, 132-134, 140-154, 159-187, 206-269
+app/api/routes/clients.py                            69     27      6      1  57.33%   23-28, 33-34, 58-106, 127-128, 139-141
+app/api/routes/events.py                             65     20     22      7  59.77%   38, 42-44, 49, 54-59, 62, 64, 67, 70-72, 77, 97-99
+app/api/routes/findings.py                           68     18     24     10  65.22%   42, 47, 52-57, 60, 63, 65, 67, 69, 72, 77, 83, 101-102
+app/api/routes/graph.py                              88     12     36      6  82.26%   99, 113, 136, 148-150, 169-171, 178-183
+app/api/routes/health.py                              5      0      0      0 100.00%
+app/api/routes/root.py                                5      0      0      0 100.00%
+app/api/routes/targets.py                            61     38     14      1  32.00%   20-70, 85-86, 94-102, 109-110
+app/api/utils.py                                     11      0      0      0 100.00%
+app/core/__init__.py                                  1      0      0      0 100.00%
+app/core/config.py                                   36     15     10      1  47.83%   9-11, 16-27
+app/core/deps.py                                      3      3      0      0   0.00%   1-5
+app/core/logging.py                                   3      0      0      0 100.00%
+app/core/time.py                                     47     11     24      8  67.61%   13, 22-24, 27-29, 34, 42, 45, 52->54, 56
+app/dto/__init__.py                                   2      0      0      0 100.00%
+app/dto/targets.py                                    3      0      0      0 100.00%
+app/schemas/__init__.py                               0      0      0      0 100.00%
+app/schemas/common.py                                 9      9      0      0   0.00%   1-15
+app/services/analyze/__init__.py                     82     72     26      0   9.26%   12-64, 80-122, 132-157
+app/services/analyze/attack_fsa.py                  316    205     92      0  27.21%   113-185, 201, 205, 209, 213, 217, 221, 230-231, 236, 241-244, 257-259, 263, 267, 283, 287, 292, 297, 319-334, 338, 342, 362-364, 368, 390-393, 397, 407-410, 415, 424, 428-431, 435-438, 449-455, 463-471, 495-566, 583-634, 650-676, 685-691, 709-726, 740-751, 760-770
+app/services/analyze/killchain.py                   646    512    294      0  14.26%   55-68, 220, 229-239, 244-246, 251-252, 260-268, 276-280, 392-394, 397, 400-407, 417-419, 474-487, 495-534, 555-611, 620-625, 634, 645-662, 689-699, 708-717, 725-729, 734-740, 749-758, 780-831, 849-904, 925-1034, 1051-1251, 1278-1290, 1304-1335, 1375-1431, 1443-1462, 1489-1537, 1548, 1553, 1574-1627
+app/services/analyze/killchain_llm.py               278    237    104      0  10.73%   30, 78-80, 86, 89-159, 181, 184-208, 215-269, 281-334, 347-396, 405-420, 428-437, 469-474, 482-532, 543-545, 548-551, 569-636, 680-721
+app/services/analyze/pipeline.py                    133     99     30      0  20.86%   30, 49-51, 56, 66-93, 97-107, 123-126, 151-317
+app/services/analyze/runner.py                       68     39      8      0  38.16%   33-35, 40, 57-74, 86-96, 100-109, 114-118, 123-133
+app/services/analyze/trace.py                        83     65     36      0  15.13%   19-21, 26-30, 34-35, 44-52, 62-67, 71-85, 103-136
+app/services/analyze/ttp_similarity/__init__.py       3      0      0      0 100.00%
+app/services/analyze/ttp_similarity/router.py        37     10      2      0  69.23%   46-64
+app/services/analyze/ttp_similarity/service.py      374    321    176      0   9.64%   23-25, 29-34, 38-49, 53-64, 74-80, 84-87, 92-95, 99-100, 107-118, 122-133, 137-148, 187, 191-196, 200-345, 373-553, 563-573, 591-657, 671-692
+app/services/client_poller.py                       165    133     30      0  16.41%   29-31, 35-36, 40-45, 49-54, 58-78, 82-96, 100, 104-121, 125-134, 143-162, 166-223, 228-232, 236-250, 255-264
+app/services/neo4j/__init__.py                        3      0      0      0 100.00%
+app/services/neo4j/db.py                            534    435    184      3  15.88%   60-65, 70-74, 80-84, 90-126, 156-159, 187-202, 232-242, 253-255, 260-272, 287-301, 306-337, 365-396, 422-441, 480-489, 510-518, 523-534, 546-559, 564-577, 589-619, 624-632, 641-654, 659-666, 702, 705-706, 724-742, 747-757, 768-784, 805, 817, 820-821, 879-880, 885-891, 922-929, 945-952, 967-1094, 1099, 1126-1129, 1134-1146, 1151-1170, 1175-1210, 1220-1227, 1232-1281, 1290-1313
+app/services/neo4j/ecs_ingest.py                    268    256    156      0   2.83%   14-26, 31-33, 38-42, 47-51, 56-71, 76-85, 90-405
+app/services/neo4j/ingest.py                        152    138     80      0   6.03%   10-11, 35-43, 67-80, 85-125, 130-150, 155-159, 187-234, 261-324
+app/services/neo4j/internal.py                       11      0      0      0 100.00%
+app/services/neo4j/models.py                        220    131     88      5  31.82%   62, 66, 69-70, 79, 90, 94-95, 101, 105, 108-109, 125-129, 141, 145, 149, 153, 157-162, 187-194, 206-228, 253-271, 284-297, 301-305, 309-313, 320, 324-331, 335-344, 361-370, 381, 385, 389, 393, 397, 401, 405, 409
+app/services/neo4j/utils.py                          86     55     42      5  31.25%   20-34, 43-44, 49-50, 55, 66-68, 75-77, 91, 96-99, 103->105, 108-111, 122-124, 132-159
+app/services/opensearch/__init__.py                   4      0      0      0 100.00%
+app/services/opensearch/analysis.py                1740   1639    790      4   4.31%   142-143, 148-153, 158, 163, 171-204, 209-220, 225-298, 323-364, 371-376, 381, 386, 393-554, 571-758, 784-838, 847-856, 866, 876-906, 911-919, 927->930, 934-935, 942-943, 954, 975-981, 988-997, 1002-1013, 1018-1047, 1052-1078, 1089-1117, 1129-1188, 1206-1308, 1327-1455, 1487-1668, 1695-1743, 1755-1765, 1792-1899, 1926-1980, 2007-2066, 2093-2146, 2173-2222, 2244-2335, 2369-2430, 2448-2708, 2734-3139, 3165-3355, 3383-3510, 3528-3665, 3702-3880, 3905-3934, 3944-4124, 4131, 4156-4177
+app/services/opensearch/client.py                   153     66     38     10  53.93%   9-10, 23, 25, 56->60, 60->64, 83->101, 97-99, 102-104, 131-138, 146-148, 169-171, 180-200, 209, 214-215, 224-234, 243-256, 261-265, 286, 299->301, 311, 318-320
+app/services/opensearch/index.py                     21      2      2      1  86.96%   35, 43
+app/services/opensearch/internal.py                   6      0      0      0 100.00%
+app/services/opensearch/mappings.py                   5      0      0      0 100.00%
+app/services/opensearch/query.py                    136    126     54      0   5.26%   37-114, 135-186, 207-258, 322-433, 483-517
+app/services/opensearch/storage.py                  415    208    228     68  43.70%   22-106, 118-129, 133, 146-174, 189-190, 229-233, 235, 243-244, 249-258, 264-268, 271, 276-283, 288-289, 294, 297->301, 303-304, 308, 314, 322, 325->493, 328-329, 333-334, 339->346, 341->343, 343->346, 347->351, 352->354, 359->361, 366, 369-370, 372, 378-379, 381, 383, 388-389, 402->406, 407->417, 409->417, 411-414, 421-437, 441-446, 451-464, 469-470, 473-474, 481-482, 485-487, 495-509, 512-523, 537, 547-548, 572, 576, 582, 592-595, 601, 631, 642->645, 646-648, 652->656, 657-663, 665->670, 672-680, 685->688, 689-695, 704->707, 708-714, 720-721, 748-755
+----------------------------------------------------------------------------------------------
+TOTAL                                              6549   4977   2632    136  19.26%
+Coverage HTML written to dir htmlcov
+=========================== short test summary info ============================
+FAILED tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_complete_workflow_with_incremental_processing
+FAILED tests/integration/test_services_opensearch/test_full_workflow.py::TestFullWorkflowWithIncremental::test_incremental_processing_avoids_duplicates
+FAILED tests/integration/test_services_opensearch/test_incremental_analysis.py::TestIncrementalProcessing::test_fetch_and_store_findings_incremental
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_complete_event_lifecycle
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_complete_finding_deduplication_workflow
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_multi_index_data_flow
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_data_analysis_complete_workflow
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_multiple_attack_techniques
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_same_attack_multiple_hosts
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_time_window_deduplication
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_fingerprint_variations
+ERROR tests/e2e/test_opensearch_system.py::TestPerformanceAndScalability::test_bulk_store_large_dataset
+ERROR tests/e2e/test_opensearch_system.py::TestPerformanceAndScalability::test_search_with_pagination
+ERROR tests/e2e/test_opensearch_system.py::TestErrorHandling::test_handle_invalid_event_structure
+3 failed, 27 passed, 1 skipped, 184 deselected, 8 warnings, 11 errors in 5.03s

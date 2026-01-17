@@ -1,0 +1,86 @@
+digraph {
+    rankdir=LR;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fontsize=10];
+    edge [fontname="PingFang SC", fontsize=9];
+
+    // Layer 1: Telemetry
+    subgraph cluster_l1 {
+        label="Layer 1: Telemetry 事实层";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#424242";
+        fontname="PingFang SC";
+
+        T1 [label="ECS 事件\nevent.kind 为 event", fillcolor="#bbdefb", color="#0d47a1"];
+        T2 [label="OpenSearch\ncs-events-*", fillcolor="#e1bee7", color="#4a148c"];
+
+        T1 -> T2 [style="bold"];
+    }
+
+    // Layer 2: Raw Findings
+    subgraph cluster_l2 {
+        label="Layer 2: Raw Findings 原始告警层";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#424242";
+        fontname="PingFang SC";
+
+        R1 [label="传感器告警\nSecurity Analytics\nevent.kind 为 alert\ndataset 非 canonical", fillcolor="#bbdefb", color="#0d47a1"];
+        R2 [label="OpenSearch\nraw-findings-*", fillcolor="#e1bee7", color="#4a148c"];
+
+        R1 -> R2 [style="bold"];
+    }
+
+    // Layer 3: Canonical Findings
+    subgraph cluster_l3 {
+        label="Layer 3: Canonical Findings 规范告警层";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#424242";
+        fontname="PingFang SC";
+
+        C1 [label="融合去重\nevent.kind 为 alert\ndataset 为 finding.canonical", fillcolor="#bbdefb", color="#0d47a1"];
+        C2 [label="OpenSearch\ncanonical-findings-*", fillcolor="#e1bee7", color="#4a148c"];
+
+        C1 -> C2 [style="bold"];
+    }
+
+    // Layer 4: Entity Graph
+    subgraph cluster_l4 {
+        label="Layer 4: Entity Graph 图谱层";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#424242";
+        fontname="PingFang SC";
+
+        G1 [label="节点/边\nHost/User/Process\nFile/IP/Domain", fillcolor="#bbdefb", color="#0d47a1"];
+        G2 [label="Neo4j\nEntity Graph", fillcolor="#e1bee7", color="#4a148c"];
+
+        G1 -> G2 [style="bold"];
+    }
+
+    // Layer 5: Trace Task
+    subgraph cluster_l5 {
+        label="Layer 5: Trace Task 溯源任务层";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#424242";
+        fontname="PingFang SC";
+
+        A1 [label="任务状态 + 结果\ntask_id\nanalysis.* 字段", fillcolor="#bbdefb", color="#0d47a1"];
+        A2 [label="OpenSearch\nanalysis-tasks-*", fillcolor="#e1bee7", color="#4a148c"];
+        A3 [label="Neo4j\n边属性写回", fillcolor="#e1bee7", color="#4a148c"];
+
+        A1 -> A2 [label="状态", style="dashed"];
+        A1 -> A3 [label="结果", style="dashed"];
+    }
+
+    // 层间关系
+    T2 -> R1 [label="检测", style="dashed"];
+    R2 -> C1 [label="融合", style="dashed"];
+    T2 -> G1 [label="ECS→Graph", style="dashed"];
+    C1 -> G1 [label="ECS→Graph", style="dashed"];
+    G2 -> A1 [label="读取", style="dashed"];
+    C2 -> A1 [label="输入", style="dashed"];
+}

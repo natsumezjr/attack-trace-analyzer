@@ -1,0 +1,208 @@
+\subsection{注册与轮询}\label{31-registration-polling}
+
+\subsection{注册表结构}\label{registry-structure}
+
+中心机使用 OpenSearch 索引 \texttt{client-registry} 作为客户机注册表的唯一权威数据源。该索引存储所有已注册客户机的核心信息，包括标识、接口地址、能力声明以及轮询状态。
+
+注册表文档包含以下字段：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{client.id}：客户机唯一标识符
+\item
+  \texttt{client.listen\_url}：客户机拉取接口基地址（如 \texttt{http://10.0.0.11:8888}）
+\item
+  \texttt{client.capabilities}：数据源能力声明，支持三类（falco、suricata、filebeat）
+\item
+  \texttt{poll.last\_seen}：最近一次轮询时间戳
+\item
+  \texttt{poll.status}：最近一次轮询状态标记
+\item
+  \texttt{poll.last\_error}：最近一次轮询失败的错误信息
+\end{itemize}
+
+字段定义与索引约束详见：
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/82-OpenSearch索引与Mapping规范.md}
+\item
+  \texttt{../../80-规范/87-客户机与中心机接口.md}
+\end{itemize}
+
+\subsection{注册流程}\label{registration-flow}
+
+中心机通过 HTTP 接口接收客户机注册请求。注册成功后，客户机信息必须持久化到 \texttt{client-registry} 索引中。
+
+\textbf{注册接口}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{POST /api/v1/clients/register}
+\end{itemize}
+
+接口的请求格式、响应结构以及错误码定义详见：
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/87-客户机与中心机接口.md}
+\end{itemize}
+
+\textbf{容错要求}：注册失败时严禁降级为"仅内存登记"，必须向调用方返回明确的错误信息，同时保持注册表数据的一致性。
+
+\subsection{轮询调度}\label{polling-scheduling}
+
+\subsection{实现位置}\label{implementation-location}
+
+轮询服务的核心实现位于：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/client\_poller.py}
+\end{itemize}
+
+\subsection{轮询周期与超时}\label{polling-timeout}
+
+轮询周期与超时参数通过环境变量配置，代码中内置默认值：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{CENTER\_POLL\_INTERVAL\_SECONDS}：轮询间隔（默认 \texttt{5} 秒）
+\item
+  \texttt{CENTER\_POLL\_TIMEOUT\_SECONDS}：单次请求超时（默认 \texttt{5} 秒）
+\end{itemize}
+
+完整的环境变量清单与默认值详见：
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/89-环境变量与配置规范.md}
+\end{itemize}
+
+\subsection{单轮询流程}\label{single-polling-flow}
+
+每个定时器触发周期执行一次完整的轮询流程，如图 \ref{fig:center-61-01} 所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-61/center-61-01.pdf}
+\caption{单轮询流程}
+\label{fig:center-61-01}
+\end{figure}
+
+\textbf{流程说明}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{注册表读取}：从 OpenSearch 索引 \texttt{client-registry} 读取所有已注册客户机列表；
+\item
+  \textbf{客户机遍历}：解析每个客户机的 \texttt{client.id}、\texttt{client.listen\_url}、\texttt{client.capabilities} 字段；
+\item
+  \textbf{路由选择}：根据客户机的 capabilities 确定需要拉取的数据路由，可选路由包括 \texttt{falco}、\texttt{suricata}、\texttt{filebeat}；
+\item
+  \textbf{HTTP 拉取}：向每个客户机的各个路由发送 HTTP GET 请求，地址格式为 \texttt{\{listen\_url\}/\{route\}}；
+\item
+  \textbf{事件提取}：从响应体中提取 \texttt{data[]} 事件数组，汇总为本周期的事件列表；
+\item
+  \textbf{状态更新}：将轮询结果写回注册表，更新 \texttt{poll.*} 相关字段；
+\item
+  \textbf{事件存储}（Step 2）：调用 \texttt{store\_events()} 将事件列表写入 OpenSearch，根据路由分别存储到 Telemetry、Raw Findings 或 Canonical 索引；
+\item
+  \textbf{数据分析}（Step 3）：调用 \texttt{run\_data\_analysis()} 执行检测算法与告警融合，将原始数据转换为 Canonical 格式并写回 OpenSearch；
+\item
+  \textbf{图谱入库}（Step 4）：调用 Neo4j 入图流程，将 Telemetry 与 Canonical 数据导入图数据库。
+\end{enumerate}
+
+\textbf{相关模块}：
+
+\begin{itemize}
+\tightlist
+\item
+  Step 2 事件存储：\texttt{backend/app/services/opensearch/storage.py:store\_events()}
+\item
+  Step 3 数据分析：\texttt{backend/app/services/opensearch/analysis.py:run\_data\_analysis()}
+\item
+  Step 4 图谱入库：\texttt{backend/app/services/neo4j/ingest.py:ingest\_from\_opensearch\_ingested\_window()}
+\end{itemize}
+
+\subsection{状态更新与错误处理}\label{status-update-error-handling}
+
+\subsection{轮询状态机}\label{polling-state-machine}
+
+轮询服务通过状态机管理执行流程，状态转换逻辑如图 \ref{fig:center-61-02} 所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-61/center-61-02.pdf}
+\caption{轮询状态机}
+\label{fig:center-61-02}
+\end{figure}
+
+\textbf{状态定义}：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Idle}：空闲等待状态，等待定时器触发
+\item
+  \textbf{Polling}：轮询进行中，正在从注册表读取客户机列表
+\item
+  \textbf{Fetching}：数据拉取阶段，向客户机接口发起 HTTP 请求
+\item
+  \textbf{Processing}：数据处理阶段，提取事件并更新状态
+\item
+  \textbf{Success}：单个客户机轮询成功
+\item
+  \textbf{Error}：单个客户机轮询失败
+\end{itemize}
+
+\subsection{故障处理策略}\label{error-handling-strategy}
+
+轮询服务采用隔离与容错机制，确保单个客户机或数据源故障不影响整体服务可用性。
+
+\textbf{容错原则}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{数据源隔离}：单个数据源拉取失败不影响其他数据源的拉取；
+\item
+  \textbf{客户机隔离}：单个客户机轮询失败不影响其他客户机的轮询；
+\item
+  \textbf{错误记录}：失败信息写入 \texttt{poll.last\_error}，状态标记写入 \texttt{poll.status}，下一轮次自动重试；
+\item
+  \textbf{持续运行}：轮询循环不因单个客户机异常而退出；
+\item
+  \textbf{必选依赖处理}：OpenSearch 与 Neo4j 属于中心机必选依赖。当 Step 3（数据分析）或 Step 4（图谱入库）失败时，\textbf{轮询任务应快速失败并暴露错误}（便于靶场联调与验收时及时发现问题），但\textbf{禁止在后台任务中直接调用 \texttt{os.\_exit(1)} 终止 FastAPI 进程}（避免服务"假死"或不可控退出，同时保留排障与恢复能力）。
+\end{enumerate}
+
+\subsection{故障处理时序图}\label{error-handling-sequence-diagram}
+
+完整的超时、重试与错误记录流程如图 \ref{fig:center-61-03} 所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-61/center-61-03.pdf}
+\caption{故障处理时序图}
+\label{fig:center-61-03}
+\end{figure}
+
+\textbf{时序说明}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{正常流程}：定时器触发轮询服务 → 拉取所有客户机的三类数据源 → 更新注册表状态 → 执行数据处理流水线（存储/分析/入图）；
+\item
+  \textbf{超时处理}：单个数据源超时（如 falco）不阻塞其他数据源（suricata 与 filebeat 继续拉取）→ 错误信息记录到 \texttt{poll.last\_error} → 状态标记为 \texttt{partial\_success} → 继续处理已成功拉取的事件；
+\item
+  \textbf{流水线故障}：当 OpenSearch 或 Neo4j 等必选依赖失败时 → 抛出异常终止本轮轮询任务 → 记录完整错误堆栈 → 保持 FastAPI 进程运行（便于排障与恢复）。
+\end{enumerate}

@@ -1,0 +1,163 @@
+\section{中心机模块}\label{3-center-module}
+
+\section{中心机职责边界}\label{1-center-responsibilities}
+
+中心机承担以下职责：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  接收并维护客户机注册信息（\texttt{client-registry}）；
+\item
+  周期性轮询客户机，拉取事件并存储至 OpenSearch；
+\item
+  执行检测与告警融合，生成 Canonical Findings；
+\item
+  对外提供前端 API，涵盖事件查询、告警查询、图查询、任务管理、报告导出等功能；
+\item
+  执行溯源任务并将结果写回图谱边属性。
+\end{enumerate}
+
+\section{FastAPI 应用生命周期}\label{2-fastapi-lifecycle}
+
+中心机后端基于 FastAPI 框架构建，入口文件位于：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/main.py}
+\end{itemize}
+
+应用启动时将自动启动两个后台任务：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  客户机轮询服务（周期性拉取客户机事件并入库）
+\item
+  溯源任务执行器（异步执行溯源任务并写回结果）
+\end{enumerate}
+
+关于应用生命周期的详细说明，请参考相关模块代码，入口位于：
+
+\section{中心机系统架构}\label{21-center-system-architecture}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-60/center-60-01.pdf}
+\caption{中心机系统架构}
+\label{fig:center-60-01}
+\end{figure}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/client\_poller.py}
+\item
+  \texttt{backend/app/services/analyze/runner.py}
+\end{itemize}
+
+\section{代码目录结构}\label{3-code-directory-structure}
+
+中心机后端核心代码组织在 \texttt{backend/app/} 目录下：
+
+\begin{verbatim}
+backend/app/
+  api/                 路由定义与请求响应模型
+  core/                配置、日志、时间工具
+  dto/                 DTO 定义
+  schemas/             Pydantic schema
+  services/
+    client_poller.py   轮询服务
+    opensearch/        OpenSearch 存储与分析
+    neo4j/             Neo4j 入图与图查询
+    analyze/           溯源算法与任务执行
+\end{verbatim}
+
+\section{模块依赖关系}\label{31-module-dependencies}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-60/center-60-02.pdf}
+\caption{模块依赖关系}
+\label{fig:center-60-02}
+\end{figure}
+
+\section{API 路由组织}\label{4-api-routing}
+
+路由统一汇总入口：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/api/router.py}
+\end{itemize}
+
+外部 API 的完整定义见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/88-前端与中心机接口.md}
+\end{itemize}
+
+本节仅说明路由模块的组织方式，接口字段定义请参考上述文档。
+
+\section{端到端数据流}\label{41-end-to-end-data-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-60/center-60-03.pdf}
+\caption{端到端数据流}
+\label{fig:center-60-03}
+\end{figure}
+
+\section{模块集成点}\label{5-module-integration-points}
+
+\section{OpenSearch}\label{51-opensearch}
+
+中心机通过以下模块统一处理 OpenSearch 的读写操作：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/opensearch/}
+\end{itemize}
+
+字段规范化与去重由 \texttt{store\_events()} 函数负责，详见 \texttt{62-OpenSearch存储与索引治理.md}。
+
+\section{Neo4j}\label{52-neo4j}
+
+中心机图查询与入图操作通过以下模块实现：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/neo4j/}
+\end{itemize}
+
+具体实现见 \texttt{64-Neo4j入图与图查询.md} 和 \texttt{../../80-规范/84-Neo4j实体图谱规范.md}。
+
+\section{Analysis}\label{53-analysis}
+
+中心机溯源任务与算法的核心入口：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/analyze/}
+\end{itemize}
+
+相关算法设计详见 \texttt{../../50-详细设计/分析/}。
+
+\section{运维入口}\label{6-operations-entry}
+
+中心机的启动流程、健康检查、数据清理以及演示准备步骤均在运维文档中说明：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../90-运维与靶场/90-编译安装与使用.md}
+\end{itemize}

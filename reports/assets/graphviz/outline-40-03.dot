@@ -1,0 +1,109 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fontsize=10];
+    edge [fontname="PingFang SC", fontsize=9];
+
+    // 定义节点
+    Timer [label="定时器\n(5s)", fillcolor="#e1f5fe", color="#0277bd"];
+    Poller [label="轮询服务", fillcolor="#e1f5fe", color="#0277bd"];
+    Clients [label="客户机集群", fillcolor="#e1f5fe", color="#0277bd"];
+    OS [label="OpenSearch", fillcolor="#e1bee7", color="#6a1b9a"];
+    SA [label="Security\nAnalytics", fillcolor="#e1bee7", color="#6a1b9a"];
+    Neo4j [label="Neo4j", fillcolor="#e1bee7", color="#6a1b9a"];
+
+    // Step 1: 拉取数据
+    subgraph cluster_step1 {
+        label="Step 1: 拉取数据";
+        style=filled;
+        fillcolor="#f0f8ff";
+        color="#0277bd";
+        fontname="PingFang SC";
+        fontsize=10;
+
+        step1_start [label="", shape=point, width=0];
+        step1_poll [label="读取 client-registry", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step1_return [label="返回客户机列表", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step1_fetch [label="GET /falco,/filebeat,/suricata", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step1_events [label="ECS 事件列表", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+
+        step1_start -> step1_poll [label="Poller → OS"];
+        step1_poll -> step1_return [label="OS → Poller", style="dashed"];
+        step1_return -> step1_fetch [label="Poller → Clients"];
+        step1_fetch -> step1_events [label="Clients → Poller", style="dashed"];
+    }
+
+    // Step 2: 写入 OpenSearch
+    subgraph cluster_step2 {
+        label="Step 2: 写入 OpenSearch";
+        style=filled;
+        fillcolor="#fff3e0";
+        color="#e65100";
+        fontname="PingFang SC";
+        fontsize=10;
+
+        step2_store [label="store_events(批量事件)", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step2_process [label="字段处理\n- 三时间字段\n- event.id 去重\n- 索引路由", fillcolor="#fff9c4", color="#f57f17"];
+        step2_done [label="写入完成", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+
+        step2_store -> step2_process [label="Poller → OS"];
+        step2_process -> step2_done [label="OS → Poller", style="dashed"];
+    }
+
+    // Step 3: 检测与融合
+    subgraph cluster_step3 {
+        label="Step 3: 检测与融合";
+        style=filled;
+        fillcolor="#f1f8e9";
+        color="#33691e";
+        fontname="PingFang SC";
+        fontsize=10;
+
+        step3_trigger [label="触发 Store-first 检测", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step3_scan [label="扫描 ecs-events-*", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step3_raw [label="生成 Raw Findings", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step3_merge [label="融合去重 (Raw→Canonical)", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step3_rules [label="指纹规则\n- threat.technique.id\n- host.id\n- entity_id\n- time_bucket", fillcolor="#fff9c4", color="#f57f17"];
+        step3_canonical [label="写入 Canonical Findings", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+
+        step3_trigger -> step3_scan [label="Poller → SA"];
+        step3_scan -> step3_raw [label="SA → OS", style="dashed"];
+        step3_raw -> step3_merge [label="Poller → OS"];
+        step3_merge -> step3_rules [style="dotted"];
+        step3_rules -> step3_merge [style="dotted"];
+        step3_merge -> step3_canonical [label="OS → Poller", style="dashed"];
+    }
+
+    // Step 4: 入图 Neo4j
+    subgraph cluster_step4 {
+        label="Step 4: 入图 Neo4j";
+        style=filled;
+        fillcolor="#fce4ec";
+        color="#c2185b";
+        fontname="PingFang SC";
+        fontsize=10;
+
+        step4_query [label="查询本 tick 新数据", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step4_data [label="Canonical + Telemetry", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step4_write [label="批量写入节点/边", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+        step4_convert [label="ECS→Graph 转换\n- MERGE 节点\n- MERGE 边\n- ts_float 属性", fillcolor="#fff9c4", color="#f57f17"];
+        step4_done [label="入图完成", fillcolor="#ffffff", color="#424242", style="rounded,filled"];
+
+        step4_query -> step4_data [label="Poller → OS", style="dashed"];
+        step4_data -> step4_write [label="Poller → Neo4j"];
+        step4_write -> step4_convert [style="dotted"];
+        step4_convert -> step4_write [style="dotted"];
+        step4_write -> step4_done [label="Neo4j → Poller", style="dashed"];
+    }
+
+    // 主流程连接
+    Timer -> Poller [label="触发 tick", style="bold"];
+    Poller -> step1_start [style="bold"];
+    step1_events -> step2_store [style="bold"];
+    step2_done -> step3_trigger [style="bold"];
+    step3_canonical -> step4_query [style="bold"];
+    step4_done -> Timer [label="等待下次触发 (5s)", style="dashed"];
+
+    {rank=same; Timer; Poller}
+    {rank=same; step1_poll; step2_store; step3_trigger; step4_query}
+}

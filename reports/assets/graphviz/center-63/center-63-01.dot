@@ -1,0 +1,58 @@
+digraph "TimeBucketAggregation" {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    // Define cluster for time buckets
+    subgraph cluster_bucket0 {
+        label="时间桶0 (0-300s)";
+        style=filled;
+        fillcolor="#e1f5fe";
+        color="#1565c0";
+        fontsize=12;
+
+        rf1 [label="Raw Finding 1\n(0-30s)", fillcolor="#fff9c4"];
+        rf2 [label="Raw Finding 2\n(50-70s)", fillcolor="#fff9c4"];
+        rf3 [label="Raw Finding 3\n(200-210s)", fillcolor="#fff9c4"];
+
+        {rank=same; rf1; rf2; rf3;}
+    }
+
+    subgraph cluster_bucket1 {
+        label="时间桶1 (300-600s)";
+        style=filled;
+        fillcolor="#e1f5fe";
+        color="#1565c0";
+        fontsize=12;
+
+        rf4 [label="Raw Finding 4\n(300-340s)", fillcolor="#fff9c4"];
+        rf5 [label="Raw Finding 5\n(350-375s)", fillcolor="#fff9c4"];
+        rf6 [label="Raw Finding 6\n(450-465s)", fillcolor="#fff9c4"];
+
+        {rank=same; rf4; rf5; rf6;}
+    }
+
+    subgraph cluster_bucket2 {
+        label="时间桶2 (600-900s)";
+        style=filled;
+        fillcolor="#e1f5fe";
+        color="#1565c0";
+        fontsize=12;
+
+        rf7 [label="Raw Finding 7\n(600-635s)", fillcolor="#fff9c4"];
+        rf8 [label="Raw Finding 8\n(700-720s)", fillcolor="#fff9c4"];
+        rf9 [label="Raw Finding 9\n(800-830s)", fillcolor="#fff9c4"];
+
+        {rank=same; rf7; rf8; rf9;}
+    }
+
+    // Time axis
+    time_axis [label="Unix 时间戳 (秒)\n0s        300s        600s        900s",
+                shape=plaintext, fontsize=11];
+
+    // Invisible edges to maintain order
+    edge [style=invis];
+    rf1 -> rf4 -> rf7;
+    rf2 -> rf5 -> rf8;
+    rf3 -> rf6 -> rf9;
+}

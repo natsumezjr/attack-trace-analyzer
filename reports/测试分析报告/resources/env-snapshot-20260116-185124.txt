@@ -1,0 +1,27 @@
+# Test environment snapshot
+timestamp: Fri Jan 16 18:51:24 CST 2026
+git: 19901a9
+branch: Huafucius/docs
+
+## Tool versions
+uv 0.9.18
+Python 3.14.2
+Docker version 28.3.3, build 980b856
+Docker Compose version v2.39.2
+
+## Docker ps
+NAMES                   STATUS                   PORTS
+opensearch              Up 5 minutes (healthy)   0.0.0.0:9200->9200/tcp, [::]:9200->9200/tcp, 9300/tcp, 0.0.0.0:9600->9600/tcp, [::]:9600->9600/tcp, 9650/tcp
+backend-python          Up 12 hours              
+opensearch-dashboards   Up 12 hours              0.0.0.0:5601->5601/tcp, [::]:5601->5601/tcp
+neo4j                   Up 7 minutes (healthy)   0.0.0.0:7474->7474/tcp, [::]:7474->7474/tcp, 7473/tcp, 0.0.0.0:7687->7687/tcp, [::]:7687->7687/tcp
+
+## OpenSearch health
+{"cluster_name":"docker-cluster","status":"yellow","timed_out":false,"number_of_nodes":1,"number_of_data_nodes":1,"discovered_master":true,"discovered_cluster_manager":true,"active_primary_shards":30,"active_shards":30,"relocating_shards":0,"initializing_shards":0,"unassigned_shards":11,"delayed_unassigned_shards":0,"number_of_pending_tasks":0,"number_of_in_flight_fetch":0,"task_max_waiting_in_que
+
+## Neo4j health
+HTTP/1.1 200 OK
+Date: Fri, 16 Jan 2026 10:51:24 GMT
+Access-Control-Allow-Origin: *
+Content-Type: application/json
+Vary: Accept

@@ -1,0 +1,68 @@
+digraph EvidenceFlow {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.35",
+    ranksep="0.45",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="Test Evidence Workflow (No Screenshots)"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  subgraph cluster_run {
+    label="Execute";
+    color="#B0D7D0";
+    style="rounded";
+    run_pytest [label="pytest\n(unit / integration / e2e)"];
+    run_scripts [label="scripts/*\n(import_test_data, test_killchain, ...)"];
+    run_api [label="curl API smoke\n(/health /clients /events /findings /graph /tasks)"];
+  }
+
+  subgraph cluster_artifacts {
+    label="Artifacts (text evidence)";
+    color="#B0D7D0";
+    style="rounded";
+    artifacts [label="*.txt / *.json / *.log\n+ htmlcov/ (coverage)"];
+    resources [label="reports/测试分析报告/resources/\n(timestamped evidence)"];
+  }
+
+  subgraph cluster_report {
+    label="Report Output";
+    color="#B0D7D0";
+    style="rounded";
+    manual_tex [label="manual/*.tex\n(verified narrative)"];
+    pdf [label="main.pdf\n(XeLaTeX)"];
+  }
+
+  note [shape=note, style="filled", color="#D94F4F", fillcolor="#FFECEC",
+        label="Policy:\n- no screenshots\n- reproducible outputs only"];
+
+  run_pytest -> artifacts;
+  run_scripts -> artifacts;
+  run_api -> artifacts;
+  artifacts -> resources;
+  resources -> manual_tex;
+  manual_tex -> pdf;
+  note -> artifacts [style=dashed, color="#D94F4F"];
+}
+

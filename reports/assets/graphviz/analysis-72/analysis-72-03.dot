@@ -1,0 +1,45 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial", fontsize=9];
+
+    Start [label="LLM 输出", shape=ellipse, fillcolor="#fce4ec"];
+    ExtractJSON [label="提取 JSON 对象", fillcolor="#fff3e0"];
+    CheckFields [label="chosen_path_ids<br/>存在且为数组?", shape=diamond, fillcolor="#fce4ec"];
+
+    Reject1 [label="无效: 缺少或类型错误", fillcolor="#ffcdd2"];
+    CheckLength [label="数组长度<br/>等于 pairs 长度?", shape=diamond, fillcolor="#fce4ec"];
+    Reject2 [label="无效: 长度不匹配", fillcolor="#ffcdd2"];
+    ValidateIds [label="遍历每个 path_id", fillcolor="#fff3e0"];
+    CheckPathId [label="i-th path_id<br/>在 candidates 中?", shape=diamond, fillcolor="#fce4ec"];
+    Reject3 [label="无效: path_id 不存在", fillcolor="#ffcdd2"];
+    NextId [label="还有更多<br/>path_id?", shape=diamond, fillcolor="#fce4ec"];
+    ProcessConfidence [label="处理 confidence", fillcolor="#fff3e0"];
+    CheckConf [label="confidence<br/>为数值?", shape=diamond, fillcolor="#fce4ec"];
+    ClipConf [label="裁剪到 0.0..1.0", fillcolor="#fff3e0"];
+    SetDefault [label="设为 0.5", fillcolor="#fff3e0"];
+    Accept [label="有效输出", fillcolor="#c8e6c9"];
+    Fallback [label="进入回退模式", fillcolor="#ffcdd2"];
+    Success [label="返回 LLM 结果", shape=ellipse, fillcolor="#c8e6c9"];
+
+    Start -> ExtractJSON;
+    ExtractJSON -> CheckFields;
+    CheckFields -> Reject1 [label="否"];
+    CheckFields -> CheckLength [label="是"];
+    CheckLength -> Reject2 [label="否"];
+    CheckLength -> ValidateIds [label="是"];
+    ValidateIds -> CheckPathId;
+    CheckPathId -> Reject3 [label="否"];
+    CheckPathId -> NextId [label="是"];
+    NextId -> CheckPathId [label="是"];
+    NextId -> ProcessConfidence [label="否"];
+    ProcessConfidence -> CheckConf;
+    CheckConf -> ClipConf [label="是"];
+    CheckConf -> SetDefault [label="否"];
+    ClipConf -> Accept;
+    SetDefault -> Accept;
+    Accept -> Success;
+    Reject1 -> Fallback;
+    Reject2 -> Fallback;
+    Reject3 -> Fallback;
+}

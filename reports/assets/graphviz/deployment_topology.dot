@@ -1,0 +1,73 @@
+digraph DeploymentTopology {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.38",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="Deployment Topology (Center + Optional Clients)"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  subgraph cluster_center {
+    label="Center Node (macOS/Linux)";
+    color="#B0D7D0";
+    style="rounded";
+
+    subgraph cluster_host {
+      label="Host Processes";
+      color="#D0ECE7";
+      style="rounded";
+      backend [label="Backend API\nFastAPI\n:8001"];
+      frontend [label="Frontend UI\nNext.js\n:3000"];
+    }
+
+    subgraph cluster_docker {
+      label="Docker Compose (backend/docker-compose.yml)";
+      color="#D0ECE7";
+      style="rounded";
+      opensearch [label="OpenSearch\nHTTPS :9200"];
+      dashboards [label="OpenSearch Dashboards\nHTTP :5601"];
+      neo4j [label="Neo4j\nHTTP :7474\nBolt :7687"];
+    }
+  }
+
+  subgraph cluster_clients {
+    label="Client Nodes (Linux only)";
+    color="#B0D7D0";
+    style="rounded";
+    sensors [label="Sensors\nFalco / Filebeat / Suricata"];
+    mq [label="RabbitMQ\n(data.* queues)"];
+    pull_api [label="Pull API\nGo backend\nGET /falco /filebeat /suricata"];
+  }
+
+  frontend -> backend [label="HTTP"];
+  backend -> opensearch [label="store/search"];
+  backend -> neo4j [label="ECS→Graph / queries"];
+  dashboards -> opensearch [label="dev UI", style=dashed];
+
+  sensors -> mq;
+  mq -> pull_api;
+  backend -> pull_api [label="poll incremental\n(client_poller)", style=dashed];
+}
+

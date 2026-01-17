@@ -1,0 +1,32 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    LogEntry [label="日志条目\nauth.log 行", fillcolor="#e3f2fd"];
+    ParseField [label="解析关键字段\nprocess/ssh/sudo", fillcolor="#fff3e0"];
+    LoadRules [label="加载 Sigma 规则\nclient/sensor/filebeat/rules.d", fillcolor="#fff3e0"];
+
+    Match [label="规则匹配?", shape=diamond, fillcolor="#fff9c4"];
+
+    Alert [label="生成告警\nevent.kind 为 alert\nevent.dataset 为\nfinding.raw.filebeat_sigma\n补充 rule.* 字段", fillcolor="#ffcdd2"];
+    CheckAuth [label="是否认证日志?", shape=diamond, fillcolor="#fff9c4"];
+
+    AuthTelemetry [label="生成认证 Telemetry\nevent.kind 为 event\nevent.dataset 为 hostlog.auth\n提取 user.name/\nsource.ip/\nevent.outcome", fillcolor="#c8e6c9"];
+    Skip [label="跳过该日志\n不输出到队列", fillcolor="#eeeeee"];
+    Publish [label="发布到 RabbitMQ\n队列: data.filebeat", fillcolor="#f3e5f5"];
+
+    LogEntry -> ParseField;
+    ParseField -> LoadRules;
+    LoadRules -> Match;
+
+    Match -> Alert [label="命中"];
+    Match -> CheckAuth [label="未命中"];
+
+    CheckAuth -> AuthTelemetry [label="是"];
+    CheckAuth -> Skip [label="否"];
+
+    Alert -> Publish;
+    AuthTelemetry -> Publish;
+}

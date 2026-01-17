@@ -1,0 +1,90 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_client {
+        label="客户机";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e1f5fe";
+
+        Sensors [label="传感器采集", style="rounded, filled", fillcolor="#e1f5fe"];
+        Buffer [label="本地缓冲区", style="rounded, filled", fillcolor="#e1f5fe"];
+    }
+
+    subgraph cluster_pull {
+        label="中心机 Step1";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#fff3e0";
+
+        PullTask [label="拉取任务", style="rounded, filled", fillcolor="#fff3e0"];
+        HTTP [label="HTTP POST\n批量拉取", shape=component, fillcolor=lightgreen];
+    }
+
+    subgraph cluster_process {
+        label="中心机 Step2";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#fff3e0";
+
+        Validate [label="ECS 校验\n+ 字段补齐", style="rounded, filled", fillcolor="#fff3e0"];
+        TimeProc [label="三时间处理\ntimestamp/event.created\nevent.ingested", style="rounded, filled", fillcolor="#fff3e0"];
+        Route [label="路由判断\nevent.kind", style="rounded, filled", fillcolor="#fff3e0"];
+    }
+
+    subgraph cluster_os {
+        label="OpenSearch 集群";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f3e5f5";
+
+        EventsIndex [label="ecs-events-*\nTelemetry", shape=cylinder, fillcolor=lightyellow];
+        RawIndex [label="findings-raw-*\nRaw Findings", shape=cylinder, fillcolor=lightyellow];
+        CanonicalIndex [label="findings-canonical-*\nCanonical Findings", shape=cylinder, fillcolor=lightyellow];
+        TasksIndex [label="analysis-tasks-*\n任务状态", shape=cylinder, fillcolor=lightyellow];
+    }
+
+    subgraph cluster_detect {
+        label="中心机 Step3";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e8f5e9";
+
+        SA [label="Security Analytics\n检测引擎", style="rounded, filled", fillcolor="#e8f5e9"];
+        Fusion [label="告警融合\n去重逻辑", style="rounded, filled", fillcolor="#e8f5e9"];
+    }
+
+    subgraph cluster_graph {
+        label="中心机 Step4";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e8f5e9";
+
+        Neo4j [label="Neo4j 入图", style="rounded, filled", fillcolor="#e8f5e9"];
+        TaskState [label="任务状态更新", style="rounded, filled", fillcolor="#e8f5e9"];
+    }
+
+    Sensors -> Buffer;
+    Buffer -> PullTask [label="轮询触发\ncursor 机制"];
+    PullTask -> HTTP [label="批量拉取\n1000条/批"];
+    HTTP -> Validate;
+    Validate -> TimeProc [label="通过"];
+    Validate -> DropInvalid [label="失败\n缺失必需字段", shape=box, style="dashed, filled", fillcolor=lightgray];
+
+    TimeProc -> Route;
+    Route -> EventsIndex [label="event.kind=event\nevent.dataset=falco/filebeat/suricata"];
+    Route -> RawIndex [label="event.kind=alert\ndataset!=canonical"];
+    Route -> CanonicalIndex [label="event.kind=alert\ndataset=finding.canonical"];
+    Route -> TasksIndex [label="task.status"];
+
+    EventsIndex -> SA [label="触发检测"];
+    SA -> RawIndex [label="生成告警"];
+    RawIndex -> Fusion [label="融合去重"];
+    Fusion -> CanonicalIndex;
+
+    CanonicalIndex -> Neo4j [label="创建任务"];
+    Neo4j -> TasksIndex [label="状态变更"];
+}

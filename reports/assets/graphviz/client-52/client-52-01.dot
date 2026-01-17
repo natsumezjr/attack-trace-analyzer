@@ -1,0 +1,40 @@
+digraph {
+    rankdir=TD;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    EVE [label="EVE JSON\n/data/eve.json", fillcolor="#e3f2fd"];
+    Parser [label="EVE 解析器\n识别 event_type", fillcolor="#fff3e0"];
+
+    DNS [label="event_type=dns?", shape=diamond, fillcolor="#fff9c4"];
+    HTTP [label="event_type=http?", shape=diamond, fillcolor="#fff9c4"];
+    ALERT [label="event_type=alert?", shape=diamond, fillcolor="#fff9c4"];
+    FLOW [label="event_type=flow?", shape=diamond, fillcolor="#fff9c4"];
+
+    D1 [label="netflow.dns\n补充 dns.question.name\n补充 dns.answers", fillcolor="#c8e6c9"];
+    H1 [label="netflow.http\n补充 http.method\n补充 http.url", fillcolor="#c8e6c9"];
+    A1 [label="finding.raw.suricata\nevent.kind 为 alert\n补充 alert.* 字段", fillcolor="#c8e6c9"];
+    F1 [label="netflow.flow\n补充五元组\n补充 flow.id", fillcolor="#c8e6c9"];
+
+    HostID [label="补充 host.id/name\n使用 HOST_ID/HOST_NAME\n或生成 host.id", fillcolor="#c8e6c9"];
+    Publish [label="发布到 RabbitMQ\n队列: data.suricata\n点号扁平键形态", fillcolor="#f3e5f5"];
+
+    EVE -> Parser;
+    Parser -> DNS;
+    Parser -> HTTP;
+    Parser -> ALERT;
+    Parser -> FLOW;
+
+    DNS -> D1;
+    HTTP -> H1;
+    ALERT -> A1;
+    FLOW -> F1;
+
+    D1 -> HostID;
+    H1 -> HostID;
+    A1 -> HostID;
+    F1 -> HostID;
+
+    HostID -> Publish;
+}

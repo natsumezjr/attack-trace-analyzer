@@ -1,0 +1,245 @@
+\section{WSL连接服务器指南}\label{wsl-server-connection}
+
+本文面向使用WSL环境的用户，提供从WSL连接到靶场服务器\texttt{\textless{}CENTER\_IP\textgreater{}}的完整步骤。
+
+\subsection{重要说明}\label{important-notes}
+
+{\small
+\begin{itemize}
+\tightlist
+\item
+  \textbf{网卡\texttt{ens5f1}是服务器端的配置}，你的WSL本地环境不需要这个网卡
+\item
+  你只需要能SSH连接到服务器即可，所有靶场配置都在服务器端完成
+\item
+  服务器IP \texttt{\textless{}CENTER\_IP\textgreater{}} 是内网地址，需要通过VPN或内网路由访问
+\end{itemize}
+}
+
+\subsection{检查网络连通性}\label{check-network-connectivity}
+
+\subsubsection{检查是否能ping通服务器}\label{check-ping-server}
+
+在WSL中执行：
+
+\begin{verbatim}
+ping -c 3 <CENTER_IP>
+\end{verbatim}
+
+\subsubsection{检查SSH端口是否开放}\label{check-ssh-port}
+
+\begin{verbatim}
+## 方法1：使用nc（如果已安装）
+nc -zv <CENTER_IP> 22
+
+## 方法2：使用ssh测试（推荐）
+ssh -v ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\subsubsection{检查WSL网络配置（可选）}\label{check-wsl-network}
+
+\begin{verbatim}
+## 查看WSL IP和路由
+ip addr show
+ip route
+\end{verbatim}
+
+\subsection{SSH连接服务器}\label{ssh-connection}
+
+\subsubsection{基本连接命令}\label{basic-ssh-command}
+
+\begin{verbatim}
+ssh ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\textbf{密码}：通过线下渠道分发
+
+\subsubsection{如果连接失败，尝试以下方案}\label{connection-failures}
+
+\paragraph{方案A：指定SSH端口（如果不是22）}\label{solution-specify-ssh-port}
+
+\begin{verbatim}
+ssh -p <端口号> ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\paragraph{方案B：使用跳板机（如果需要）}\label{solution-jump-host}
+
+\begin{verbatim}
+ssh -J jump_user@jump_host ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\paragraph{方案C：使用SSH密钥（如果提供了密钥文件）}\label{solution-ssh-key}
+
+\begin{verbatim}
+ssh -i /path/to/private_key ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\paragraph{方案D：详细调试模式（查看连接过程）}\label{solution-verbose-debug}
+
+\begin{verbatim}
+ssh -v ubuntu@<CENTER_IP>
+\end{verbatim}
+
+\subsection{连接成功后的验证}\label{verify-connection}
+
+连接成功后，在服务器上依次执行以下命令：
+
+\subsubsection{确认工作目录}\label{verify-work-directory}
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+export REPO="$BASE"/repo/attack-trace-analyzer
+
+cd "$BASE"
+pwd
+ls -la
+\end{verbatim}
+
+\subsubsection{检查Docker配置}\label{verify-docker}
+
+\begin{verbatim}
+docker --version
+docker-compose --version
+docker ps
+\end{verbatim}
+
+\subsubsection{检查服务器网卡（这是服务器端的，你本地不需要）}\label{verify-server-nic}
+
+\begin{verbatim}
+ip -br a | grep ens5f1
+ip route
+\end{verbatim}
+
+\subsubsection{检查项目文件结构}\label{verify-project-structure}
+
+\begin{verbatim}
+cd "$REPO"
+ls -la
+\end{verbatim}
+
+\subsubsection{检查已运行的服务（如果有）}\label{verify-running-services}
+
+\begin{verbatim}
+ss -lntup | grep -E ':(9200|7474|7687|18881|18882|18883|18884)\b'
+\end{verbatim}
+
+\subsection{如果无法连接，排查步骤}\label{troubleshoot-connection}
+
+\subsubsection{检查Windows防火墙}\label{check-windows-firewall}
+
+在Windows PowerShell中执行：
+
+\begin{verbatim}
+## 检查防火墙状态
+Get-NetFirewallProfile | Select-Object Name, Enabled
+\end{verbatim}
+
+\subsubsection{检查WSL网络模式}\label{check-wsl-network-mode}
+
+在WSL中执行：
+
+\begin{verbatim}
+## 查看WSL IP
+hostname -I
+
+## 查看路由
+ip route
+
+## 测试DNS解析
+nslookup <CENTER_IP>
+\end{verbatim}
+
+\subsubsection{检查是否需要VPN}\label{check-vpn-required}
+
+\begin{itemize}
+\tightlist
+\item
+  询问交付人是否需要连接VPN才能访问内网\texttt{\textless{}LAN\_CIDR\textgreater{}}
+\item
+  如果需要VPN，先连接VPN再尝试SSH
+\end{itemize}
+
+\subsubsection{询问交付人的问题清单}\label{questions-for-deliverer}
+
+如果以上步骤都无法连接，请向交付人确认：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  是否需要VPN或特殊网络配置？
+\item
+  是否需要跳板机？如果有，跳板机地址和用户名是什么？
+\item
+  SSH端口是否为22？如果不是，端口号是多少？
+\item
+  是否需要SSH密钥？如果需要，密钥文件在哪里？
+\item
+  WSL是否能访问\texttt{\textless{}LAN\_CIDR\textgreater{}}网段？
+\item
+  是否有其他网络限制或配置要求？
+\end{enumerate}
+
+\subsection{连接成功后的下一步}\label{next-steps-after-connection}
+
+连接成功后，按照以下文档进行部署：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{完整部署步骤}：\texttt{97-单机靶场落地步骤.md}
+\item
+  \textbf{一键编排}：\texttt{92-一键编排.md}
+\item
+  \textbf{C2部署}：\texttt{93-C2部署与证据点.md}
+\item
+  \textbf{验证清单}：\texttt{94-验证清单.md}
+\item
+  \textbf{重置与排障}：\texttt{95-重置复现与排障.md}
+\end{enumerate}
+
+\subsection{快速参考}\label{quick-reference}
+
+\subsubsection{服务器信息}\label{server-information}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{IP}：\texttt{\textless{}CENTER\_IP\textgreater{}}
+\item
+  \textbf{用户名}：\texttt{ubuntu}
+\item
+  \textbf{工作目录}：\texttt{/home/ubuntu/attack-trace-analyzer}
+\item
+  \textbf{固定变量}：
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+export REPO="$BASE"/repo/attack-trace-analyzer
+\end{verbatim}
+\end{itemize}
+
+\subsubsection{常用端口（服务器端）}\label{common-ports-server}
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch：\texttt{9200}
+\item
+  Neo4j Browser：\texttt{7474}
+\item
+  Neo4j Bolt：\texttt{7687}
+\item
+  后端：\texttt{8001}
+\item
+  前端：\texttt{3000}
+\item
+  Client-01 API：\texttt{18881}
+\item
+  Client-02 API：\texttt{18882}
+\item
+  Client-03 API：\texttt{18883}
+\item
+  Client-04 API：\texttt{18884}
+\end{itemize}

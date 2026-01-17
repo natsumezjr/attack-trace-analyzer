@@ -1,0 +1,91 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fontsize=10];
+    edge [fontname="PingFang SC", fontsize=9];
+
+    // 客户机集群
+    subgraph cluster_clients {
+        label="客户机集群 (≥5 节点)";
+        style=filled;
+        fillcolor="#e3f2fd";
+        color="#1565c0";
+        fontname="PingFang SC";
+        fontsize=11;
+
+        C1 [label="client-01\nFalco + Filebeat + Suricata\nRabbitMQ + API", fillcolor="#e3f2fd", color="#0d47a1"];
+        C2 [label="client-02\nFalco + Filebeat + Suricata\nRabbitMQ + API", fillcolor="#e3f2fd", color="#0d47a1"];
+        C3 [label="client-03\nFalco + Filebeat + Suricata\nRabbitMQ + API", fillcolor="#e3f2fd", color="#0d47a1"];
+        C4 [label="...", fillcolor="#e3f2fd", color="#0d47a1"];
+        C5 [label="client-N\nFalco + Filebeat + Suricata\nRabbitMQ + API", fillcolor="#e3f2fd", color="#0d47a1"];
+
+        {rank=same C1 C2 C3 C4 C5}
+    }
+
+    // 中心机后端
+    subgraph cluster_backend {
+        label="中心机后端 (FastAPI :8001)";
+        style=filled;
+        fillcolor="#fff3e0";
+        color="#e65100";
+        fontname="PingFang SC";
+        fontsize=11;
+
+        Scheduler [label="定时流水线调度器\n单定时器 (5s 周期)", fillcolor="#fff3e0", color="#bf360c"];
+        OS_Mod [label="OpenSearch 模块\n入库/检测/融合", fillcolor="#fff3e0", color="#bf360c"];
+        Neo4j_Mod [label="Neo4j 模块\n入图/图查询", fillcolor="#fff3e0", color="#bf360c"];
+        Analysis_Mod [label="Analysis 模块\n异步溯源任务", fillcolor="#fff3e0", color="#bf360c"];
+        API [label="对外 API\n/api/v1/*", fillcolor="#fff3e0", color="#bf360c"];
+    }
+
+    // 存储层
+    subgraph cluster_storage {
+        label="存储层";
+        style=filled;
+        fillcolor="#f3e5f5";
+        color="#6a1b9a";
+        fontname="PingFang SC";
+        fontsize=11;
+
+        OS [label="OpenSearch :9200\n├─ Telemetry 索引\n├─ Findings 索引\n└─ Task 索引", fillcolor="#f3e5f5", color="#4a148c"];
+        Neo4j [label="Neo4j :7687\n├─ Entity Graph\n├─ 图查询/最短路\n└─ 边属性 (溯源结果)", fillcolor="#f3e5f5", color="#4a148c"];
+    }
+
+    // 中心机前端
+    subgraph cluster_frontend {
+        label="中心机前端 (Next.js :3000)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#2e7d32";
+        fontname="PingFang SC";
+        fontsize=11;
+
+        UI [label="图谱可视化 UI\n├─ 事件/告警查询\n├─ 图谱展示\n├─ 溯源任务\n└─ 报告导出", fillcolor="#e8f5e9", color="#1b5e20"];
+    }
+
+    // 客户机到中心机的连接
+    C1 -> Scheduler [label="定时拉取\nGET /falco,/filebeat,/suricata", style="bold", color="#1565c0"];
+    C2 -> Scheduler [label="定时拉取", style="bold", color="#1565c0"];
+    C3 -> Scheduler [label="定时拉取", style="bold", color="#1565c0"];
+    C5 -> Scheduler [label="定时拉取", style="bold", color="#1565c0"];
+
+    // 调度器到模块
+    Scheduler -> OS_Mod [style="dashed"];
+    Scheduler -> Neo4j_Mod [style="dashed"];
+    Scheduler -> Analysis_Mod [style="dashed"];
+
+    // 模块到存储
+    OS_Mod -> OS [label="写入/读取", style="dashed", color="#6a1b9a"];
+    Neo4j_Mod -> Neo4j [label="写入/查询", style="dashed", color="#6a1b9a"];
+    Analysis_Mod -> OS [label="任务状态", style="dashed", color="#6a1b9a"];
+    Analysis_Mod -> Neo4j [label="结果写回", style="dashed", color="#6a1b9a"];
+
+    // API 连接
+    API -> Scheduler [dir="both", style="dashed"];
+    API -> Neo4j_Mod [dir="both", style="dashed"];
+    API -> Analysis_Mod [dir="both", style="dashed"];
+
+    // 前端连接
+    UI -> API [label="HTTP 请求", dir="both", color="#2e7d32"];
+    UI -> API [label="WebSocket", dir="both", style="dotted", color="#2e7d32"];
+}

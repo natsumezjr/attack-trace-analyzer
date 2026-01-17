@@ -1,0 +1,42 @@
+digraph {
+    rankdir=LR;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor="#e1f5fe"];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_host {
+        label="宿主机";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f5f5f5";
+
+        Kernel [label="内核钩子\nsystemcalls\nfile access", fillcolor="#e1f5fe"];
+    }
+
+    subgraph cluster_falco {
+        label="Falco 容器";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f0f0f0";
+
+        FalcoEngine [label="Falco 引擎\n0.42.1\n读取 /data/falco.jsonl", fillcolor="#e1f5fe"];
+        Rules [label="规则目录\n/etc/falco/rules.d\nata_telemetry_rules.yaml", shape=folder, fillcolor="#e1f5fe"];
+    }
+
+    subgraph cluster_converter {
+        label="falco-ecs 容器";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#fff3e0";
+
+        JSONLReader [label="JSONL 读取器\n/data/falco.jsonl\ntail -f 模式", fillcolor="#fff3e0"];
+        ECSConverter [label="ECS 转换器\nfalco_json_to_ecs.py\nevent.dataset 判断\nhost.id/name 补齐", fillcolor="#fff3e0"];
+        RabbitPublisher [label="RabbitMQ 发布器\n队列: data.falco", fillcolor="#fff3e0"];
+    }
+
+    Kernel -> FalcoEngine [label="系统调用"];
+    Rules -> FalcoEngine [label="加载规则"];
+    FalcoEngine -> JSONLReader [label="JSONL 输出"];
+    JSONLReader -> ECSConverter [label="逐行解析"];
+    ECSConverter -> RabbitPublisher [label="ECS JSON"];
+}

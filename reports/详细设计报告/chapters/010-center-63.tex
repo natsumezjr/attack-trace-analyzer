@@ -1,0 +1,255 @@
+\subsection{检测与告警融合}\label{center-63-detection-fusion}
+
+\subsubsection{检测触发机制}\label{center-63-trigger}
+
+中心机的检测与融合模块\textbf{在每个 tick 内自动执行}，无需手动开关。轮询服务完成 Step 1/2（拉取并入库）后，立即启动 Step 3（检测与融合）。
+
+触发点位于：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/client\_poller.py}
+\end{itemize}
+
+\subsubsection{检测与融合入口}\label{center-63-entry}
+
+检测与融合通过统一的入口函数完成：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{backend/app/services/opensearch/analysis.py:run\_data\_analysis()}
+\end{itemize}
+
+该函数执行两段核心操作：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{关联分析}：基于 Correlation Rules 实现跨事件关联（必要时自动创建或更新规则），产出高层攻击场景和关联告警；
+\item
+  \textbf{融合去重}：对 \texttt{raw-findings-*} 执行融合去重，生成 Canonical Findings 并写入 \texttt{canonical-findings-*} 索引。
+\end{enumerate}
+
+\begin{quote}
+注：底层调用 OpenSearch 插件 API（Security Analytics / Correlation Rules）的细节属于工程实现，可能随版本调整；本文档仅约束入口、输入输出与审计口径。
+\end{quote}
+
+\subsubsection{手动触发（仅调试）}\label{center-63-manual-trigger}
+
+开发与联调阶段允许手动调用 \texttt{run\_data\_analysis()} 单独执行一次，便于排障与回放；但靶场与验收环境仍以``tick 内自动触发''为准。
+
+\subsection{Raw Finding 结构与写入}\label{center-63-raw-finding}
+
+Raw Finding 来源于两个渠道：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  客户机侧直接产生的告警事件：Filebeat Sigma detector、Falco 或 Suricata（\texttt{event.kind="alert"}）；
+\item
+  中心机侧 OpenSearch Security Analytics 产生的 findings（经拉取并转换为 ECS 告警事件）。
+\end{enumerate}
+
+Raw Finding 的字段结构与最小必填字段遵循以下规范：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/83-告警数据规范.md}
+\end{itemize}
+
+\subsubsection{Security Analytics Finding 转换}\label{center-63-sa-conversion}
+
+当告警来源为 OpenSearch Security Analytics 时，中心机按照既定规则将原始 finding 转换为 ECS 告警事件，并写入 \texttt{raw-findings-*} 索引：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{event.kind="alert"}
+\item
+  \texttt{event.dataset="finding.raw.security\_analytics"}
+\item
+  \texttt{rule.id/rule.name} 从 detector 信息派生
+\item
+  \texttt{threat.*} 从 finding 的 ATT\&CK tags 派生（或从固定映射表派生）
+\end{itemize}
+
+实现位置：\texttt{backend/app/services/opensearch/analysis.py:\_convert\_security\_analytics\_finding\_to\_ecs()}。
+
+\subsection{融合指纹规则}\label{center-63-fingerprint}
+
+融合去重以固定时间窗口内的 Raw Finding 为输入，按照指纹规则聚合生成 Canonical Finding。
+
+指纹字段与生成规则遵循以下规范：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/83-告警数据规范.md}
+\end{itemize}
+
+\subsubsection{时间桶参数}\label{center-63-time-bucket}
+
+融合指纹采用固定的时间桶参数：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{TIME\_WINDOW\_MINUTES\ =\ 3}
+\end{itemize}
+
+实现位置：\texttt{backend/app/services/opensearch/analysis.py:TIME\_WINDOW\_MINUTES}。
+
+\subparagraph{时间桶示意图}\label{center-63-time-bucket-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-63/center-63-01.pdf}
+\caption{时间桶聚合示例}
+\label{fig:center-63-01}
+\end{figure}
+
+\textbf{说明}：
+
+\begin{itemize}
+\tightlist
+\item
+  X 轴表示 Unix 时间戳（秒）
+\item
+  每个 3 分钟桶（180 秒）内的 Raw Findings 会被分配到同一个桶中
+\item
+  只有同一时间桶内且指纹相同的 Raw Findings 才会被融合
+\item
+  跨桶的 Raw Findings 即使内容完全相同也不会被融合
+\end{itemize}
+
+\subsubsection{指纹构造要素}\label{center-63-fingerprint-elements}
+
+指纹 key 由以下要素构成：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{threat.technique.id}
+\item
+  \texttt{host.id}
+\item
+  \texttt{entity\_id}（取值顺序：\texttt{process.entity\_id} → \texttt{destination.ip{[}/destination.domain{]}} → \texttt{file.hash.sha256}）
+\item
+  \texttt{time\_bucket}
+\end{itemize}
+
+实现位置：\texttt{backend/app/services/opensearch/analysis.py:generate\_fingerprint()} 与 \texttt{fingerprint\_id\_from\_key()}。
+
+\subsection{字段映射：Raw → Canonical}\label{center-63-field-mapping}
+
+Raw Finding 转换为 Canonical Finding 时的关键字段映射关系：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-63/center-63-02.pdf}
+\caption{字段映射关系}
+\label{fig:center-63-02}
+\end{figure}
+
+\textbf{说明}：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{event.dataset}：从 \texttt{finding.raw.*} 转换为 \texttt{finding.canonical}
+\item
+  \textbf{provider 字段}：Raw Finding 中的单一 provider 扩展为数组 \texttt{provider.*}，记录所有来源
+\item
+  \textbf{finding.fingerprint}：基于指纹要素生成唯一标识符
+\item
+  \textbf{custom.evidence.event\_ids}：收集所有被融合的 Raw Finding 的 \texttt{event.id}
+\item
+  \textbf{finding.dedup\_count}：记录被融合的 Raw Finding 数量
+\end{itemize}
+
+\subsection{Canonical 生成与覆盖规则}\label{center-63-canonical-rules}
+
+Canonical Finding 的生成规则、\texttt{event.id} 生成规则以及覆盖行为遵循以下规范：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/83-告警数据规范.md}
+\end{itemize}
+
+\subsubsection{融合写入动作}\label{center-63-write-actions}
+
+融合写入按以下步骤执行：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  从 \texttt{raw-findings-*} 拉取 Raw Findings；
+\item
+  按指纹 key 分组；
+\item
+  每组多条 Raw Findings 合并为一个 Canonical Finding；
+\item
+  每组单条 Raw Finding 直接规范化为 Canonical Finding；
+\item
+  批量写入 \texttt{canonical-findings-*} 索引并刷新。
+\end{enumerate}
+
+实现位置：\texttt{backend/app/services/opensearch/analysis.py:deduplicate\_findings()}。
+
+\subsubsection{融合算法流程}\label{center-63-algorithm-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-63/center-63-03.pdf}
+\caption{融合算法流程}
+\label{fig:center-63-03}
+\end{figure}
+
+\textbf{流程说明}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Raw Findings 聚合}：从 \texttt{raw-findings-*} 索引拉取时间窗口内的所有 Raw Findings
+\item
+  \textbf{时间桶分组}：按 3 分钟桶分组，确保只有同一时间桶内的 Raw Findings 会被融合
+\item
+  \textbf{指纹生成}：基于固定要素生成唯一指纹 key
+\item
+  \textbf{去重融合}：相同指纹的 Raw Findings 合并为一个 Canonical Finding
+\item
+  \textbf{Provider 信息合并}：将所有来源的 provider 信息合并到 \texttt{provider.*} 字段数组
+\item
+  \textbf{写入 OpenSearch}：批量写入 \texttt{canonical-findings-*} 索引
+\end{enumerate}
+
+\subsection{审计与可回溯性}\label{center-63-audit}
+
+审计与可回溯性要求：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Raw 与 Canonical Finding 必须包含证据引用 \texttt{custom.evidence.event\_ids}；
+\item
+  Canonical Finding 的证据引用必须能回溯到 Telemetry 的 \texttt{event.id}；
+\item
+  任意 Canonical Finding 必须能定位到其来源 providers 与融合指纹。
+\end{enumerate}
+
+字段规范详见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/81-ECS字段规范.md}
+\end{itemize}

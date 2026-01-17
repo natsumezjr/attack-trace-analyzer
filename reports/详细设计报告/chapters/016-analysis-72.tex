@@ -1,0 +1,546 @@
+\subsection{LLM 选择器与回退机制}\label{sec:llm-selector-fallback}
+
+\subsubsection{输入裁剪规则}\label{subsec:input-truncation-rules}
+
+LLM 选择器的输入数据由 \texttt{killchain.py} 生成，经由 \texttt{killchain\_llm.py} 进行二次裁剪处理，确保满足以下要求：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  输入规模可控（字段数量与文本长度均受约束）；
+\item
+  输入信息可完整回溯至图中的边与路径（保留 \texttt{path\_id} 及关键步骤信息）；
+\item
+  输入数据在回退模式下具备完全可复现性（不依赖外部服务状态）。
+\end{enumerate}
+
+代码实现绑定点：
+
+\begin{itemize}
+\tightlist
+\item
+  原始输入生成：\texttt{backend/app/services/analyze/killchain.py:build\_llm\_payload()}
+\item
+  二次裁剪：\texttt{backend/app/services/analyze/killchain\_llm.py:PayloadReducer.reduce()}
+\item
+  启发式预筛选：\texttt{backend/app/services/analyze/killchain\_llm.py:HeuristicPreselector.preselect()}
+\end{itemize}
+
+\subsubsection{原始输入结构（固定）}\label{subsec:original-input-structure}
+
+\texttt{build\_llm\_payload()} 生成的 payload 采用 JSON 对象结构，顶层字段定义如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{constraints}：全局约束条件（包含时间窗、锚点等信息）；
+\item
+  \texttt{segments\ 数组}：按 ATT\&CK 战术分段的异常摘要信息；
+\item
+  \texttt{pairs\ 数组}：相邻分段之间的"锚点对"及候选连接路径集合。
+\end{itemize}
+
+字段详细说明：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{segments\ 数组.abnormal\_edge\_summaries\ 数组}：元素来源于边摘要（用于结果解释与路径选择）；
+\item
+  \texttt{pairs\ 数组.candidates{[}{]}}：元素为候选路径（每条路径包含 \texttt{steps\ 数组}）。
+\end{itemize}
+
+\subsubsection{二次裁剪（PayloadReducer，固定参数）}\label{subsec:payload-reducer}
+
+二次裁剪模块将大规模 payload 压缩为 reduced payload，压缩规则与参数配置固定如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  文本截断长度阈值：\texttt{max\_str\_len\ 为\ 200}；
+\item
+  单路径最大保留步骤数：\texttt{max\_steps\_per\_path\ 为\ 10}；
+\item
+  每个步骤的 \texttt{key\_props} 仅保留固定字段集合（参见下表）。
+\end{enumerate}
+
+代码实现绑定点：\texttt{backend/app/services/analyze/killchain\_llm.py:LLMChooseConfig} 与 \texttt{DEFAULT\_EDGE\_KEYS\_KEEP}。
+
+\paragraph{Reduced Payload 顶层结构（固定）}\label{subsec:reduced-payload-structure}
+
+裁剪后的数据结构定义如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{constraints}：原样保留（转换为普通 dict 格式）；
+\item
+  \texttt{segments\ 数组}：保留分段元信息及裁剪后的异常摘要；
+\item
+  \texttt{pairs\ 数组}：保留段对元信息及裁剪后的候选路径步骤。
+\end{itemize}
+
+\paragraph{steps.key\_props 保留字段集合（固定）}\label{subsec:key-props-retention}
+
+每个步骤的 \texttt{key\_props} 仅保留以下键值（其余键值被丢弃）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{edge\_id}
+\item
+  \texttt{ts}
+\item
+  \texttt{src\_uid}
+\item
+  \texttt{dst\_uid}
+\item
+  \texttt{rel}
+\item
+  \texttt{event.id}
+\item
+  \texttt{event.dataset}
+\item
+  \texttt{event.action}
+\item
+  \texttt{rule.name}
+\item
+  \texttt{threat.tactic.name}
+\item
+  \texttt{threat.technique.name}
+\item
+  \texttt{host.id}
+\item
+  \texttt{host.name}
+\item
+  \texttt{user.name}
+\item
+  \texttt{process.entity\_id}
+\item
+  \texttt{process.name}
+\item
+  \texttt{process.command\_line}
+\item
+  \texttt{source.ip}
+\item
+  \texttt{destination.ip}
+\item
+  \texttt{dns.question.name}
+\item
+  \texttt{domain.name}
+\end{itemize}
+
+\paragraph{Payload 裁剪流程}\label{subsec:payload-truncation-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-72/analysis-72-01.pdf}
+\caption{Payload 裁剪流程}
+\label{fig:analysis-72-01}
+\end{figure}
+
+\subsubsection{启发式预筛（HeuristicPreselector，固定参数）}\label{subsec:heuristic-preselector}
+
+基于 reduced payload，系统执行启发式预筛选操作，进一步削减每个段对的候选路径数量。
+
+固定参数：
+
+\begin{itemize}
+\tightlist
+\item
+  每个段对最多保留候选数：\texttt{per\_pair\_keep\ 为\ 8}
+\end{itemize}
+
+启发式评分规则定义如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  路径跳数定义：\texttt{hop=len(steps)}；
+\item
+  基础得分计算：\texttt{base\ =\ 10.0\ /\ (1.0\ +\ hop)}；
+\item
+  连续性得分：统计当前候选与"全链滚动上下文 token 集合"的交集数量 \texttt{overlap}，加权得分为 \texttt{0.5\ *\ overlap}；
+\item
+  综合得分公式：\texttt{score\ =\ base\ +\ 0.5\ *\ overlap}。
+\end{enumerate}
+
+滚动上下文 token 集合包含以下固定维度：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{proc}：\texttt{process.entity\_id}
+\item
+  \texttt{host}：\texttt{host.id}
+\item
+  \texttt{user}：\texttt{user.name}
+\item
+  \texttt{ip}：\texttt{source.ip} 与 \texttt{destination.ip}
+\item
+  \texttt{domain}：\texttt{dns.question.name} 与 \texttt{domain.name}
+\end{itemize}
+
+预筛选输出行为定义如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  每个 \texttt{pair.candidates{[}{]}} 按 score 降序排列；
+\item
+  截断保留 Top \texttt{per\_pair\_keep} 个候选；
+\item
+  在 \texttt{pair.heuristic\_ranking\ 数组} 中记录评分结果与依据，便于调试分析。
+\end{enumerate}
+
+\paragraph{启发式评分公式}\label{subsec:heuristic-scoring-formula}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-72/analysis-72-02.pdf}
+\caption{启发式评分公式}
+\label{fig:analysis-72-02}
+\end{figure}
+
+\paragraph{评分示例}\label{subsec:scoring-examples}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.08\textwidth}p{0.12\textwidth}p{0.12\textwidth}p{0.15\textwidth}p{0.12\textwidth}p{0.25\textwidth}@{}}
+\toprule\noalign{}
+hop & base & overlap & 连续性得分 & score & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & 5.0 & 3 & 1.5 & 6.5 & 最短路径，连续性最高 \\
+2 & 3.33 & 2 & 1.0 & 4.33 & 中等路径，连续性中等 \\
+3 & 2.5 & 1 & 0.5 & 3.0 & 较长路径，连续性较低 \\
+5 & 1.67 & 0 & 0.0 & 1.67 & 长路径，无连续性 \\
+\end{longtable}
+}
+
+\subsubsection{输出结构与校验规则}\label{subsec:output-structure-validation}
+
+LLM chooser 对外输出采用 JSON 对象格式（Python dict），字段集合与校验规则配置固定。
+
+代码实现绑定点：
+
+\begin{itemize}
+\tightlist
+\item
+  输出校验：\texttt{backend/app/services/analyze/killchain\_llm.py:validate\_choose\_result()}
+\item
+  JSON 提取：\texttt{backend/app/services/analyze/killchain\_llm.py:\_extract\_json\_obj()}
+\end{itemize}
+
+\paragraph{输出结构（固定字段）}\label{subsec:output-structure-fields}
+
+返回对象的字段定义如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{chosen\_path\_ids:\ list{[}str{]}}
+\item
+  \texttt{explanation:\ str}
+\item
+  \texttt{confidence:\ float}（取值范围 \texttt{0.0..1.0}）
+\item
+  \texttt{pair\_explanations:\ list{[}object{]}}
+\end{enumerate}
+
+字段语义说明：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{chosen\_path\_ids{[}i{]}}：表示第 \texttt{i} 个 \texttt{pairs{[}i{]}} 中被选中的 \texttt{path\_id}；
+\item
+  \texttt{explanation}：整条攻击链的全局解释文本；
+\item
+  \texttt{confidence}：攻击链解释结果的置信度评估；
+\item
+  \texttt{pair\_explanations}：按段对组织的解释数组，用于前端分段展示。
+\end{itemize}
+
+\paragraph{校验规则（固定）}\label{subsec:validation-rules}
+
+输出需满足以下全部条件方可判定为"有效 LLM 输出"：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{chosen\_path\_ids} 字段存在且类型为 \texttt{list{[}str{]}}；
+\item
+  \texttt{len(chosen\_path\_ids)\ ==\ len(pairs)} 长度匹配；
+\item
+  对每个索引 \texttt{i}，\texttt{chosen\_path\_ids{[}i{]}} 必须属于 \texttt{pairs{[}i{]}.candidates{[}{]}.path\_id} 集合。
+\end{enumerate}
+
+\texttt{confidence} 字段的处理规则：
+
+\begin{itemize}
+\tightlist
+\item
+  当 LLM 输出 \texttt{confidence} 为数值时，系统将其裁剪至 \texttt{0.0..1.0} 区间；
+\item
+  当 LLM 未输出 \texttt{confidence} 或类型错误时，系统默认设置为 \texttt{0.5}。
+\end{itemize}
+
+\subparagraph{输出校验流程}\label{subsec:output-validation-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-72/analysis-72-03.pdf}
+\caption{输出校验流程}
+\label{fig:analysis-72-03}
+\end{figure}
+
+\subsubsection{失败判定条件}\label{subsec:failure-conditions}
+
+当以下任一条件满足时，系统将自动进入回退模式：
+
+\paragraph{Payload 层失败（固定）}\label{subsec:payload-layer-failure}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{pairs\ 数组} 为空（仅包含单段攻击阶段，无需段间连接）；
+\item
+  \texttt{pairs\ 数组} 非空但存在段对无候选路径（该段对输出空字符串）。
+\end{enumerate}
+
+\paragraph{LLM 调用层失败（固定）}\label{subsec:llm-call-failure}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  未注入 \texttt{chat\_complete}（即没有可用的大模型调用函数）；
+\item
+  \texttt{chat\_complete(messages)} 抛出异常；
+\item
+  大模型返回内容无法提取 JSON 对象；
+\item
+  提取出的 JSON 对象未通过 \texttt{validate\_choose\_result()} 校验。
+\end{enumerate}
+
+\paragraph{Provider 创建失败（固定）}\label{subsec:provider-creation-failure}
+
+LLM client 的创建入口为 \texttt{create\_llm\_client()}，provider 选择逻辑如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  当 \texttt{LLM\_PROVIDER="mock"} 时，返回 \texttt{MockChooser}；
+\item
+  当 \texttt{LLM\_PROVIDER="deepseek"} 且 \texttt{DEEPSEEK\_API\_KEY} 为空字符串时，返回 \texttt{MockChooser}；
+\item
+  当 \texttt{LLM\_PROVIDER="deepseek"} 且 \texttt{DEEPSEEK\_API\_KEY} 非空时，返回带 \texttt{chat\_complete} 的 \texttt{LLMChooser}；
+\item
+  当 \texttt{LLM\_PROVIDER} 为其它值时，返回 \texttt{MockChooser}。
+\end{enumerate}
+
+实现绑定点：\texttt{backend/app/services/analyze/killchain\_llm.py:create\_llm\_client()}。
+
+\paragraph{上层兜底失败（固定）}\label{subsec:upper-layer-fallback}
+
+当 \texttt{create\_llm\_client()} 因依赖缺失等原因抛出异常时，上层 \texttt{analyze\_killchain()} 会将 \texttt{llm\_client} 置为 \texttt{None}，最终由 \texttt{killchain.py} 的内置回退逻辑完成段对连接。
+
+代码实现绑定点：
+
+\begin{itemize}
+\tightlist
+\item
+  上层入口：\texttt{backend/app/services/analyze/\_\_init\_\_.py:analyze\_killchain()}
+\item
+  内置回退：\texttt{backend/app/services/analyze/killchain.py:select\_killchain\_with\_llm()}
+\end{itemize}
+
+\paragraph{LLM 选择器流程图}\label{subsec:llm-selector-flowchart}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-72/analysis-72-04.pdf}
+\caption{LLM 选择器流程图}
+\label{fig:analysis-72-04}
+\end{figure}
+
+\subsubsection{回退算法}\label{subsec:fallback-algorithm}
+
+回退算法包含两个层次：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{killchain\_llm.py:fallback\_choose()}：\texttt{LLMChooser} 与 \texttt{MockChooser} 的统一回退机制；
+\item
+  \texttt{killchain.py:select\_killchain\_with\_llm()}：上层未提供可用 chooser 时的回退处理。
+\end{enumerate}
+
+\paragraph{回退层级结构}\label{subsec:fallback-hierarchy}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/analysis-72/analysis-72-05.pdf}
+\caption{回退层级结构}
+\label{fig:analysis-72-05}
+\end{figure}
+
+\paragraph{LLMChooser 回退（fallback\_choose，固定）}\label{subsec:llmchooser-fallback}
+
+回退算法对每个段对执行以下操作：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在 \texttt{pair.candidates{[}{]}} 中选择 \texttt{len(steps)} 最小的候选路径；
+\item
+  将该候选的 \texttt{path\_id} 写入 \texttt{chosen\_path\_ids}；
+\item
+  当段对候选集合为空时，该段对输出空字符串 \texttt{""}。
+\end{enumerate}
+
+回退输出的字段配置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{confidence\ 为\ 0.5}
+\item
+  \texttt{pair\_explanations={[}{]}}
+\item
+  \texttt{explanation} 使用 \texttt{fallback\_choose()} 内置解释文本（不依赖外部输入）。
+\end{itemize}
+
+\paragraph{killchain.py 内置回退（固定）}\label{subsec:killchain-builtin-fallback}
+
+当 \texttt{llm\_client} 不可用或 LLM 选择失败时，\texttt{killchain.py} 会对每个段对的候选路径集合，选择边数最少（\texttt{len(edges)} 最小）的候选路径。
+
+该回退模式下输出的 \texttt{confidence} 固定为 \texttt{0.5}，解释文本由 \texttt{killchain.py} 内置常量生成。
+
+\paragraph{回退机制对比}\label{subsec:fallback-comparison}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.12\textwidth}p{0.15\textwidth}p{0.15\textwidth}p{0.18\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+LLM & 模型 & 用途 & 回退策略 & 触发条件 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+LLM-1 & DeepSeek & 主要解释 & 无回退 & {\scriptsize \texttt{LLM\_PROVIDER="deepseek"} 且 API Key 非空} \\
+LLM-2 & Qwen & 备用解释 & LLM-1 失败时启用 & 预留扩展，当前未实现 \\
+Rule-based & 规则引擎 & 兜底 & 所有 LLM 失败时启用 & {\scriptsize • Payload 层失败 • LLM 调用层失败 • Provider 创建失败 • 输出校验失败} \\
+\end{longtable}
+}
+
+\subsubsection{配置参数}\label{subsec:configuration-parameters}
+
+\paragraph{模型选择参数}\label{subsec:model-selection-params}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.22\textwidth}p{0.12\textwidth}p{0.18\textwidth}p{0.38\textwidth}@{}}
+\toprule\noalign{}
+参数 & 类型 & 默认值 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{LLM\_PROVIDER}} & string & {\scriptsize\texttt{"mock"}} & {\scriptsize LLM 提供商：可选 \texttt{mock} 或 \texttt{deepseek}} \\
+{\scriptsize\texttt{DEEPSEEK\_API\_KEY}} & string & {\scriptsize\texttt{""}} & {\scriptsize DeepSeek API 密钥，为空时自动切换至 MockChooser} \\
+\end{longtable}
+}
+
+\paragraph{裁剪参数}\label{subsec:truncation-params}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.10\textwidth}p{0.12\textwidth}p{0.23\textwidth}p{0.25\textwidth}@{}}
+\toprule\noalign{}
+参数 & 类型 & 默认值 & 位置 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{max\_str\_len}} & int & {\scriptsize\texttt{200}} & PayloadReducer & 文本字段最大长度限制 \\
+{\scriptsize\texttt{max\_steps\_per\_path}} & int & {\scriptsize\texttt{10}} & PayloadReducer & 单路径最大保留步骤数 \\
+{\scriptsize\texttt{per\_pair\_keep}} & int & {\scriptsize\texttt{8}} & HeuristicPreselector & 每个段对最大保留候选数 \\
+\end{longtable}
+}
+
+\paragraph{LLM 调用参数}\label{subsec:llm-call-params}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.22\textwidth}p{0.15\textwidth}p{0.18\textwidth}p{0.35\textwidth}@{}}
+\toprule\noalign{}
+参数 & 类型 & 默认值 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{temperature}} & float & {\scriptsize\texttt{0.3}} & DeepSeek 温度参数配置 \\
+{\scriptsize\texttt{response\_format}} & string & {\scriptsize\texttt{json\_object}} & 强制 JSON 输出格式 \\
+{\scriptsize\texttt{timeout}} & int & - & API 调用超时时间（待实现） \\
+{\scriptsize\texttt{max\_retries}} & int & - & 最大重试次数（待实现） \\
+\end{longtable}
+}
+
+\paragraph{配置示例}\label{subsec:configuration-examples}
+
+\subparagraph{生产环境配置}\label{para:production-config}
+
+\begin{verbatim}
+## 使用 DeepSeek 进行 LLM 解释
+export LLM_PROVIDER="deepseek"
+export DEEPSEEK_API_KEY="sk-your-api-key-here"
+\end{verbatim}
+
+\subparagraph{开发/测试环境配置}\label{para:dev-test-config}
+
+\begin{verbatim}
+## 使用 Mock 模式（不调用真实 API）
+export LLM_PROVIDER="mock"
+export DEEPSEEK_API_KEY=""
+\end{verbatim}
+
+\subparagraph{禁用 LLM 功能}\label{para:llm-disabled}
+
+\begin{verbatim}
+## 设置为空或任意非 deepseek 值，系统自动回退到规则引擎
+export LLM_PROVIDER=""
+export DEEPSEEK_API_KEY=""
+\end{verbatim}
+
+\subsubsection{可复现性保证}\label{subsec:reproducibility-guarantee}
+
+可复现性保证规则定义如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  reduced payload 的裁剪参数固定（参见 1.2 与 1.3 节）；
+\item
+  回退算法仅依赖 reduced payload，不引入随机因素；
+\item
+  当候选路径的 \texttt{steps} 数量相同时，Python 的稳定排序会保留原始候选顺序，确保回退结果对同一输入保持一致性；
+\item
+  DeepSeek 调用固定使用 \texttt{temperature\ 为\ 0.3}，在支持时启用 \texttt{response\_format=\{"type":"json\_object"\}}，并通过严格校验将异常输出统一收敛至回退模式。
+\end{enumerate}
+
+DeepSeek 适配实现绑定点：\texttt{backend/app/services/analyze/killchain\_llm.py:\_create\_llm\_chat\_complete()}。

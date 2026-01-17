@@ -1,0 +1,277 @@
+\subsection{Falco 采集与 ECS 转换}\label{21-falco-collection-ecs-conversion}
+
+\subsubsection{组件与文件位置}\label{1-components-file-locations}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+组件 & 位置 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Falco 引擎 & \texttt{client/docker-compose.yml} 的 \texttt{falco} 服务 & Falco 输出 JSONL 到共享卷 \\
+ECS 转换器 & \texttt{client/sensor/falco/ecs-converter/falco\_json\_to\_ecs.py} & 读取 JSONL，转换为 ECS JSON，发布到 RabbitMQ \\
+\end{longtable}
+}
+
+\subsubsection{Falco 组件架构}\label{11-falco-component-architecture}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/client-51/client-51-01.pdf}
+\caption{Falco 组件架构}
+\label{fig:client-51-01}
+\end{figure}
+
+\subsubsection{采集输入}\label{2-collection-input}
+
+\subsubsection{Falco 输出文件}\label{21-falco-output-file}
+
+Falco 将事件以 JSONL 格式写入共享卷：
+
+\begin{itemize}
+\tightlist
+\item
+  路径：\texttt{/data/falco.jsonl}
+\item
+  格式：每行一个 JSON 对象（JSONL）
+\end{itemize}
+
+该文件由 \texttt{falco} 容器生成，由 \texttt{falco-ecs} 容器消费。
+
+\subsubsection{Falco 容器关键配置}\label{22-falco-container-config}
+
+Falco 以特权模式运行并挂载宿主机关键目录，配置固定为：
+
+\begin{verbatim}
+image: falcosecurity/falco:0.42.1
+privileged: true
+pid: host
+volumes:
+  - /var/run/docker.sock:/host/var/run/docker.sock
+  - /dev:/host/dev
+  - /proc:/host/proc:ro
+  - /boot:/host/boot:ro
+  - /lib/modules:/host/lib/modules:ro
+  - /usr:/host/usr:ro
+  - /etc:/host/etc:ro
+  - /sys/kernel/debug:/sys/kernel/debug
+  - /sys/kernel/tracing:/sys/kernel/tracing
+  - ./data:/data
+command:
+  - falco
+  - -o
+  - json_output=true
+  - -o
+  - file_output.enabled=true
+  - -o
+  - file_output.filename=/data/falco.jsonl
+\end{verbatim}
+
+\subsubsection{Telemetry 规则（用于``能入图''）}\label{23-telemetry-rules-graph}
+
+Falco 默认规则集主要用于``检测/告警''，而图谱重建需要一定比例的``事实 Telemetry''。
+
+ATA系统通过在 Falco 容器中加载额外的 Telemetry 规则文件补充以下能力：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{execve/execveat}：产生 \texttt{hostlog.process}（用于进程树 / 父子进程）
+\item
+  \texttt{open/openat/...}：产生 \texttt{hostbehavior.file} / \texttt{hostlog.file\_registry}（用于文件访问链路）
+\item
+  \texttt{connect}：产生 \texttt{hostbehavior.syscall}（用于 \texttt{Process\ →\ IP} 的网络连接边）
+\end{itemize}
+
+规则文件位置：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{client/sensor/falco/rules.d/ata\_telemetry\_rules.yaml}
+\end{itemize}
+
+部署时通过容器挂载方式加载至 Falco 默认规则目录：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{/etc/falco/rules.d}
+\end{itemize}
+
+\subsubsection{ECS 转换规则}\label{3-ecs-conversion-rules}
+
+\subsubsection{转换器运行方式}\label{31-converter-operation}
+
+\texttt{falco-ecs} 容器通过脚本 \texttt{falco\_json\_to\_ecs.py} 启动，参数配置如下：
+
+\begin{verbatim}
+--input /data/falco.jsonl
+--follow
+--queue data.falco
+\end{verbatim}
+
+\subsubsection{输出字段形态}\label{32-output-field-format}
+
+Falco 转换器采用\textbf{嵌套对象形态}输出（而非点号扁平键）。
+
+示例（节选）：
+
+\begin{verbatim}
+{
+  "@timestamp": "2026-01-14T12:00:00.000Z",
+  "ecs": {"version": "9.2.0"},
+  "event": {"kind": "event", "dataset": "hostlog.process"},
+  "host": {"name": "client-01", "id": "h-1111111111111111"},
+  "process": {"pid": 1234, "executable": "/usr/bin/bash"},
+  "message": "...",
+  "falco": { "...": "raw event payload" }
+}
+\end{verbatim}
+
+说明：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Falco 转换器输出 \texttt{ecs.version="9.2.0"}；中心机入库前会执行最终规范化，确保权威口径一致（参见 \texttt{../../80-规范/81-ECS字段规范.md}）。
+\item
+  Falco 原始事件完整保存在 \texttt{falco} 字段中，用于审计与回放。
+\item
+  Telemetry 的 \texttt{event.dataset} 根据事件类型映射为 \texttt{hostlog.process} / \texttt{hostbehavior.file} / \texttt{hostlog.file\_registry} / \texttt{hostbehavior.syscall}，以满足 \texttt{../../80-规范/84-Neo4j实体图谱规范.md} 的抽取条件。
+\item
+  为确保三传感器数据在同一主机上的可关联性，转换器支持：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    通过环境变量 \texttt{HOST\_NAME} 覆盖 \texttt{host.name}（权威值参见 \texttt{89-环境变量与配置规范.md}）
+  \item
+    优先使用环境变量 \texttt{HOST\_ID} 覆盖 \texttt{host.id}；当 \texttt{HOST\_ID} 缺失时，按 \texttt{81-ECS字段规范.md} 规则回退生成 \texttt{host.id}（\texttt{h-} + sha1(host.name){[}:16{]}）。
+  \end{itemize}
+\end{enumerate}
+
+\subsubsection{eventkind 规则}\label{33-event-kind-rules}
+
+Falco 转换器依据 \texttt{priority} 与阈值判断事件性质：
+
+\begin{itemize}
+\tightlist
+\item
+  正常行为：\texttt{event.kind="event"}
+\item
+  异常行为：\texttt{event.kind="alert"}
+\end{itemize}
+
+阈值参数由转换器启动参数 \texttt{-\/-abnormal-priority} 指定，默认值为 \texttt{WARNING}。
+
+\subsubsection{转换逻辑示例}\label{34-conversion-logic-example}
+
+以下代码展示 Falco 事件到 ECS 的核心转换逻辑：
+
+\begin{verbatim}
+def falco_to_ecs(falco_event: dict) -> dict:
+    """将 Falco JSONL 事件转换为 ECS 格式"""
+    ecs_event = {
+        "ecs": {"version": "9.2.0"},
+        "event": {
+            "kind": determine_event_kind(falco_event),  # 基于 priority 判断
+            "dataset": map_dataset(falco_event),       # hostlog.process 等
+        },
+        "host": {
+            "name": os.getenv("HOST_NAME", falco_event.get("host_name")),
+            "id": get_or_generate_host_id()
+        },
+        "process": {
+            "pid": falco_event.get("proc.pid"),
+            "executable": falco_event.get("proc.exe"),
+            "command": falco_event.get("proc.cmdline")
+        },
+        "message": falco_event.get("output", ""),
+        "falco": falco_event  # 保留原始事件用于审计
+    }
+    return ecs_event
+
+def determine_event_kind(falco_event: dict) -> str:
+    """基于 priority 判断事件类型"""
+    priority = falco_event.get("priority", "")
+    if priority in ["WARNING", "ERROR", "CRITICAL"]:
+        return "alert"
+    return "event"
+
+def map_dataset(falco_event: dict) -> str:
+    """映射 event.dataset"""
+    evt_type = falco_event.get("event_type", "")
+    if evt_type == "execve":
+        return "hostlog.process"
+    elif evt_type in ["open", "openat"]:
+        return "hostlog.file_registry"
+    elif evt_type == "connect":
+        return "hostbehavior.syscall"
+    return "hostbehavior.default"
+\end{verbatim}
+
+\subsubsection{eventid 生成与幂等}\label{4-event-id-generation-idempotency}
+
+\subsubsection{eventid 的来源}\label{41-event-id-source}
+
+Falco 转换器不强制生成 \texttt{event.id}。客户机对外拉取接口在返回数据前会补全稳定的 \texttt{event.id}：
+
+\begin{itemize}
+\tightlist
+\item
+  当消息体已包含 \texttt{event.id}（扁平键或嵌套键）时直接透传；
+\item
+  当缺失 \texttt{event.id} 时，对消息体做 \texttt{sha1}，取前 16 位生成：\texttt{evt-\textless{}sha1{[}:16{]}\textgreater{}}。
+\end{itemize}
+
+该补齐逻辑位于：\texttt{client/backend/queue/client.go} 的 \texttt{ensureEventID}。
+
+权威规则参见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{../../80-规范/81-ECS字段规范.md}
+\end{itemize}
+
+\subsubsection{幂等与重复处理}\label{42-idempotency-duplicate-handling}
+
+\begin{itemize}
+\tightlist
+\item
+  RabbitMQ 队列层面保证增量拉取：消息被 \texttt{ack} 后不再重复返回。
+\item
+  OpenSearch 写入以 \texttt{event.id} 为幂等键，重复写入不会产生重复文档。
+\end{itemize}
+
+\subsubsection{队列投递}\label{5-queue-delivery}
+
+Falco 转换器将数据投递至 RabbitMQ：
+
+\begin{itemize}
+\tightlist
+\item
+  AMQP：由环境变量 \texttt{RABBITMQ\_URL} 指定
+\item
+  队列：由环境变量 \texttt{RABBITMQ\_QUEUE} 指定，默认为 \texttt{data.falco}
+\end{itemize}
+
+队列语义参见：\texttt{54-RabbitMQ缓冲与队列语义.md}。
+
+\subsubsection{故障处理}\label{6-error-handling}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Falco 未产生日志文件时，转换器会持续等待输入文件出现后开始处理。
+\item
+  RabbitMQ 连接断开时，转换器会重连后继续发布。
+\item
+  任何无法解析的行会被跳过，转换器继续处理后续行以保证持续运行。
+\end{enumerate}

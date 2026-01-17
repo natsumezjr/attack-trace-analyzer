@@ -1,0 +1,67 @@
+digraph {
+    rankdir=TB;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial"];
+
+    // Initial state
+    Start [label="", shape=point, width=0.3];
+    Queued [label="Queued\n(排队中)", shape=ellipse, fillcolor="#c8e6c9", fontsize=11];
+
+    // Main states
+    Running [label="Running\n(运行中)", shape=ellipse, fillcolor="#e1f5fe", fontsize=11];
+    Succeeded [label="Succeeded\n(成功)", shape=ellipse, fillcolor="#c8e6c9", fontsize=11];
+    Failed [label="Failed\n(失败)", shape=ellipse, fillcolor="#ef9a9a", fontsize=11];
+
+    // Terminal state
+    End [label="", shape=doublecircle, fillcolor="#ef9a9a", width=0.4];
+
+    // Transitions
+    Start -> Queued [label="创建任务", fontsize=10];
+    Queued -> Running [label="开始执行", fontsize=10];
+    Running -> Succeeded [label="成功完成", fontsize=10];
+    Running -> Failed [label="执行失败", fontsize=10];
+    Failed -> End [label="", fontsize=10];
+    Succeeded -> End [label="", fontsize=10];
+
+    // Notes for Queued
+    subgraph cluster_queued_note {
+        label="";
+        style=invis;
+        queued_note [label="task_id 已生成\nstatus = \"queued\"\nprogress = 0\n状态可查询", shape=note, fillcolor="#fff3e0", fontsize=9];
+    }
+
+    Queued -> queued_note [style=invis, dir=none];
+
+    // Notes for Running
+    subgraph cluster_running_note {
+        label="";
+        style=invis;
+        running_note [label="正在计算关键路径\nstatus = \"running\"\nprogress: 5 → 95\n持续更新中", shape=note, fillcolor="#fff3e0", fontsize=9];
+    }
+
+    Running -> running_note [style=invis, dir=none];
+
+    // Notes for Succeeded
+    subgraph cluster_succeeded_note {
+        label="";
+        style=invis;
+        succeeded_note [label="status = \"succeeded\"\nprogress = 100\nfinished_at 已写入\n结果可读取", shape=note, fillcolor="#fff3e0", fontsize=9];
+    }
+
+    Succeeded -> succeeded_note [style=invis, dir=none];
+
+    // Notes for Failed
+    subgraph cluster_failed_note {
+        label="";
+        style=invis;
+        failed_note [label="status = \"failed\"\nfinished_at 已写入\nerror 字段必填", shape=note, fillcolor="#fff3e0", fontsize=9];
+    }
+
+    Failed -> failed_note [style=invis, dir=none];
+
+    // Position notes
+    {rank=same; Queued; queued_note}
+    {rank=same; Running; running_note}
+    {rank=same; Succeeded; succeeded_note}
+    {rank=same; Failed; failed_note}
+}

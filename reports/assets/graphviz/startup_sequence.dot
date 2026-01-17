@@ -1,0 +1,42 @@
+digraph StartupSequence {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.35",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="Recommended Startup Sequence (Minimal Loop)"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  step1 [label="1) Infra\ncd backend\ncp .env.example .env\ndocker compose up -d"];
+  step2 [label="2) Backend API\ncd backend\nuv sync\nuv run uvicorn main:app --reload"];
+  step3 [label="3) Frontend UI\ncd frontend\ncp .env.example .env.local\nnpm install && npm run dev"];
+  step4 [label="4) Verify (no screenshots)\ncurl /health\ncurl /api/v1/clients\ncurl /api/v1/events/search"];
+  optional [shape=note, style="filled", color="#2B44C6", fillcolor="#EBF5FF",
+            label="Optional:\n- fetch ATT&CK CTI\n- start Linux clients\n- run playbook (docs/20, docs/90)"];
+
+  step1 -> step2 -> step3 -> step4;
+  optional -> step4 [style=dashed];
+}
+

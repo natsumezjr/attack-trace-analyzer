@@ -1,0 +1,264 @@
+\subsection{报告导出}\label{subsec:report-export}
+
+\subsubsection{导出内容结构}\label{subsec:export-content-structure}
+
+报告导出功能服务于交付与验收场景，其导出产物、章节结构与字段规范均遵循固定规则。
+
+\paragraph{导出产物}\label{para:export-artifacts}
+
+前端导出产物为单个 Markdown 文件，文件命名规则如下：
+
+\begin{itemize}
+\tightlist
+\item
+  文件名格式：\texttt{attack-trace-report-\textless{}task\_id\textgreater{}.md}
+\end{itemize}
+
+其中 \texttt{\textless{}task\_id\textgreater{}} 代表溯源任务 ID（如 \texttt{trace-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}）。
+
+\paragraph{报告章节结构}\label{para:report-section-structure}
+
+Markdown 报告遵循固定的章节结构：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-76/frontend-76-01.pdf}
+\caption{报告章节结构}
+\label{fig:frontend-76-01}
+\end{figure}
+
+\textbf{章节清单：}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  报告元信息
+\item
+  输入与边界
+\item
+  告警与证据摘要
+\item
+  溯源关键路径
+\item
+  APT 相似度匹配结果
+\item
+  附录：原始数据（JSON）
+\end{enumerate}
+
+\paragraph{字段规范}\label{para:field-specifications}
+
+报告字段规范遵循以下规则：
+
+\begin{itemize}
+\tightlist
+\item
+  ECS 字段：\texttt{../../80-规范/81-ECS字段规范.md}
+\item
+  图查询与任务接口：\texttt{../../80-规范/88-前端与中心机接口.md}
+\item
+  写回字段：\texttt{../../80-规范/85-溯源结果写回规范.md}
+\end{itemize}
+
+\subsubsection{数据来源}\label{subsec:data-sources}
+
+报告导出依赖中心机后端接口提供数据，数据来源固定为以下 4 类请求。
+
+\paragraph{数据来源总览}\label{para:data-sources-overview}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-76/frontend-76-02.pdf}
+\caption{数据来源总览}
+\label{fig:frontend-76-02}
+\end{figure}
+
+\paragraph{报告数据映射表}\label{para:report-data-mapping-table}
+
+{\def\LTcaptype{none} % do not increment counter
+\small
+\begin{longtable}[]{@{}p{0.15\textwidth}p{0.15\textwidth}p{0.35\textwidth}p{0.25\textwidth}@{}}
+\toprule\noalign{}
+报告章节 & 数据来源 & API 端点 & 核心字段 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+报告元信息 & 任务文档 & {\footnotesize\texttt{GET /api/v1/analysis/tasks/\{task\_id\}}} & {\footnotesize\texttt{task\_id}, \texttt{status}, \texttt{time\_window}} \\
+溯源关键路径 & 图数据库 & {\footnotesize\texttt{POST /api/v1/graph/query}} & {\footnotesize\texttt{nodes{[}{]}}, \texttt{edges{[}{]}}} \\
+告警摘要 & Finding 索引 & {\footnotesize\texttt{POST /api/v1/findings/search}} & {\footnotesize\texttt{tactic}, \texttt{technique}, \texttt{event.id}} \\
+TTP 相似度 & 任务文档/LLM & {\footnotesize 任务文档或 \texttt{POST /api/v1/analysis/ttp-similarity}} & {\footnotesize\texttt{apt\_id}, \texttt{similarity}, \texttt{reasoning}} \\
+\end{longtable}
+}
+
+\paragraph{任务信息}\label{para:task-information}
+
+\begin{itemize}
+\tightlist
+\item
+  请求方法：\texttt{GET}
+\item
+  请求路径：\texttt{/api/v1/analysis/tasks/\{task\_id\}}
+\item
+  接口用途：获取任务状态机字段、时间窗与目标节点 UID
+\end{itemize}
+
+\paragraph{溯源关键路径}\label{para:critical-trace-path}
+
+\begin{itemize}
+\tightlist
+\item
+  请求方法：\texttt{POST}
+\item
+  请求路径：\texttt{/api/v1/graph/query}
+\item
+  请求体字段：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{action="analysis\_edges\_by\_task"}
+  \item
+    \texttt{task\_id=\textless{}task\_id\textgreater{}}
+  \item
+    \texttt{only\_path=false}（默认值；前端按 \texttt{analysis.is\_path\_edge=true} 筛选关键路径边）
+  \end{itemize}
+\item
+  接口用途：获取该任务写回的关键路径边与涉及节点
+\end{itemize}
+
+\begin{quote}
+说明：后端响应固定包含 \texttt{nodes{[}{]}}（按边集合中的 UID 去重拉取），无需额外的 \texttt{include\_nodes} 参数；字段结构遵循 \texttt{../../80-规范/88-前端与中心机接口.md} 规范。
+\end{quote}
+
+\paragraph{Canonical Finding 摘要}\label{para:canonical-finding-summary}
+
+\begin{itemize}
+\tightlist
+\item
+  请求方法：\texttt{POST}
+\item
+  请求路径：\texttt{/api/v1/findings/search}
+\item
+  请求体字段：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{stage="canonical"}
+  \item
+    \texttt{start\_ts/end\_ts} 使用任务时间窗
+  \item
+    \texttt{host\_id} 指定为报告主机
+  \end{itemize}
+\item
+  接口用途：获取时间窗内 Canonical Finding 的 tactic/technique 覆盖情况与证据引用
+\end{itemize}
+
+\paragraph{TTP 相似度}\label{para:ttp-similarity}
+
+TTP 相似度结果的读取遵循以下规则：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{优先}从任务文档 \texttt{task.result.ttp\_similarity.*} 读取（确保与任务执行时结果一致，避免重复计算）；
+\item
+  若任务文档缺失该结果，则\textbf{回落}调用 \texttt{POST\ /api/v1/analysis/ttp-similarity} 重新计算（参数为 \texttt{host\_id\ +\ start\_ts/end\_ts}）。
+\end{enumerate}
+
+\subsubsection{生成规则与可复现性}\label{subsec:generation-rules-reproducibility}
+
+\paragraph{生成流程}\label{para:generation-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-76/frontend-76-03.pdf}
+\caption{生成流程}
+\label{fig:frontend-76-03}
+\end{figure}
+
+\paragraph{报告主机选择规则}\label{para:report-host-selection-rules}
+
+报告主机 \texttt{host\_id} 的取值遵循以下规则：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  若 \texttt{task.target.node\_uid} 的 UID 中包含 \texttt{host.id}（如 \texttt{Host:host.id=...} 或 \texttt{File:host.id=...;file.path=...}），直接从 UID 解析 \texttt{host.id}；
+\item
+  否则，从 \texttt{POST\ /api/v1/graph/query} 的 \texttt{nodes{[}{]}} 中定位 \texttt{uid\ ==\ task.target.node\_uid} 的目标节点，优先读取 \texttt{node.key{[}"host.id"{]}}，其次读取 \texttt{node.props{[}"host.id"{]}}；
+\item
+  若上述两项均无法获取 \texttt{host.id}，导出流程终止并提示错误。
+\end{enumerate}
+
+\begin{quote}
+说明：中心机后端在节点响应中将唯一键字段拆分为 \texttt{key} 与 \texttt{props} 两部分，部分节点的 \texttt{host.id} 可能出现在 \texttt{key} 中。为保证导出稳定性，必须按上述优先级读取。
+\end{quote}
+
+\paragraph{排序与格式化}\label{para:sorting-formatting}
+
+为确保同一输入导出得到一致的关键内容，报告采用固定排序规则：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-76/frontend-76-04.pdf}
+\caption{排序与格式化规则}
+\label{fig:frontend-76-04}
+\end{figure}
+
+\textbf{排序规则详表：}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+数据类型 & 主排序键 & 次排序键 & 第三排序键 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Canonical Findings & \texttt{@timestamp} 升序 & \texttt{event.id} 升序 & - \\
+图节点 & \texttt{uid} 升序 & - & - \\
+图边 & \texttt{props.ts\_float} 升序 & \texttt{src\_uid} 升序 & \texttt{rtype} / \texttt{dst\_uid} 升序 \\
+Tactics/Techniques & 字符串升序 & - & - \\
+\end{longtable}
+}
+
+报告中不包含后端响应的 \texttt{server\_time} 字段，仅保留与输入相关的稳定字段。
+
+\paragraph{证据引用呈现}\label{para:evidence-reference-presentation}
+
+报告中每条关键路径边均需呈现以下字段：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-76/frontend-76-05.pdf}
+\caption{证据引用呈现规则}
+\label{fig:frontend-76-05}
+\end{figure}
+
+\textbf{必呈字段清单：}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+字段类别 & 必呈字段 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+基础字段 & \texttt{event.id} & 事件唯一标识 \\
+& \texttt{event.dataset} & 数据集来源 \\
+证据字段 & \texttt{custom.evidence.event\_ids{[}{]}} & 关联证据 ID 列表 \\
+& \texttt{analysis.task\_id} & 所属溯源任务 \\
+& \texttt{analysis.is\_path\_edge} & 是否关键路径边 \\
+告警字段\textless br/（条件性） & \texttt{is\_alarm\ 为\ true} & 告警标识 \\
+& \texttt{rule.*} & 规则信息 \\
+& \texttt{threat.*} & 威胁情报 \\
+& \texttt{custom.finding.*} & Finding 扩展字段 \\
+\end{longtable}
+}
+
+这些字段支撑现场演示中"从告警到证据再到路径"的解释闭环。

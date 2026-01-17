@@ -1,0 +1,108 @@
+\section{部署拓扑与网络规划}\label{deployment-network-planning}
+
+本文档定义项目靶场的节点拓扑、网络规划、端口分配与访问边界，确保现场演示的部署一致性与可复现性。
+
+\subsection{读者对象}\label{outline-42-audience}
+
+\begin{itemize}
+\tightlist
+\item
+  靶场负责人
+\item
+  部署与编排人员
+\item
+  演示与验收人员
+\end{itemize}
+
+\subsection{引用关系}\label{outline-42-references}
+
+\begin{itemize}
+\tightlist
+\item
+  详细部署步骤：\texttt{../90-运维与靶场/91-靶场部署.md}
+\item
+  一键编排说明：\texttt{../90-运维与靶场/92-一键编排.md}
+\item
+  接口与端口规范：\texttt{../80-规范/87-客户机与中心机接口.md}
+\end{itemize}
+
+\subsection{节点与角色}\label{nodes-roles}
+
+靶场节点角色划分如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{center}：中心机（部署 OpenSearch、Neo4j、后端 API 与前端服务）
+\item
+  \texttt{client-01} 至 \texttt{client-04}：客户机节点（负责数据采集与缓冲）
+\item
+  \texttt{c2}：命令与控制服务器（用于生成可观测通信证据）
+\end{itemize}
+
+\subsection{网络规划}\label{network-planning}
+
+网络规划遵循以下原则：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  网络隔离：靶场网络与宿主机外网隔离，所有演示数据在靶场内闭环流转。
+\item
+  端口暴露：中心机对外端口仅面向靶场网络可达。
+\item
+  服务隔离：客户机仅向中心机开放数据拉取接口，不对外提供其他服务端口。
+\end{enumerate}
+
+\subsection{端口规划}\label{port-planning}
+
+端口分配与用途如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\small
+\begin{longtable}[]{@{}lrll@{}}
+\toprule\noalign{}
+组件 & 端口 & 协议 & 访问控制 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+中心机后端 & 8001 & HTTP & 仅内网 \\
+中心机前端 & 3000 & HTTP & 公网（可选） \\
+OpenSearch & 9200 & HTTP & 仅本地 \\
+Neo4j Bolt & 7687 & Bolt & 仅本地 \\
+Neo4j Browser & 7474 & HTTP & 仅本地 \\
+客户机拉取接口 & 8888 & HTTP & 仅内网 \\
+\end{longtable}
+}
+
+\subsection{部署拓扑}\label{deployment-topology}
+
+部署拓扑遵循"中心机集中、客户机分布"的架构：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  客户机采集数据并缓冲至本地队列
+\item
+  中心机周期性轮询拉取客户机数据
+\item
+  中心机将数据写入 OpenSearch，并根据需要触发检测与告警融合
+\item
+  中心机将数据入图至 Neo4j，前端通过中心机 API 查询与展示
+\end{enumerate}
+
+\subsection{安全边界与隔离}\label{security-boundaries-isolation}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  代码隔离：中心机不运行未知样本，不执行来自外部的不可信代码。
+\item
+  访问控制：靶场网络中所有组件的访问鉴权与令牌由接口规范统一定义。
+\item
+  运维保障：现场演示以稳定性为首要目标，任何需要人工介入的步骤必须写入运维文档。
+\end{enumerate}

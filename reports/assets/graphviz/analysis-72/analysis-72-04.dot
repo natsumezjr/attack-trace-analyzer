@@ -1,0 +1,50 @@
+digraph {
+    rankdir=TD;
+    node [style="filled,rounded", fontname="Arial", fontsize=9];
+    edge [fontname="Arial", fontsize=8];
+
+    Start [label="输入: killchain payload", shape=ellipse, fillcolor="#fce4ec"];
+    CheckPayload [label="payload<br/>是否有效?", shape=diamond, fillcolor="#fce4ec"];
+
+    UpperFallback [label="killchain.py 内置回退<br/>选择 edges 最少", fillcolor="#ffcdd2"];
+    FallbackInResult [label="该 pair 输出空字符串<br/>其他 pairs 继续", fillcolor="#ffcdd2"];
+    Reduce [label="二次裁剪与预筛选", fillcolor="#fff3e0"];
+
+    CreateClient [label="创建 LLM Client", fillcolor="#fff3e0"];
+    CheckEnv [label="LLM_PROVIDER", shape=diamond, fillcolor="#fce4ec"];
+    Mock [label="MockChooser", fillcolor="#fff3e0"];
+    CheckKey [label="API Key", shape=diamond, fillcolor="#fce4ec"];
+    Real [label="LLMChooser<br/>chat_complete 函数", fillcolor="#fff3e0"];
+
+    Fallback [label="fallback_choose()<br/>• 选择 len(steps) 最小<br/>• confidence 为 0.5", fillcolor="#ffcdd2"];
+    HasChatComplete [label="chat_complete<br/>是否存在?", shape=diamond, fillcolor="#fce4ec"];
+    CallLLM [label="调用 DeepSeek API", fillcolor="#fff3e0"];
+    ExtractResult [label="提取 JSON 对象", fillcolor="#fff3e0"];
+    Validate [label="validate_<br/>choose_result", shape=diamond, fillcolor="#fce4ec"];
+    Success [label="返回 LLM 选择结果", shape=ellipse, fillcolor="#c8e6c9"];
+    Output [label="输出: 选择结果", shape=ellipse, fillcolor="#fce4ec"];
+
+    Start -> CheckPayload;
+    CheckPayload -> UpperFallback [label="pairs 为空"];
+    CheckPayload -> FallbackInResult [label="某个 pair 无候选"];
+    CheckPayload -> Reduce [label="有效"];
+    Reduce -> CreateClient;
+    CreateClient -> CheckEnv;
+    CheckEnv -> Mock [label="mock"];
+    CheckEnv -> CheckKey [label="deepseek"];
+    CheckKey -> Mock [label="空字符串"];
+    CheckKey -> Real [label="非空"];
+    CheckEnv -> Mock [label="其他"];
+    Mock -> Fallback;
+    Real -> HasChatComplete;
+    HasChatComplete -> Fallback [label="否"];
+    HasChatComplete -> CallLLM [label="是"];
+    CallLLM -> ExtractResult;
+    ExtractResult -> Validate;
+    Validate -> Fallback [label="无效"];
+    Validate -> Success [label="有效"];
+    Fallback -> Output;
+    FallbackInResult -> Output;
+    UpperFallback -> Output;
+    Success -> Output;
+}

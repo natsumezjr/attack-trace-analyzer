@@ -1,0 +1,164 @@
+\section{单机靶场落地步骤}\label{single-host-range-setup}
+
+本文面向靶场负责人，给出在单台内网 Linux 主机上落地 \textbf{≥5 节点靶场}的固定步骤，确保可部署、可复现、可观测。
+
+本文只覆盖靶场底座与采集链路。中心机业务接口与算法接线不影响本文目标达成。
+
+\subsection{前置：连接服务器}\label{prereq-connect-server}
+
+如果你使用WSL环境，需要先连接到服务器。详细步骤见：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{98-WSL连接服务器指南.md}
+\end{itemize}
+
+连接成功后，在服务器上继续执行本文后续步骤。
+
+\subsection{固定目标状态}\label{target-status}
+
+靶场最终应达到以下状态：
+
+\begin{itemize}
+\tightlist
+\item
+  节点：\texttt{center-01} + \texttt{client-01..04} + \texttt{c2-01}
+\item
+  端口：\texttt{91-靶场部署.md} 的端口规划全部可达
+\item
+  采集：\texttt{94-验证清单.md} 中 4 个 client 的三接口可返回 \texttt{total}
+\item
+  证据：对 \texttt{\textless{}C2\_DOMAIN\textgreater{}} 发起 DNS 与 HTTP 请求后，\texttt{macvlan0} 抓包可见 53 与 80 流量
+\end{itemize}
+
+\subsection{宿主机条件检查}\label{host-requirements}
+
+在宿主机执行：
+
+\begin{verbatim}
+ip -br a
+ip route
+docker --version
+docker-compose --version
+\end{verbatim}
+
+网卡口径固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  物理网卡：\texttt{ens5f1}
+\item
+  C2 抓包网卡：\texttt{macvlan0}
+\end{itemize}
+
+\subsection{目录规划与变量}\label{directory-planning}
+
+本文使用固定根目录：
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+export REPO="$BASE"/repo/attack-trace-analyzer
+\end{verbatim}
+
+准备目录：
+
+\begin{verbatim}
+mkdir -p "$BASE"/{repo,run}
+\end{verbatim}
+
+\subsection{部署中心机基础设施}\label{deploy-center-infra}
+
+在仓库目录执行：
+
+\begin{verbatim}
+cd "$REPO"/backend
+docker-compose up -d
+\end{verbatim}
+
+验证端口监听：
+
+\begin{verbatim}
+ss -lntup | egrep ':(9200|9600|7474|7687)\\b' || true
+\end{verbatim}
+
+验证 OpenSearch：
+
+\begin{verbatim}
+curl -k -s https://<CENTER_IP>:9200 >/dev/null && echo "opensearch ok"
+\end{verbatim}
+
+\subsection{部署 c2-01}\label{deploy-c2}
+
+按 \texttt{93-C2部署与证据点.md} 的第 3 节到第 7 节依次执行，完成：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  创建 Docker macvlan 网络 \texttt{c2-macvlan}
+\item
+  创建宿主机 \texttt{macvlan0} 并添加两条 \texttt{/32} 路由
+\item
+  启动 \texttt{c2-dns} 与 \texttt{c2-http}
+\item
+  完成 DNS、HTTP 与抓包验收
+\end{enumerate}
+
+\subsection{部署 4 套 client（单机多实例）}\label{deploy-4-clients}
+
+按 \texttt{92-一键编排.md} 的第 2.3 节依次执行，完成：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  创建 \texttt{run/client-01..04} 目录
+\item
+  放置每个实例的 \texttt{docker-compose.yml} 与 \texttt{sensor}、\texttt{backend} 软链接
+\item
+  写入每个实例的 \texttt{.env}（端口与 Host 标识）
+\item
+  启动 4 套实例
+\end{enumerate}
+
+验证（以 client-01 为例）：
+
+\begin{verbatim}
+curl -s http://<CENTER_IP>:18881/filebeat | head
+curl -s http://<CENTER_IP>:18881/falco | head
+curl -s http://<CENTER_IP>:18881/suricata | head
+\end{verbatim}
+
+\subsection{做一次证据动作闭环验收}\label{verify-evidence-loop}
+
+在宿主机执行：
+
+\begin{verbatim}
+dig @<C2_DNS_IP> <C2_DOMAIN> +noall +answer +time=1 +tries=1
+curl -s http://<C2_HTTP_IP>/health && echo
+\end{verbatim}
+
+然后按 \texttt{94-验证清单.md} 依次完成：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  网络端口检查
+\item
+  4 个 client 的三接口产数检查
+\item
+  中心机注册表与检索接口检查
+\end{enumerate}
+
+\subsection{重置与复现}\label{reset-reproduce}
+
+演示前重置与排障入口为：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{95-重置复现与排障.md}
+\end{itemize}

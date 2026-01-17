@@ -1,0 +1,335 @@
+\section{作品技术原理介绍}\label{technical-principle}
+
+\subsection{文档目的}\label{document-purpose}
+
+本文件用于说明ATA系统从``多源采集''到``检测融合''再到``图谱溯源''的端到端技术原理。
+
+\subsection{读者对象}\label{target-audience}
+
+\begin{itemize}
+\tightlist
+\item
+  评审人员
+\item
+  技术方案审核人员
+\end{itemize}
+
+\subsection{引用关系}\label{references}
+
+\begin{itemize}
+\tightlist
+\item
+  字段规范与示例：\texttt{../80-规范/81-ECS字段规范.md}
+\item
+  图谱规范：\texttt{../80-规范/84-Neo4j实体图谱规范.md}
+\item
+  接口规范：\texttt{../80-规范/86-接口全局约定.md}、\texttt{../80-规范/88-前端与中心机接口.md}
+\item
+  概要设计：\texttt{../40-概要设计/40-概要设计报告.md}
+\item
+  详细设计：\texttt{../50-详细设计/}
+\end{itemize}
+
+\subsection{技术路线概览}\label{tech-overview}
+
+ATA系统采用``多源遥测 -\textgreater{} 统一字段 -\textgreater{} Store-first 检测 -\textgreater{} 图谱化建模 -\textgreater{} 溯源算法 -\textgreater{} 可视化与报告''的技术路线，核心目标是让每条结论都能追溯到可验证的 \texttt{event.id} 证据链，同时支持主机行为、主机日志、网络流量三类输入的统一分析 {[}R1{]}{[}R3{]}{[}R4{]}{[}R5{]}{[}R6{]}。
+
+图 0-1 展示系统端到端技术路线：
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{../figures/architecture_overview.pdf}
+\caption{ATA End-to-End Architecture Overview}
+\label{fig:architecture-overview}
+\end{figure}
+
+\subsection{多源采集与 ECS 归一化}\label{multi-source-ecs}
+
+主机行为、主机日志、网络流量是常见的三类安全遥测数据，具有覆盖面互补、证据链可交叉验证的优势 {[}R4{]}{[}R5{]}{[}R6{]}{[}R7{]}。ATA系统在客户机侧分别接入 Falco、Filebeat(+Sigma)、Suricata，并统一转换为 ECS 子集字段（权威口径见 \texttt{../80-规范/81-ECS字段规范.md}）。
+
+表 1 给出三类数据源的对比：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+数据源类别 & 典型数据 & 采集组件 & 关键字段（示例） & 主要价值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+主机行为 & 进程创建、文件访问、网络 syscall & Falco & \texttt{process.*} \texttt{file.*} \texttt{network.*} & 细粒度行为链路、进程关系 \\
+主机日志 & 认证日志、系统日志、审计日志 & Filebeat + Sigma & \texttt{event.*} \texttt{user.*} \texttt{log.*} & 账号与权限变更、持久化证据 \\
+网络流量 & DNS/HTTP/Flow/IDS 告警 & Suricata & \texttt{source.*} \texttt{destination.*} \texttt{network.*} & 对外通信链路、C2 线索 \\
+\end{longtable}
+}
+
+\subsubsection{Falco（主机行为）}\label{falco-host-behavior}
+
+Falco 基于内核事件或 eBPF 采集 syscall，适合捕获进程创建、文件访问、网络连接等主机行为 {[}R4{]}。ATA系统在 \texttt{client/sensor/falco/ecs-converter/} 将 Falco JSONL 输出转换为 ECS 字段，并投递至 RabbitMQ 的 \texttt{data.falco} 队列。
+
+关键点：
+
+\begin{itemize}
+\tightlist
+\item
+  以规则名和事件上下文生成 \texttt{event.id}，保证幂等写入
+\item
+  保留 \texttt{process.parent.*}、\texttt{process.executable} 等字段，支持进程链分析
+\end{itemize}
+
+\subsubsection{Filebeat + Sigma（主机日志）}\label{filebeat-sigma-host-logs}
+
+主机日志类遥测在业界常由 Wazuh/OSSEC 等 HIDS 处理 {[}R12{]}，ATA系统实现上采用 Filebeat 收集日志并结合 Sigma 规则做检测，达成等价的``主机日志 + 规则检测''能力 {[}R6{]}{[}R7{]}。对应实现位于 \texttt{client/sensor/filebeat/}。
+
+关键点：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{event.dataset} 用于标识日志来源与规则集
+\item
+  Sigma 告警转为 ECS Finding，统一进入检测融合流程
+\end{itemize}
+
+\subsubsection{Suricata（网络流量）}\label{suricata-network-traffic}
+
+Suricata 通过抓包与 IDS 规则生成 EVE JSON，覆盖 DNS/HTTP/Flow 等网络事件与告警 {[}R5{]}。ATA系统在 \texttt{client/sensor/suricata/exporter/} 中将 EVE JSON 转换为 ECS 并投递 \texttt{data.suricata} 队列。
+
+关键点：
+
+\begin{itemize}
+\tightlist
+\item
+  统一对 \texttt{source.*} / \texttt{destination.*} / \texttt{network.*} 建模
+\item
+  重点保留域名、协议、端口与告警签名
+\end{itemize}
+
+\subsubsection{\texorpdfstring{1.4 ECS 归一与 \texttt{event.id}}{1.4 ECS 归一与 event.id}}\label{ecs-normalization-event-id}
+
+为保证多源可融合、可检索、可溯源，ATA系统统一遵循 ECS 子集字段规范 {[}R3{]}。关键字段如下：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+字段 & 说明 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{event.id} & 全局去重标识 & 幂等写入与证据引用 \\
+\texttt{event.kind} / \texttt{event.category} & 事件类型 & 路由与检测 \\
+\texttt{event.dataset} & 数据源标识 & 区分 Falco/Filebeat/Suricata \\
+\texttt{host.id} / \texttt{host.name} & 主机身份 & 资产与图谱归并 \\
+\texttt{process.*} / \texttt{file.*} & 主机行为实体 & 进程树与文件链 \\
+\texttt{source.*} / \texttt{destination.*} & 网络通信 & C2 与横向移动 \\
+\end{longtable}
+}
+
+\subsection{传输缓冲与中心机轮询}\label{buffer-and-polling}
+
+客户机采用 RabbitMQ 作为本地缓冲层，中心机以固定周期轮询拉取增量数据，避免中心机与客户机强耦合 {[}R10{]}。队列消息在 \texttt{basic.get\ +\ ack} 后即被消费，保证``增量语义''。
+
+表 2 为队列与接口对照：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+队列 & 拉取接口 & 数据源 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{data.falco} & \texttt{GET\ /falco} & Falco 主机行为 \\
+\texttt{data.filebeat} & \texttt{GET\ /filebeat} & 主机日志 \\
+\texttt{data.suricata} & \texttt{GET\ /suricata} & 网络流量 \\
+\end{longtable}
+}
+
+\subsection{Store-first 检测与告警融合（OpenSearch）}\label{store-first-detection-opensearch}
+
+中心机采用 OpenSearch 作为事件与告警的统一存储与检索引擎 {[}R8{]}。流程遵循 Store-first：先入库 Telemetry，再触发检测与融合生成 Findings，确保所有检测结论都有可回放的原始事件。
+
+图 3-1 展示检测融合流程：
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{../figures/store_first_pipeline.pdf}
+\caption{Store-first Detection \& Fusion Pipeline}
+\label{fig:store-first-pipeline}
+\end{figure}
+
+表 3 为索引与数据对象对应关系：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+数据对象 & OpenSearch 索引（示例） & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Telemetry & \texttt{ecs-events-*} & 统一 ECS 事件 \\
+Raw Finding & \texttt{findings-raw-*} & 检测原始告警 \\
+Canonical Finding & \texttt{findings-canonical-*} & 融合后告警 \\
+Analysis Task & \texttt{analysis-tasks-*} & 溯源任务状态 \\
+\end{longtable}
+}
+
+\subsection{图谱建模与查询（Neo4j）}\label{graph-modeling-query-neo4j}
+
+OpenSearch 擅长检索与统计，但溯源分析需要更强的``关系遍历与路径解释''。因此ATA系统将 Canonical Findings 与必要的 Telemetry 建模为实体关系图写入 Neo4j {[}R9{]}。
+
+表 4 为 ECS 字段到图谱实体/关系的映射：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+ECS 字段/对象 & 图谱实体 & 关系类型（示例） \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{host.*} & Host & Host -\textgreater{} Process（运行） \\
+\texttt{process.*} & Process & Process -\textgreater{} File（访问） \\
+\texttt{file.*} & File & Process -\textgreater{} File（创建/修改） \\
+\texttt{source.*} / \texttt{destination.*} & IP/Port & Process -\textgreater{} IP（连接） \\
+\texttt{dns.*} / \texttt{url.*} & Domain/URL & Process -\textgreater{} Domain（解析/访问） \\
+\end{longtable}
+}
+
+关键原则：
+
+\begin{itemize}
+\tightlist
+\item
+  以 \texttt{event.id} 回写边属性，保证溯源证据可追溯
+\item
+  通过 \texttt{analysis.*} 字段写回溯源结果（高亮边、任务 ID）
+\end{itemize}
+
+\subsection{关联溯源算法（KillChain）}\label{correlation-trace-algorithm-killchain}
+
+溯源任务由前端触发，中心机异步执行并写回结果。核心算法遵循``FSA 战术分段 -\textgreater{} 候选路径 -\textgreater{} LLM 选择 -\textgreater{} 写回解释''的流程 {[}R1{]}{[}R2{]}。
+
+图 5-1 展示 KillChain 分析流水线：
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{../figures/killchain_pipeline.pdf}
+\caption{KillChain Analysis Pipeline (Phases A--D)}
+\label{fig:killchain-pipeline}
+\end{figure}
+
+表 5 为算法阶段与输出：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+阶段 & 输入 & 输出 & 目的 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Phase A & 告警边集合 & 战术段（Segment） & 识别攻击阶段 \\
+Phase B & 段锚点 & 候选路径集合 & 连接阶段路径 \\
+Phase C & 候选路径 & KillChain 结果 & 选择最合理链路 \\
+Phase D & KillChain & 图谱写回/任务文档 & 可视化与报告 \\
+\end{longtable}
+}
+
+ATA系统以 MITRE ATT\&CK 的战术维度作为分段依据，并引入回退机制保障在无 LLM 或低置信场景下仍可产出稳定结果。
+
+\subsection{TTP 相似度匹配（组织归因）}\label{ttp-similarity-attribution}
+
+系统从 Canonical Findings 提取 \texttt{threat.tactic.id} 与 \texttt{threat.technique.id}，与 MITRE ATT\&CK CTI 离线数据进行相似度匹配 {[}R1{]}{[}R2{]}。实现上采用 TF-IDF 向量化与余弦相似度：
+
+\begin{equation}
+\text{sim}(A, B) = \frac{A \cdot B}{|A| \times |B|}
+\end{equation}
+
+输出 Top-3 相似组织及关键 techniques，作为溯源解释的补充证据。
+
+\subsection{前端可视化与报告导出}\label{frontend-visualization-report-export}
+
+前端采用 Next.js App Router，实现图谱渲染、任务管理、进度轮询与报告导出（接口定义见 \texttt{../80-规范/88-前端与中心机接口.md}）。
+
+主要能力：
+
+\begin{itemize}
+\tightlist
+\item
+  图谱按时间窗拉取，突出告警边与溯源路径
+\item
+  任务面板展示任务状态与溯源结论
+\item
+  报告导出输出时间线摘要、关键证据与 TTP 归因
+\end{itemize}
+
+\subsection{质量与一致性保障}\label{quality-consistency}
+
+表 6 总结关键工程策略：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+策略 & 说明 & 目的 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+幂等写入 & \texttt{event.id} 去重 & 防止重复入库 \\
+单定时器轮询 & 严格顺序执行 & 避免数据漂移 \\
+固定时间窗 & 统一查询边界 & 结果可复现 \\
+统一字段规范 & ECS 子集 & 跨源融合一致性 \\
+写回边属性 & \texttt{analysis.*} & 前后端一致展示 \\
+\end{longtable}
+}
+
+\subsection{项目实现绑定点}\label{implementation-bindings}
+
+\begin{itemize}
+\tightlist
+\item
+  客户机采集：\texttt{client/sensor/falco/} \texttt{client/sensor/filebeat/} \texttt{client/sensor/suricata/}
+\item
+  队列与拉取 API：\texttt{client/backend/} \texttt{docs/50-详细设计/客户机/55-拉取接口.md}
+\item
+  中心机轮询与存储：\texttt{backend/app/services/client\_poller.py} \texttt{backend/app/services/opensearch/}
+\item
+  图谱建模与查询：\texttt{backend/app/services/neo4j/}
+\item
+  KillChain/TTP：\texttt{backend/app/services/analyze/}
+\item
+  前端展示与导出：\texttt{frontend/app/} \texttt{frontend/components/}
+\end{itemize}
+
+\subsection{参考资料与链接}\label{references-links}
+
+\begin{itemize}
+\tightlist
+\item
+  {[}R1{]} MITRE ATT\&CK: \url{https://attack.mitre.org/}
+\item
+  {[}R2{]} MITRE CTI (STIX Bundle): \url{https://github.com/mitre/cti}
+\item
+  {[}R3{]} Elastic Common Schema (ECS): \url{https://www.elastic.co/guide/en/ecs/current/index.html}
+\item
+  {[}R4{]} Falco Documentation: \url{https://falco.org/docs/}
+\item
+  {[}R5{]} Suricata Documentation: \url{https://docs.suricata.io/}
+\item
+  {[}R6{]} Filebeat Documentation: \url{https://www.elastic.co/guide/en/beats/filebeat/current/index.html}
+\item
+  {[}R7{]} Sigma Rules: \url{https://sigmahq.io/}
+\item
+  {[}R8{]} OpenSearch Security Analytics: \url{https://opensearch.org/docs/latest/security-analytics/}
+\item
+  {[}R9{]} Neo4j Documentation: \url{https://neo4j.com/docs/}
+\item
+  {[}R10{]} RabbitMQ Documentation: \url{https://www.rabbitmq.com/documentation.html}
+\item
+  {[}R11{]} OpenSearch Project: \url{https://opensearch.org/docs/latest/}
+\item
+  {[}R12{]} Wazuh Documentation: \url{https://documentation.wazuh.com/}
+\end{itemize}

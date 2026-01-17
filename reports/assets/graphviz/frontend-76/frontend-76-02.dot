@@ -1,0 +1,45 @@
+digraph {
+    rankdir=LR;
+    node [fontname="Arial"];
+
+    subgraph cluster_frontend {
+        label="Frontend / UI";
+        style=filled;
+        fillcolor="#e0f7fa";
+        
+        Export [label="Report Export Function", shape=box, fillcolor="#b3e5fc"];
+    }
+
+    subgraph cluster_backend {
+        label="Backend / API";
+        style=filled;
+        fillcolor="#e8f5e9";
+        
+        API1 [label="Task Info API", shape=component, fillcolor="#c8e6c9"];
+        API2 [label="Graph Query API", shape=component, fillcolor="#c8e6c9"];
+        API3 [label="Finding Search API", shape=component, fillcolor="#c8e6c9"];
+        API4 [label="TTP Similarity API", shape=component, fillcolor="#c8e6c9"];
+    }
+
+    subgraph cluster_data {
+        label="Data Sources";
+        style=filled;
+        fillcolor="#e3f2fd";
+        
+        TaskDB [label="Task Document", shape=cylinder, fillcolor="#fff9c4"];
+        GraphDB [label="Graph Database", shape=cylinder, fillcolor="#fff9c4"];
+        FindingDB [label="Finding Index", shape=cylinder, fillcolor="#fff9c4"];
+        LLMService [label="LLM Inference Service", shape=component, fillcolor="#fff9c4"];
+    }
+
+    Export -> API1 [label="GET /tasks/:id"];
+    Export -> API2 [label="POST /graph/query"];
+    Export -> API3 [label="POST /findings/search"];
+    Export -> API4 [label="Read or Calculate TTP"];
+
+    API1 -> TaskDB;
+    API2 -> GraphDB;
+    API3 -> FindingDB;
+    API4 -> TaskDB [label="Priority Read"];
+    API4 -> LLMService [label="Fallback Call"];
+}

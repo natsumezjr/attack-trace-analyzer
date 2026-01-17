@@ -1,0 +1,96 @@
+\subsection{RabbitMQ 缓冲与队列语义}\label{24-rabbitmq-buffer-queue-semantics}
+
+\subsubsection{队列命名}\label{1-queue-naming}
+
+客户机侧使用 3 个固定队列分别接收三类数据源：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+数据源 & 默认队列名 & 环境变量 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Falco & \texttt{data.falco} & \texttt{FALCO\_QUEUE} 或 \texttt{RABBITMQ\_QUEUE} \\
+Filebeat & \texttt{data.filebeat} & \texttt{FILEBEAT\_QUEUE} 或 \texttt{RABBITMQ\_QUEUE} \\
+Suricata & \texttt{data.suricata} & \texttt{SURICATA\_QUEUE} 或 \texttt{RABBITMQ\_QUEUE} \\
+\end{longtable}
+}
+
+队列名称的实际取值以 \texttt{client/docker-compose.yml} 配置为准。
+
+\subsubsection{消息流转架构}\label{11-message-flow-architecture}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/client-54/client-54-01.pdf}
+\caption{消息流转架构}
+\label{fig:client-54-01}
+\end{figure}
+
+\subsubsection{消费语义与增量语义}\label{2-consumption-incremental-semantics}
+
+中心机通过客户机拉取接口获取数据时，客户机 Go 后端从队列中逐条读取消息并确认：
+
+\begin{itemize}
+\tightlist
+\item
+  使用 \texttt{basic.get} 方法从队列拉取消息
+\item
+  拉取到的消息在返回前执行 \texttt{ack} 确认
+\item
+  队列为空时，接口返回空数组
+\end{itemize}
+
+基于上述机制，增量语义由 RabbitMQ 队列自身保证，无需使用游标机制。
+
+\subsubsection{队列消费时序}\label{21-queue-consumption-timing}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/client-54/client-54-02.pdf}
+\caption{队列消费时序}
+\label{fig:client-54-02}
+\end{figure}
+
+\subsubsection{幂等与重复处理}\label{3-idempotency-duplicate-handling}
+
+\paragraph{拉取层幂等}\label{31-pull-layer-idempotency}
+
+同一条消息被 \texttt{ack} 确认后，后续拉取操作将不再返回该消息，从而避免重复处理。
+
+\paragraph{入库层幂等}\label{32-storage-layer-idempotency}
+
+中心机入库时使用 \texttt{event.id} 字段去重，重复写入不会产生重复文档（详见 \texttt{../../80-规范/81-ECS字段规范.md}）。
+
+\subsubsection{断连与恢复}\label{4-disconnection-recovery}
+
+当 RabbitMQ 连接断开时，系统按以下流程处理：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  客户机 Go 后端在下次拉取请求时自动重连
+\item
+  若重连失败，接口返回 500 错误并在响应体中携带 \texttt{error} 字段
+\item
+  中心机在下一轮轮询时继续重试，并同步更新注册表中的错误信息
+\end{enumerate}
+
+\subsubsection{容量边界}\label{5-capacity-boundaries}
+
+RabbitMQ 的容量边界取决于宿主机磁盘空间与 RabbitMQ 默认策略。
+
+为确保演示环境稳定运行：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  靶场运行前必须清理历史队列数据
+\item
+  复现与演示过程中若出现磁盘空间不足，按 \texttt{../../90-运维与靶场/95-重置复现与排障.md} 执行清理后重新运行
+\end{enumerate}

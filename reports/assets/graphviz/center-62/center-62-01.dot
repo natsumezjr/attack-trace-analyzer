@@ -1,0 +1,37 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_indices {
+        label="OpenSearch 索引体系";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f3e5f5";
+
+        Telemetry [label="ecs-events-*\n遥测数据\nevent.kind 为 event", shape=cylinder, fillcolor=lightyellow];
+        RawFindings [label="findings-raw-*\n原始告警\nevent.kind 为 alert\ndataset 非 canonical", shape=cylinder, fillcolor=lightyellow];
+        CanonicalFindings [label="findings-canonical-*\n规范告警\nevent.kind 为 alert\ndataset 为 finding.canonical", shape=cylinder, fillcolor=lightyellow];
+        Tasks [label="analysis-tasks-*\n溯源任务\n任务状态与结果", shape=cylinder, fillcolor=lightyellow];
+    }
+
+    subgraph cluster_sources {
+        label="三传感器数据";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#e1f5fe";
+
+        Falco [label="Falco 数据", style="rounded, filled", fillcolor="#e1f5fe"];
+        Filebeat [label="Filebeat 数据", style="rounded, filled", fillcolor="#e1f5fe"];
+        Suricata [label="Suricata 数据", style="rounded, filled", fillcolor="#e1f5fe"];
+    }
+
+    Falco -> Telemetry [label="Step2 入库"];
+    Filebeat -> Telemetry [label="Step2 入库"];
+    Suricata -> Telemetry [label="Step2 入库"];
+
+    Telemetry -> RawFindings [label="Step3 检测"];
+    RawFindings -> CanonicalFindings [label="Step3 融合"];
+    CanonicalFindings -> Tasks [label="Step4 入图"];
+}

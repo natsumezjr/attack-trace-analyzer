@@ -1,0 +1,610 @@
+\subsection{图谱可视化与交互}\label{subsec:graph-visualization-interaction}
+
+\subsection{图查询请求与时间窗}\label{subsec:graph-query-time-window}
+
+图谱页的数据源为中心机图查询接口：\texttt{POST\ /api/v1/graph/query}。
+
+\subsection{视图模式（固定配置）}\label{subsec:view-modes}
+
+溯源分析页面提供三种视图模式：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  告警视图：\texttt{action="alarm\_edges"}
+\item
+  时间窗视图：\texttt{action="edges\_in\_window"}
+\item
+  任务视图：\texttt{action="analysis\_edges\_by\_task"}
+\end{enumerate}
+
+各视图功能说明：
+
+\begin{itemize}
+\tightlist
+\item
+  告警视图：展示 \texttt{is\_alarm=true} 的边集合
+\item
+  时间窗视图：展示用户选定时间窗内的边集合
+\item
+  任务视图：展示溯源任务写回的边集合
+\end{itemize}
+
+\subsection{时间窗输入（固定配置）}\label{subsec:time-window-input}
+
+后端接口的时间窗字段定义如下（详见 \texttt{88-前端与中心机接口.md}）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{start\_ts}：ISO 8601 格式（UTC 时区）
+\item
+  \texttt{end\_ts}：ISO 8601 格式（UTC 时区）
+\end{itemize}
+
+前端页面\textbf{不提供高级时间选择器}，仅保留"最近 N 分钟"的快捷方式：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  用户选择 \texttt{N}（分钟）；
+\item
+  在触发"刷新图谱"或"创建溯源任务"时，前端以当前时刻 \texttt{now} 计算：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{end\_ts\ =\ now}
+  \item
+    \texttt{start\_ts\ =\ now\ -\ N\ minutes}
+  \end{itemize}
+\item
+  将计算得到的 \texttt{start\_ts/end\_ts} 同时用于：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    时间窗视图（\texttt{action="edges\_in\_window"}）
+  \item
+    溯源任务创建（\texttt{POST\ /api/v1/analysis/tasks}）
+  \end{itemize}
+\end{enumerate}
+
+该规则旨在限制图查询返回规模、确保任务输入与图展示口径一致，并保障报告导出的可复现性。
+
+\textbf{时间窗计算示例}：
+
+\begin{verbatim}
+// 时间窗计算函数
+function calculateTimeWindow(minutes) {
+  const now = new Date();
+  const endTs = now.toISOString(); // 当前时间 UTC
+
+  const startTime = new Date(now.getTime() - minutes * 60 * 1000);
+  const startTs = startTime.toISOString(); // N 分钟前 UTC
+
+  return {
+    start_ts: startTs,
+    end_ts: endTs,
+  };
+}
+
+// 使用示例
+const window = calculateTimeWindow(15);
+console.log(window);
+// 输出示例：
+// {
+//   start_ts: "2025-01-16T10:30:00.000Z",
+//   end_ts: "2025-01-16T10:45:00.000Z"
+// }
+\end{verbatim}
+
+\textbf{时间窗快捷选项}：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.25\textwidth}p{0.12\textwidth}p{0.53\textwidth}@{}}
+\toprule\noalign{}
+选项名称 & 时间范围 & 典型场景 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+最近 5 分钟 & N=5 & 实时监控 \\
+最近 15 分钟 & N=15 & 即时分析 \\
+最近 30 分钟 & N=30 & 短期溯源 \\
+最近 1 小时 & N=60 & 常规分析 \\
+最近 3 小时 & N=180 & 长周期溯源 \\
+\end{longtable}
+}
+
+\subsection{请求字段固定值（固定配置）}\label{subsec:request-field-fixed-values}
+
+为确保前端渲染所需字段完整，图查询请求固定携带：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{allowed\_reltypes=null}（不做关系类型裁剪）
+\end{itemize}
+
+时间窗视图筛选告警边时固定使用：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{only\_alarm=true}
+\end{itemize}
+
+接口字段的完整定义见：\texttt{../../80-规范/88-前端与中心机接口.md}。
+
+\subsection{渲染模型}\label{subsec:rendering-model}
+
+前端图渲染使用 AntV G6（\texttt{@antv/g6}），图数据模型与样式绑定关系保持固定。
+
+\subsection{图谱渲染数据流（固定配置）}\label{subsec:graph-rendering-data-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-75/frontend-75-01.pdf}
+\caption{图谱渲染数据流}
+\label{fig:frontend-75-01}
+\end{figure}
+
+\subsection{后端数据模型到 G6 的映射（固定配置）}\label{subsec:backend-to-g6-mapping}
+
+后端接口 \texttt{graph/query} 返回数据包含：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{nodes{[}{]}}：节点对象，包含 \texttt{uid/ntype/key/props} 字段
+\item
+  \texttt{edges{[}{]}}：边对象，包含 \texttt{src\_uid/dst\_uid/rtype/props} 字段
+\end{itemize}
+
+G6 映射规则如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  G6 Node
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{id\ =\ node.uid}
+  \item
+    \texttt{data\ =\ node}（完整保留）
+  \item
+    \texttt{label}：从 \texttt{node.props} 与 \texttt{node.uid} 生成（见 2.2）
+  \end{itemize}
+\item
+  G6 Edge
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{source\ =\ edge.src\_uid}
+  \item
+    \texttt{target\ =\ edge.dst\_uid}
+  \item
+    \texttt{data\ =\ edge}（完整保留）
+  \item
+    \texttt{id}：按固定规则生成（见 2.3）
+  \end{itemize}
+\end{enumerate}
+
+\textbf{数据映射示例}：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+数据层级 & 后端字段 & G6 字段 & 示例值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{节点标识} & \texttt{uid} & \texttt{id} & \texttt{"host-12345"} \\
+\textbf{节点类型} & \texttt{ntype} & \texttt{data.ntype} & \texttt{"Host"} \\
+\textbf{节点键} & \texttt{key} & \texttt{data.key} & \texttt{"/proc/1234"} \\
+\textbf{节点属性} & \texttt{props} & \texttt{data.props} & \texttt{\{host.name:\ "web-01"\}} \\
+\textbf{节点标签} & - & \texttt{label} & \texttt{"web-01"} (从 props 生成) \\
+\textbf{边源节点} & \texttt{src\_uid} & \texttt{source} & \texttt{"host-12345"} \\
+\textbf{边目标节点} & \texttt{dst\_uid} & \texttt{target} & \texttt{"proc-67890"} \\
+\textbf{边关系类型} & \texttt{rtype} & \texttt{data.rtype} & \texttt{"spawned"} \\
+\textbf{边属性} & \texttt{props} & \texttt{data.props} & \texttt{\{is\_alarm:\ true\}} \\
+\textbf{边标识} & - & \texttt{id} & \texttt{"e-a3f5c9d2b1e4..."} (SHA1 生成) \\
+\end{longtable}
+}
+
+\subsection{节点标签生成规则（固定配置）}\label{subsec:node-label-generation-rules}
+
+节点展示标签按以下规则生成（从上到下依次匹配）：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Host 节点：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{props{[}"host.name"{]}} 非空则用该值
+  \item
+    否则使用 \texttt{props{[}"host.id"{]}}
+  \end{itemize}
+\item
+  Process 节点：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{props{[}"process.name"{]}} 非空则用该值
+  \item
+    否则使用 \texttt{props{[}"process.entity\_id"{]}}
+  \end{itemize}
+\item
+  User 节点：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{props{[}"user.name"{]}} 非空则用该值
+  \item
+    否则使用 \texttt{props{[}"user.id"{]}}
+  \end{itemize}
+\item
+  IP 节点：\texttt{props{[}"ip"{]}}
+\item
+  Domain 节点：\texttt{props{[}"domain.name"{]}}
+\item
+  File 节点：\texttt{props{[}"file.path"{]}}
+\item
+  兜底：\texttt{node.uid}
+\end{enumerate}
+
+\subsection{边 ID 生成规则（固定配置）}\label{subsec:edge-id-generation-rules}
+
+后端边对象未提供独立稳定 ID，前端需为 G6 边生成稳定 \texttt{id}，生成规则如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  构造原始串：\texttt{raw\ =\ src\_uid\ +\ "\textbar{}"\ +\ rtype\ +\ "\textbar{}"\ +\ dst\_uid\ +\ "\textbar{}"\ +\ ts\_float\ +\ "\textbar{}"\ +\ event\_id}
+\item
+  计算 \texttt{sha1(raw)} 的前 16 位
+\item
+  拼接为：\texttt{e-\textless{}sha1\_16\textgreater{}}
+\end{enumerate}
+
+其中：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ts\_float} 取 \texttt{edge.props{[}"ts\_float"{]}}（数值，秒）
+\item
+  \texttt{event\_id} 取 \texttt{edge.props{[}"event.id"{]}}（字符串）
+\end{itemize}
+
+\textbf{代码示例}：
+
+\begin{verbatim}
+// 生成边 ID（前端实现）
+function generateEdgeId(edge) {
+  const raw = `${edge.src_uid}|${edge.rtype}|${edge.dst_uid}|` +
+              `${edge.props["ts_float"]}|${edge.props["event.id"]}`;
+  const sha1 = crypto.subtle.digest('SHA-1', raw);
+  const hash16 = sha1.substring(0, 16);
+  return `e-${hash16}`;
+}
+\end{verbatim}
+
+\subsection{布局与交互能力（固定配置）}\label{subsec:layout-interaction-capabilities}
+
+图布局采用有向层次布局（Dagre），参数配置如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{rankdir="LR"}
+\item
+  \texttt{nodesep=30}
+\item
+  \texttt{ranksep=60}
+\end{itemize}
+
+\textbf{配置示例}：
+
+\begin{verbatim}
+// G6 布局配置
+const layout = {
+  type: 'dagre',
+  rankdir: 'LR',
+  nodesep: 30,
+  ranksep: 60,
+};
+
+// 交互模式配置
+const modes = {
+  default: [
+    'drag-canvas',
+    'zoom-canvas',
+    'drag-node',
+  ],
+};
+\end{verbatim}
+
+交互能力配置如下：
+
+\begin{itemize}
+\tightlist
+\item
+  拖动画布
+\item
+  缩放画布
+\item
+  拖动节点
+\end{itemize}
+
+\subsection{交互规则}\label{subsec:interaction-rules}
+
+\subsection{选中与详情面板（固定配置）}\label{subsec:selection-detail-panel}
+
+用户点选节点或边后，页面展示详情面板：
+
+\begin{itemize}
+\tightlist
+\item
+  Node 详情：展示 \texttt{uid/ntype/key/props}（JSON 格式）
+\item
+  Edge 详情：展示 \texttt{src\_uid/dst\_uid/rtype/props}（JSON 格式）
+\end{itemize}
+
+详情面板用于现场演示的证据解释，需重点展示 \texttt{event.id} 与 \texttt{custom.evidence.event\_ids{[}{]}}。
+
+\subsection{高亮规则（固定配置）}\label{subsec:highlighting-rules}
+
+边的颜色与线型高亮规则如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  告警边高亮：当 \texttt{edge.props.is\_alarm=true} 时，边样式为红色加粗
+\item
+  关键路径边高亮：当 \texttt{edge.props{[}"analysis.is\_path\_edge"{]}=true} 时，边样式为蓝色加粗
+\item
+  普通边：灰色细线
+\end{enumerate}
+
+当同一条边同时满足条件 1 与 2 时，关键路径边样式优先于告警边样式。
+
+\textbf{高亮效果示意}：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.18\textwidth}p{0.10\textwidth}p{0.20\textwidth}p{0.20\textwidth}p{0.22\textwidth}@{}}
+\toprule\noalign{}
+边类型 & 判断条件 & 样式配置 & 颜色值 & 线宽 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+告警边 & \texttt{is\_alarm=true} & 红色加粗 & \texttt{\#ff4d4f} & 3px \\
+关键路径边 & \texttt{analysis.is\_path\_edge=true} & 蓝色加粗 & \texttt{\#1890ff} & 3px \\
+普通边 & 默认 & 灰色细线 & \texttt{\#d9d9d9} & 1px \\
+\end{longtable}
+}
+
+\textbf{代码示例}：
+
+\begin{verbatim}
+// 边样式映射函数
+function getEdgeStyle(edge) {
+  const props = edge.props || {};
+
+  // 优先级：关键路径 > 告警 > 普通
+  if (props["analysis.is_path_edge"] === true) {
+    return {
+      stroke: '#1890ff',
+      lineWidth: 3,
+      lineAppendWidth: 3,
+    };
+  }
+
+  if (props.is_alarm === true) {
+    return {
+      stroke: '#ff4d4f',
+      lineWidth: 3,
+      lineAppendWidth: 3,
+    };
+  }
+
+  // 普通边
+  return {
+    stroke: '#d9d9d9',
+    lineWidth: 1,
+    lineAppendWidth: 1,
+  };
+}
+\end{verbatim}
+
+\textbf{样式优先级流程图}：
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-75/frontend-75-02.pdf}
+\caption{边样式优先级流程}
+\label{fig:frontend-75-02}
+\end{figure}
+
+\subsection{任务触发与轮询}\label{subsec:task-trigger-polling}
+
+\subsection{交互流程图（完整闭环）}\label{subsec:interaction-flow-complete-loop}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-75/frontend-75-03.pdf}
+\caption{前端交互流程完整闭环}
+\label{fig:frontend-75-03}
+\end{figure}
+
+\subsection{任务触发（固定配置）}\label{subsec:task-trigger}
+
+溯源任务触发流程如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  用户在时间窗视图中选中一个节点
+\item
+  页面使用该节点的 \texttt{uid} 作为 \texttt{target\_node\_uid}
+\item
+  使用当前页面时间窗（由``最近 N 分钟''计算得到）作为 \texttt{start\_ts/end\_ts}
+\item
+  调用 \texttt{POST\ /api/v1/analysis/tasks} 创建任务
+\end{enumerate}
+
+\subsection{轮询策略（固定配置）}\label{subsec:polling-strategy}
+
+任务创建成功后，前端启动轮询机制，策略如下：
+
+\begin{itemize}
+\tightlist
+\item
+  轮询接口：\texttt{GET\ /api/v1/analysis/tasks/\{task\_id\}}
+\item
+  轮询间隔：\texttt{1s}
+\item
+  停止条件：\texttt{task.status} 为 \texttt{succeeded} 或 \texttt{failed}
+\end{itemize}
+
+\textbf{轮询状态机}：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+任务状态 & 含义 & 前端行为 & 后续动作 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{queued} & 任务已创建，等待执行 & 显示"等待中" (0\%) & 继续轮询 \\
+\texttt{running} & 任务执行中 & 显示进度条 (5-95\%) & 继续轮询 \\
+\texttt{succeeded} & 任务成功完成 & 停止轮询，显示成功 & 查询写回边并高亮 \\
+\texttt{failed} & 任务失败 & 停止轮询，显示错误 & 展示 error.message \\
+\end{longtable}
+}
+
+\textbf{轮询实现示例}：
+
+\begin{verbatim}
+// 前端轮询实现
+async function pollTaskStatus(taskId) {
+  const pollInterval = 1000; // 1s
+  let shouldStop = false;
+
+  const timer = setInterval(async () => {
+    try {
+      const response = await fetch(`/api/v1/analysis/tasks/${taskId}`);
+      const task = await response.json();
+
+      // 更新进度 UI
+      updateProgressBar(task.progress);
+
+      // 检查终止条件
+      if (task.status === 'succeeded') {
+        clearInterval(timer);
+        await loadAnalysisEdges(taskId);
+        highlightCriticalPath();
+      } else if (task.status === 'failed') {
+        clearInterval(timer);
+        showErrorMessage(task.error?.message || '任务失败');
+      }
+    } catch (error) {
+      clearInterval(timer);
+      showErrorMessage('网络请求失败');
+    }
+  }, pollInterval);
+}
+\end{verbatim}
+
+\subsection{写回边读取与渲染（固定配置）}\label{subsec:writeback-reading-rendering}
+
+当 \texttt{task.status="succeeded"} 时，页面执行以下操作：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  调用 \texttt{POST\ /api/v1/graph/query}，参数配置如下：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{action="analysis\_edges\_by\_task"}
+  \item
+    \texttt{task\_id=\textless{}task\_id\textgreater{}}
+  \item
+    \texttt{only\_path=true}
+  \end{itemize}
+\item
+  将返回的边集合叠加到当前图中，并触发关键路径高亮（参见 3.2 节）。
+\end{enumerate}
+
+当 \texttt{task.status="failed"} 时，页面展示失败原因（后端返回的 \texttt{error.message}）。
+
+\textbf{API 响应示例}：
+
+\begin{verbatim}
+// POST /api/v1/graph/query
+// action=analysis_edges_by_task
+{
+  "nodes": [
+    {
+      "uid": "host-1921681110",
+      "ntype": "Host",
+      "key": null,
+      "props": {
+        "host.name": "web-01",
+        "host.id": "192.168.1.110"
+      }
+    },
+    {
+      "uid": "proc-12345",
+      "ntype": "Process",
+      "key": "/proc/12345",
+      "props": {
+        "process.name": "nginx",
+        "process.pid": 12345,
+        "process.entity_id": "abcdef123456"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "src_uid": "host-1921681110",
+      "dst_uid": "proc-12345",
+      "rtype": "spawned",
+      "props": {
+        "ts_float": 1737033600.123,
+        "event.id": "event-67890",
+        "is_alarm": false,
+        "analysis.is_path_edge": true,
+        "analysis.path_score": 0.95,
+        "analysis.path_position": 3
+      }
+    }
+  ]
+}
+\end{verbatim}

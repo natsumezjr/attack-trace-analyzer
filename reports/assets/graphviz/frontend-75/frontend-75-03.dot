@@ -1,0 +1,40 @@
+digraph {
+    rankdir=TD;
+    node [fontname="Arial", shape=box, style="rounded"];
+
+    subgraph cluster_stage1 {
+        label="Stage 1: Graph Loading";
+        style=filled;
+        fillcolor="#e0f7fa";
+        
+        S1_1 [label="User: Select Time Window N minutes", fillcolor="#ffccbc"];
+        S1_2 [label="Frontend: Calculate start_ts/end_ts", fillcolor="#e1f5fe"];
+        S1_3 [label="User: Click Refresh Graph", fillcolor="#ffccbc"];
+        S1_4 [label="POST /api/v1/graph/query", fillcolor="#c8e6c9"];
+        S1_5 [label="Backend: Query Time Window Data", fillcolor="#c8e6c9"];
+        S1_6 [label="Neo4j: Return nodes[] and edges[]", shape=cylinder, fillcolor="#e3f2fd"];
+        S1_7 [label="Frontend: Execute G6 Mapping and Layout", fillcolor="#e1f5fe"];
+        S1_8 [label="Frontend: Apply Node Labels and Edge Styles", fillcolor="#e1f5fe"];
+        S1_9 [label="Display Interactive Graph", fillcolor="#b3e5fc"];
+        
+        S1_1 -> S1_2 -> S1_3 -> S1_4 -> S1_5 -> S1_6 -> S1_7 -> S1_8 -> S1_9;
+    }
+
+    subgraph cluster_stage2 {
+        label="Stage 2: Create Trace Task";
+        style=filled;
+        fillcolor="#e8f5e9";
+        
+        S2_1 [label="User: Select Target Node", fillcolor="#ffccbc"];
+        S2_2 [label="Frontend: Get node.uid as target", fillcolor="#e1f5fe"];
+        S2_3 [label="POST /api/v1/analysis/tasks", fillcolor="#c8e6c9"];
+        S2_4 [label="Backend: Generate Unique task_id", fillcolor="#c8e6c9"];
+        S2_5 [label="OpenSearch: Create Task Document\nstatus: queued", shape=cylinder, fillcolor="#e3f2fd"];
+        S2_6 [label="Frontend: Start Polling Timer (1s)", fillcolor="#e1f5fe"];
+        S2_7 [label="Display task_id and Status", fillcolor="#b3e5fc"];
+        
+        S2_1 -> S2_2 -> S2_3 -> S2_4 -> S2_5 -> S2_6 -> S2_7;
+    }
+
+    S1_9 -> S2_1 [style=dashed, label="User Interaction"];
+}

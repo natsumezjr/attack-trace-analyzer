@@ -1,0 +1,63 @@
+
+❌ 测试失败: ❌ 错误：killchain 测试必须使用真实大模型！
+当前配置: LLM_PROVIDER=mock, DEEPSEEK_API_KEY=未设置
+
+请设置以下环境变量：
+  export LLM_PROVIDER=deepseek
+  export DEEPSEEK_API_KEY=your_api_key_here
+
+或者在 backend/.env 文件中添加：
+  LLM_PROVIDER=deepseek
+  DEEPSEEK_API_KEY=your_api_key_here
+
+设置后请重启后端服务。
+Traceback (most recent call last):
+  File "/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/scripts/test_analyze.py", line 346, in main
+    killchains = analyze_killchain(kc_uuid)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/app/services/analyze/__init__.py", line 29, in analyze_killchain
+    raise ValueError(error_msg)
+ValueError: ❌ 错误：killchain 测试必须使用真实大模型！
+当前配置: LLM_PROVIDER=mock, DEEPSEEK_API_KEY=未设置
+
+请设置以下环境变量：
+  export LLM_PROVIDER=deepseek
+  export DEEPSEEK_API_KEY=your_api_key_here
+
+或者在 backend/.env 文件中添加：
+  LLM_PROVIDER=deepseek
+  DEEPSEEK_API_KEY=your_api_key_here
+
+设置后请重启后端服务。
+============================================================
+KillChain 分析测试（结合大模型）
+============================================================
+
+[1/6] 初始化 Neo4j schema...
+✓ Schema 初始化完成
+
+[2/6] 加载测试数据...
+正在读取测试数据: /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/fixtures/graph/testFSA.json
+成功加载 14 条事件
+
+[3/6] 清理旧测试数据...
+[清理] 删除了 0 条 killchain 分析边
+[清理] 移除了 0 个节点的 killchain 分析标记
+[清理] 删除了 0 条边（通过 event.id）
+[清理] 删除了 0 个 User 节点
+[清理] 删除了 0 个 Host 节点
+[清理] 删除了 0 个 Process 节点
+[清理] 删除了 0 个 File 节点
+[清理] 删除了 0 个 Domain 节点
+[清理] 删除了 0 个 IP 节点
+✓ 清理完成
+
+[4/6] 导入数据到 Neo4j...
+✓ 导入完成: 49 个节点, 32 条边
+
+[5/6] 生成 killchain UUID...
+✓ KillChain UUID: cabfaebd-fa1e-45df-ab7f-8387c13beb5a
+
+[6/6] 运行 killchain 分析（结合大模型）...
+这可能需要一些时间，请耐心等待...
+

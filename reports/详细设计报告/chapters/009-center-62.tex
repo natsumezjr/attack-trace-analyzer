@@ -1,0 +1,268 @@
+\subsection{OpenSearch 存储与索引治理}\label{center-62-opensearch-storage}
+
+\subsection{模块职责与边界}\label{center-62-module-boundaries}
+
+OpenSearch 模块承担中心机侧事实、告警与任务元数据的权威存储与检索，具体职责包括：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{索引体系}：定义索引命名规范、按日滚动策略与生命周期保留策略；
+\item
+  \textbf{入库路由}：依据 \texttt{event.kind} 与 \texttt{event.dataset} 将文档分发至目标索引；
+\item
+  \textbf{字段处理}：对 ECS 文档执行三时间字段处理、扁平键兼容及基础校验；
+\item
+  \textbf{Store-first 检测}：触发 OpenSearch Security Analytics 扫描 Telemetry 并生成 Findings；
+\item
+  \textbf{融合去重}：将 Raw Findings 融合为 Canonical Findings 并写回 OpenSearch；
+\item
+  \textbf{任务存储}：持久化溯源任务的状态与元数据，支持前端轮询。
+\end{enumerate}
+
+本模块不负责：
+
+\begin{itemize}
+\tightlist
+\item
+  Neo4j 图谱建模与查询（见 \texttt{64-Neo4j入图与图查询.md} 与 \texttt{../../80-规范/84-Neo4j实体图谱规范.md}）；
+\item
+  溯源算法与结果写回（见 \texttt{../../50-详细设计/分析/} 与 \texttt{../../80-规范/85-溯源结果写回规范.md}）；
+\item
+  客户机采集与接口（见 \texttt{../../50-详细设计/客户机/} 与 \texttt{../../80-规范/87-客户机与中心机接口.md}）。
+\end{itemize}
+
+\subsection{索引体系与命名}\label{center-62-index-system}
+
+\subsection{索引清单（系统运行时必须存在）}\label{center-62-index-list}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.12\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule\noalign{}
+索引模式 & 数据对象 & 写入方 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{ecs-events-YYYY-MM-DD} & Telemetry & 中心机流水线 Step 2 & 事实事件检索、Store-first 检测输入 \\
+\texttt{raw-findings-YYYY-MM-DD} & Raw Findings & 中心机流水线 Step 3 & 原始告警审计、融合输入 \\
+\texttt{canonical-findings-YYYY-MM-DD} & Canonical Findings & 中心机流水线 Step 3 & 图谱与溯源的主输入 \\
+\texttt{client-registry} & 客户机注册表 & 客户机注册 + 流水线更新 & 客户机列表、游标、在线状态 \\
+\texttt{analysis-tasks-YYYY-MM-DD} & Trace Task & Analysis 模块 & 异步任务状态与进度轮询 \\
+\end{longtable}
+}
+
+\begin{quote}
+说明：索引保留策略见第 6 节；ECS 字段规范详见 \texttt{../../80-规范/81-ECS字段规范.md}。
+\end{quote}
+
+\subsection{索引命名规则（必须遵守）}\label{center-62-index-naming}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  所有按日滚动的索引必须使用连字符日期：\texttt{YYYY-MM-DD}。
+\item
+  索引名不得出现点号日期（例如 \texttt{2026.01.13}），避免 Security Analytics 的 pattern 解析问题。
+\item
+  \texttt{client-registry} 不按日滚动，索引名固定为 \texttt{client-registry}。
+\end{enumerate}
+
+\subsection{索引体系架构}\label{center-62-index-architecture}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-62/center-62-01.pdf}
+\caption{索引体系架构}
+\label{fig:center-62-01}
+\end{figure}
+
+\textbf{架构说明}：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Telemetry 索引}（\texttt{ecs-events-*}）：接收 Falco、Filebeat、Suricata 三类传感器的原始事件
+\item
+  \textbf{Raw Findings 索引}（\texttt{findings-raw-*}）：存储 Security Analytics 生成的原始告警
+\item
+  \textbf{Canonical Findings 索引}（\texttt{findings-canonical-*}）：存储融合去重后的规范化告警
+\item
+  \textbf{Tasks 索引}（\texttt{analysis-tasks-*}）：存储异步溯源任务的状态与结果
+\end{itemize}
+
+\subsection{入库路由与字段处理}\label{center-62-routing-processing}
+
+\subsection{路由规则（权威）}\label{center-62-routing-rules}
+
+对每条输入文档，中心机须按以下规则路由（伪代码表达）：
+
+\begin{itemize}
+\tightlist
+\item
+  当 \texttt{event.kind\ ==\ "event"}：写入 \texttt{ecs-events-*}
+\item
+  当 \texttt{event.kind\ ==\ "alert"} 且 \texttt{event.dataset\ ==\ "finding.canonical"}：写入 \texttt{canonical-findings-*}
+\item
+  当 \texttt{event.kind\ ==\ "alert"} 且 \texttt{event.dataset\ !=\ "finding.canonical"}：写入 \texttt{raw-findings-*}
+\end{itemize}
+
+\subsection{数据流向与写入流程}\label{center-62-data-flow}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/center-62/center-62-02.pdf}
+\caption{数据流向与写入流程}
+\label{fig:center-62-02}
+\end{figure}
+
+\textbf{流程说明}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{客户机采集}：Falco/Filebeat/Suricata 采集数据并写入本地缓冲区；
+\item
+  \textbf{中心机拉取}：Step1 通过 cursor 机制批量拉取客户机数据；
+\item
+  \textbf{字段处理}：Step2 执行 ECS 校验、三时间字段处理及路由判断；
+\item
+  \textbf{OpenSearch 写入}：按路由规则写入对应索引，利用 \texttt{event.id} 实现幂等去重；
+\item
+  \textbf{检测与融合}：Step3 触发 Security Analytics 检测并融合告警；
+\item
+  \textbf{任务管理}：Step4 创建溯源任务并持续更新任务状态。
+\end{enumerate}
+
+\subsection{三时间字段处理（必须执行）}\label{center-62-time-fields}
+
+中心机写入 OpenSearch 前必须保证三时间字段满足 \texttt{../../80-规范/81-ECS字段规范.md}：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{@timestamp}：主时间轴。若缺失，必须从 \texttt{event.created} 推导；若仍无法得到，中心机必须丢弃该文档。
+\item
+  \texttt{event.created}：观察时间。若缺失，中心机必须回填为 \texttt{@timestamp}。
+\item
+  \texttt{event.ingested}：入库时间。中心机必须覆盖为"当前入库时间"，不得使用上游携带值。
+\end{itemize}
+
+\subsection{ECS 字段映射与处理}\label{center-62-ecs-mapping}
+
+中心机写入 OpenSearch 前，须对关键字段进行映射和转换以确保符合 ECS 规范：
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.18\textwidth}p{0.10\textwidth}p{0.20\textwidth}p{0.20\textwidth}p{0.22\textwidth}@{}}
+\toprule\noalign{}
+ECS 字段 & 数据类型 & 必需 & 处理规则 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{@timestamp} & date & ✅ & 优先使用原始值；缺失时从 \texttt{event.created} 推导；仍缺失则丢弃文档 & 主时间轴，用于日志检索和时序分析 \\
+\texttt{event.id} & keyword & ✅ & 若缺失则生成 UUID：\texttt{\{client\_id\}-\{sensor\_type\}-\{timestamp\}-\{seq\}} & 幂等去重的唯一标识 \\
+\texttt{event.kind} & keyword & ✅ & 枚举值：\texttt{event} / \texttt{alert} / \texttt{state} & 路由判断的核心字段 \\
+\texttt{event.category} & keyword & ❌ & 映射规则：\texttt{file} → \texttt{file}，\texttt{network} → \texttt{network}，\texttt{process} → \texttt{process} & 用于前端分类展示 \\
+\texttt{event.dataset} & keyword & ✅ & 格式：\texttt{\{sensor\}.\{type\}}，如 \texttt{falco.syscall}、\texttt{finding.canonical} & 区分数据来源和告警类型 \\
+\texttt{event.created} & date & ✅ & 缺失时回填为 \texttt{@timestamp} & 事件首次被观察到的时间 \\
+\texttt{event.ingested} & date & ✅ & 覆盖为当前入库时间（UTC 毫秒时间戳） & 中心机接收时间，用于监控延迟 \\
+\texttt{source.ip} & ip & ❌ & 保持原值，支持 IPv4/IPv6 & 源地址，用于关联分析 \\
+\texttt{source.port} & long & ❌ & 范围校验：0-65535 & 源端口 \\
+\texttt{destination.ip} & ip & ❌ & 保持原值，支持 IPv4/IPv6 & 目标地址 \\
+\texttt{destination.port} & long & ❌ & 范围校验：0-65535 & 目标端口 \\
+\texttt{process.pid} & long & ❌ & 保持原值 & 进程 ID \\
+\texttt{process.executable} & keyword & ❌ & 规范化绝对路径，统一使用 \texttt{/} 分隔符 & 进程可执行文件路径 \\
+\texttt{file.path} & keyword & ❌ & 规范化绝对路径，统一使用 \texttt{/} 分隔符 & 文件路径 \\
+\texttt{file.name} & keyword & ❌ & 从 \texttt{file.path} 中提取文件名 & 文件名 \\
+\texttt{user.name} & keyword & ❌ & 保持原值 & 用户名 \\
+\texttt{host.name} & keyword & ✅ & 使用客户机注册表中的 \texttt{hostname} & 主机名 \\
+\texttt{host.ip} & ip & ❌ & 使用客户机注册表中的 \texttt{ip} & 主机 IP \\
+\texttt{agent.type} & keyword & ✅ & 固定值：\texttt{falco} / \texttt{filebeat} / \texttt{suricata} & 传感器类型标识 \\
+\texttt{agent.ephemeral\_id} & keyword & ❌ & 保持原值 & 传感器实例 ID \\
+\texttt{alert.severity} & long & ❌ & 范围映射：1-21 低 / 22-59 中 / 60-100 高 & 告警严重级别 \\
+\texttt{alert.status} & keyword & ❌ & 枚举值：\texttt{active} / \texttt{resolved} / \texttt{suppressed} & 告警状态 \\
+\texttt{threat.framework} & keyword & ❌ & 固定值：\texttt{MITRE\ ATT\&CK} & 威胁框架标识 \\
+\texttt{threat.tactic.id} & keyword & ❌ & 格式：\texttt{TAxxxx}，如 \texttt{TA0001} & 战术 ID \\
+\texttt{threat.technique.id} & keyword & ❌ & 格式：\texttt{Txxxx}，如 \texttt{T1059} & 技术 ID \\
+\texttt{rule.name} & keyword & ❌ & 保持原值 & 规则名称 \\
+\texttt{rule.category} & keyword & ❌ & 映射到 MITRE 战术，如 \texttt{Execution} / \texttt{Persistence} & 规则分类 \\
+\texttt{tags} & keyword & ❌ & 数组格式，自动去重 & 标签数组，用于快速过滤 \\
+\end{longtable}
+}
+
+\textbf{字段处理注意事项}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{扁平键兼容}：保留 \texttt{\_source} 中的扁平字段（如 \texttt{proc\_name}），但查询时优先使用嵌套 ECS 字段；
+\item
+  \textbf{类型校验}：写入前校验字段类型，类型不匹配时记录警告并使用默认值或丢弃；
+\item
+  \textbf{缺失字段}：必需字段缺失时拒绝入库，非必需字段缺失时使用默认值或留空；
+\item
+  \textbf{数组字段}：\texttt{tags}、\texttt{threat.tactic.id} 等数组字段须去重，避免重复标签；
+\item
+  \textbf{IP 地址}：支持 IPv4 和 IPv6，自动识别并设置正确的 \texttt{ip} 类型。
+\end{enumerate}
+
+\subsection{幂等与去重（必须满足）}\label{center-62-idempotency}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  每条文档必须具备 \texttt{event.id}；
+\item
+  中心机写入须按 \texttt{event.id} 幂等：同一 \texttt{event.id} 重复写入不得产生重复文档；
+\item
+  对于无法保证 \texttt{event.id} 稳定的上游输入，须在进入中心机前补齐稳定 \texttt{event.id}。
+\end{enumerate}
+
+\subsection{检测与融合}\label{center-62-detection}
+
+OpenSearch 的检测触发、Raw Finding 生成与 Canonical Finding 融合去重规则详见独立设计章节：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{63-检测与告警融合.md}。
+\end{itemize}
+
+\subsection{保留策略与脚本}\label{center-62-retention}
+
+\subsection{数据保留周期（固定）}\label{center-62-retention-period}
+
+数据保留周期的权威定义见：\texttt{../../80-规范/80-数据对象与生命周期.md}。
+
+\subsection{初始化与运维脚本（入口）}\label{center-62-scripts}
+
+OpenSearch 侧的初始化流程包括：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  启动 OpenSearch 容器；
+\item
+  启动中心机后端，后端在启动阶段调用 \texttt{initialize\_indices()} 创建或验证索引存在性（含 mapping）；
+\item
+  配置 Security Analytics detector 并导入 Sigma 规则。
+\end{enumerate}
+
+脚本入口文件如下：
+
+\begin{itemize}
+\tightlist
+\item
+  Sigma 规则导入：\texttt{backend/app/services/opensearch/scripts/import\_sigma\_rules.py}；
+\item
+  Security Analytics detector 配置：\texttt{backend/app/services/opensearch/scripts/setup\_security\_analytics.py}。
+\end{itemize}

@@ -1,0 +1,61 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=box, style="rounded, filled", fillcolor=lightblue];
+    edge [fontname="PingFang SC"];
+
+    subgraph cluster_center {
+        label="中心机服务 FastAPI";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#1b5e20";
+        penwidth=2;
+
+        Poller [label="轮询调度器\nclient_poller.py\n定时触发", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+        Pipeline [label="流水线执行器\n4步骤顺序执行\n拉取→入库→检测→入图", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+        Analysis [label="溯源分析器\n异步任务执行器\nrunner.py", shape=box, style="rounded, filled", fillcolor="#e8f5e9", color="#1b5e20", penwidth=2];
+    }
+
+    subgraph cluster_clients {
+        label="客户机集群";
+        style=filled;
+        fillcolor="#e1f5fe";
+        color="#0277bd";
+        penwidth=2;
+
+        C1 [label="客户机 1", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+        C2 [label="客户机 2", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+        C3 [label="客户机 N", shape=box, style="rounded, filled", fillcolor="#e1f5fe", color="#0277bd", penwidth=2];
+    }
+
+    subgraph cluster_frontend {
+        label="前端 Next.js";
+        style=filled;
+        fillcolor="#e0f7fa";
+        color="#006064";
+        penwidth=2;
+
+        UI [label="图谱可视化\n任务管理\n报告导出", shape=box, style="rounded, filled", fillcolor="#e0f7fa", color="#006064", penwidth=2];
+    }
+
+    OpenSearchStore [label="OpenSearch\n存储与查询", shape=cylinder, style="filled", fillcolor="#f3e5f5", color="#7b1fa2", penwidth=2];
+    Neo4jStore [label="Neo4j\n图数据库", shape=cylinder, style="filled", fillcolor="#f3e5f5", color="#7b1fa2", penwidth=2];
+
+    Poller -> C1 [label="轮询拉取"];
+    Poller -> C2 [label="轮询拉取"];
+    Poller -> C3 [label="轮询拉取"];
+
+    C1 -> Pipeline [label="返回数据"];
+    C2 -> Pipeline [label="返回数据"];
+    C3 -> Pipeline [label="返回数据"];
+
+    Pipeline -> OpenSearchStore [label="写入/查询"];
+    Pipeline -> Neo4jStore [label="写入/查询"];
+
+    UI -> Poller [label="API调用"];
+    UI -> OpenSearchStore [label="API调用"];
+    UI -> Neo4jStore [label="API调用"];
+    UI -> Analysis [label="创建任务"];
+
+    Analysis -> Neo4jStore [label="写回结果"];
+}

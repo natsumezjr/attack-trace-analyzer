@@ -1,0 +1,62 @@
+digraph "Neo4jQueryScenarios" {
+    rankdir=TB;
+    node [fontname="Arial", fontsize=9, shape=rect, style=filled];
+    edge [fontname="Arial", fontsize=8];
+
+    // Actors
+    Frontend [label="前端\n图可视化", shape=ellipse, fillcolor="#e1f5fe"];
+    API [label="后端 API\n/api/v1/graph/query", shape=box, fillcolor="#fff9c4"];
+    Service [label="Neo4j Service\n查询服务", shape=box, fillcolor="#fff9c4"];
+    Neo4jDB [label="Neo4j 数据库", shape=cylinder, fillcolor="#c8e6c9"];
+
+    // Scene 1: Alarm edges query
+    subgraph cluster_scene1 {
+        label="场景1: 告警边查询";
+        style=dashed;
+        color="#555";
+
+        req1 [label="POST {action: \"alarm_edges\"}", shape=note, fillcolor="#fff9c4"];
+        call1 [label="query_alarm_edges()", shape=note, fillcolor="#fff9c4"];
+        query1 [label="MATCH (e)-[r:ALARM]->(e2)\nWHERE r.is_alarm=true", shape=note, fillcolor="#fff9c4"];
+        resp1 [label="nodes + edges", shape=note, fillcolor="#c8e6c9"];
+    }
+
+    // Scene 2: Time window query
+    subgraph cluster_scene2 {
+        label="场景2: 时间窗查询";
+        style=dashed;
+        color="#555";
+
+        req2 [label="POST {action: \"edges_in_window\"\nt_min, t_max}", shape=note, fillcolor="#fff9c4"];
+        call2 [label="query_edges_in_window()", shape=note, fillcolor="#fff9c4"];
+        query2 [label="MATCH (n)-[r]->(m)\nWHERE r.ts_float >= t_min\nAND r.ts_float <= t_max", shape=note, fillcolor="#fff9c4"];
+        resp2 [label="nodes + edges", shape=note, fillcolor="#c8e6c9"];
+    }
+
+    // Scene 3: Shortest path query
+    subgraph cluster_scene3 {
+        label="场景3: 最短路查询";
+        style=dashed;
+        color="#555";
+
+        req3 [label="POST {action: \"shortest_path_in_window\"\nsrc_uid, dst_uid, t_min, t_max}", shape=note, fillcolor="#fff9c4"];
+        call3 [label="query_shortest_path()", shape=note, fillcolor="#fff9c4"];
+        query3 [label="1. 投影时间窗子图\n2. GDS algo.shortestPath\n3. 返回路径边序列", shape=note, fillcolor="#fff9c4"];
+        resp3 [label="path_nodes + path_edges", shape=note, fillcolor="#c8e6c9"];
+    }
+
+    // Scene 4: Analysis results query
+    subgraph cluster_scene4 {
+        label="场景4: 溯源结果查询";
+        style=dashed;
+        color="#555";
+
+        req4 [label="POST {action: \"analysis_edges_by_task\"\ntask_id, only_path}", shape=note, fillcolor="#fff9c4"];
+        call4 [label="query_analysis_edges()", shape=note, fillcolor="#fff9c4"];
+        query4 [label="MATCH (n)-[r]->(m)\nWHERE r.analysis.task_id = $task_id", shape=note, fillcolor="#fff9c4"];
+        resp4 [label="nodes + edges", shape=note, fillcolor="#c8e6c9"];
+    }
+
+    // Layout
+    {rank=same; Frontend; API; Service; Neo4jDB;}
+}

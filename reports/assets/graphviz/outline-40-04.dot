@@ -1,0 +1,40 @@
+digraph {
+    rankdir=TB;
+    fontname="PingFang SC";
+    node [fontname="PingFang SC", shape=ellipse, style="filled", fontsize=11];
+    edge [fontname="PingFang SC", fontsize=10];
+
+    // 定义节点
+    start [label="", shape=point, width=0.3];
+    queued [label="queued\n(已创建)", fillcolor="#fff9c4", color="#f57f17"];
+    running [label="running\n(执行中)", fillcolor="#90caf9", color="#1565c0"];
+    succeeded [label="succeeded\n(已完成)", fillcolor="#a5d6a7", color="#2e7d32"];
+    failed [label="failed\n(失败)", fillcolor="#ef9a9a", color="#c62828"];
+    end [label="", shape=doublecircle, width=0.3];
+
+    // 状态转移
+    start -> queued [label="创建任务", fontsize=9];
+    queued -> running [label="任务执行器取走", fontsize=9];
+    running -> succeeded [label="执行成功", fontsize=9];
+    running -> failed [label="执行失败", fontsize=9];
+    succeeded -> end [label="", fontsize=9];
+    failed -> end [label="", fontsize=9];
+
+    // 状态说明注释
+    note1 [label="task.progress = 0\ntask.created_at", shape=note, fillcolor="#ffffff", color="#424242", fontsize=9, fontname="PingFang SC"];
+    note2 [label="task.progress = 5-95\n任务执行中", shape=note, fillcolor="#ffffff", color="#424242", fontsize=9, fontname="PingFang SC"];
+    note3 [label="task.progress = 100\ntask.finished_at\n结果写回 Neo4j", shape=note, fillcolor="#ffffff", color="#424242", fontsize=9, fontname="PingFang SC"];
+    note4 [label="task.progress < 100\ntask.finished_at\ntask.error", shape=note, fillcolor="#ffffff", color="#424242", fontsize=9, fontname="PingFang SC"];
+
+    // 连接注释到状态
+    note1 -> queued [style="dotted", dir=none, fontsize=8];
+    note2 -> running [style="dotted", dir=none, fontsize=8];
+    note3 -> succeeded [style="dotted", dir=none, fontsize=8];
+    note4 -> failed [style="dotted", dir=none, fontsize=8];
+
+    // 布局调整
+    {rank=same; queued note1}
+    {rank=same; running note2}
+    {rank=same; succeeded note3}
+    {rank=same; failed note4}
+}

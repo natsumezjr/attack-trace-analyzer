@@ -1,0 +1,40 @@
+digraph KillChainPipeline {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.35",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="KillChain Analysis Pipeline (Phases A–D)"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  subgraph_src [label="Neo4j Subgraph\n(alert edges + key telemetry)"];
+  phase_a [label="Phase A\nTactic segmentation (FSA)"];
+  phase_b [label="Phase B\nCandidate path enumeration"];
+  phase_c [label="Phase C\nLLM chooser (optional)\nFallback when unavailable"];
+  phase_d [label="Phase D\nPersist & writeback\n(analysis.* on edges + task doc)"];
+
+  subgraph_src -> phase_a -> phase_b -> phase_c -> phase_d;
+}
+

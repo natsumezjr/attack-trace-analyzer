@@ -1,0 +1,241 @@
+\section{前端模块}\label{sec:frontend-module}
+
+\subsection{页面结构}\label{subsec:page-structure}
+
+前端采用 Next.js App Router（\texttt{frontend/app/}），页面与代码文件的绑定关系固定如下。
+
+\subsubsection{页面结构图}\label{subsubsec:page-structure-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-74/frontend-74-01.pdf}
+\caption{Next.js 前端页面结构}
+\label{fig:frontend-74-01}
+\end{figure}
+
+\subsubsection{页面路由与文件映射}\label{subsubsec:page-routing-file-mapping}
+
+{\def\LTcaptype{none} % do not increment counter
+\footnotesize
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.25\textwidth}p{0.45\textwidth}@{}}
+\toprule\noalign{}
+路由 & 页面用途 & 代码位置 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{\scriptsize\texttt{/}} & 项目首页与入口 & {\scriptsize\texttt{frontend/app/page.tsx}} \\
+{\scriptsize\texttt{/dashboard}} & 总览大盘 & {\scriptsize\texttt{frontend/app/dashboard/page.tsx}} \\
+{\scriptsize\texttt{/trace}} & 溯源分析主界面 & {\scriptsize\texttt{frontend/app/trace/page.tsx}} \\
+\end{longtable}
+}
+
+\subsubsection{布局与导航}\label{subsubsec:layout-navigation}
+
+布局与导航组件的绑定关系如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  全站根布局：\texttt{frontend/app/layout.tsx}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    集成主题切换功能（\texttt{ThemeProvider} + \texttt{ModeToggle}）
+  \end{itemize}
+\item
+  侧边栏组件：\texttt{frontend/components/sidebar/app-sidebar.tsx}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    固定菜单项：主页、总览、溯源分析
+  \end{itemize}
+\item
+  \texttt{/dashboard} 与 \texttt{/trace} 共享侧边栏布局：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{frontend/app/dashboard/layout.tsx}
+  \item
+    \texttt{frontend/app/trace/layout.tsx}
+  \end{itemize}
+\end{enumerate}
+
+\subsubsection{组件关系图}\label{subsubsec:component-relationship-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-74/frontend-74-02.pdf}
+\caption{前端组件关系}
+\label{fig:frontend-74-02}
+\end{figure}
+
+\subsection{数据流与状态管理}\label{subsec:data-flow-state-management}
+
+前端采用``页面内状态 + 明确的请求边界''的状态管理策略：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  页面状态仅保存渲染所需的最小数据集
+\item
+  所有后端数据通过 \texttt{88-前端与中心机接口.md} 统一获取
+\item
+  状态变更由用户操作或轮询驱动，避免隐式副作用
+\end{enumerate}
+
+\subsubsection{Dashboard 数据流}\label{subsubsec:dashboard-data-flow}
+
+Dashboard 页面展示四类概览卡片，当前实现以静态组件渲染为主。数据填充采用以下数据源：
+
+\begin{itemize}
+\tightlist
+\item
+  Telemetry 统计：\texttt{POST /api/v1/events/search}
+\item
+  Raw/Canonical 告警统计：\texttt{POST /api/v1/findings/search}
+\item
+  任务统计：\texttt{GET /api/v1/analysis/tasks}
+\end{itemize}
+
+Dashboard 页面仅读取聚合统计数据，不触发溯源任务与图查询。
+
+\subsubsection{Trace 数据流}\label{subsubsec:trace-data-flow}
+
+Trace 页面的数据流由以下 4 个阶段组成：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  时间窗输入（最近 N 分钟）→ 图数据拉取
+\item
+  图交互 → 创建溯源任务
+\item
+  任务轮询 → 读取写回边并高亮
+\item
+  TTP 相似度分析 → 输出 Top-3 组织与解释字段
+\end{enumerate}
+
+所有 HTTP 请求通过中心机后端完成，前端不直连 OpenSearch 与 Neo4j。
+
+\subsubsection{完整数据流图}\label{subsubsec:complete-data-flow-diagram}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{figures/frontend-74/frontend-74-03.pdf}
+\caption{前端完整数据流}
+\label{fig:frontend-74-03}
+\end{figure}
+
+\subsubsection{数据流阶段说明}\label{subsubsec:data-flow-stage-description}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+阶段 & 触发条件 & 数据流向 & 涉及组件 & 数据存储 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{初始化} & 页面加载 & 前端 → 后端 → Neo4j & 图谱组件 & 图节点与边 \\
+\textbf{图查询} & 时间窗变更 & 前端 → 后端 → Neo4j & 图谱组件 & 时间窗内子图 \\
+\textbf{任务创建} & 节点点击 & 前端 → 后端 → Neo4j & 任务面板 & 任务文档 \\
+\textbf{进度轮询} & 自动触发 & 前端 → 后端 → Neo4j & 任务列表 & 任务状态字段 \\
+\textbf{写回读取} & 任务完成 & 前端 → 后端 → Neo4j & 图谱组件 & analysis\_edges\_by\_task \\
+\textbf{TTP 分析} & 任务完成 & 前端 → 后端（缓存） & 报告查看器 & ttp\_similarity 字段 \\
+\end{longtable}
+}
+
+\subsection{接口调用边界}\label{subsec:api-call-boundaries}
+
+\subsubsection{网络边界约束}\label{subsubsec:network-boundary-constraints}
+
+前端的网络边界约束如下：
+
+\begin{itemize}
+\tightlist
+\item
+  仅调用中心机 HTTP API（\texttt{/api/v1/*} 与 \texttt{/health}）
+\item
+  不直连 OpenSearch（\texttt{/9200}）与 Neo4j（\texttt{/7687}）
+\end{itemize}
+
+\subsubsection{Trace 页面接口绑定}\label{subsubsec:trace-page-api-binding}
+
+Trace 页面在不同阶段调用接口的绑定关系如下（字段结构以 \texttt{88-前端与中心机接口.md} 为准）：
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+阶段 & 触发动作 & 方法 & 路径 & 目的 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+图拉取 & 设置时间窗并刷新 & POST & \texttt{/api/v1/graph/query} & 获取时间窗图边与节点 \\
+创建任务 & 点选目标节点 & POST & \texttt{/api/v1/analysis/tasks} & 创建溯源任务并得到 \texttt{task\_id} \\
+轮询任务 & 创建任务后自动开始 & GET & \texttt{/api/v1/analysis/tasks/\{task\_id\}} & 获取任务状态与进度 \\
+读取写回 & 任务完成后自动触发 & POST & \texttt{/api/v1/graph/query} & 读取 \texttt{analysis\_edges\_by\_task} 并高亮 \\
+相似度 & 任务完成后自动展示 & - & - & 优先从任务文档 \texttt{task.result.ttp\_similarity.*} 读取并展示 Top-3；必要时回退调用 \texttt{/api/v1/analysis/ttp-similarity} \\
+\end{longtable}
+}
+
+\subsubsection{前端代理规则}\label{subsubsec:frontend-proxy-rules}
+
+ATA系统运行时前端端口为 \texttt{3000}，后端端口为 \texttt{8001}。为满足浏览器同源策略，前端通过 Next.js rewrite 规则将以下路径转发到本地后端：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{/api/*} → \texttt{http://localhost:8001/api/*}
+\item
+  \texttt{/health} → \texttt{http://localhost:8001/health}
+\end{itemize}
+
+配置文件位置：\texttt{frontend/next.config.ts}。
+
+\paragraph{代理配置示例}\label{para:proxy-config-example}
+
+\begin{verbatim}
+// frontend/next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:8001/api/:path*",
+      },
+      {
+        source: "/health",
+        destination: "http://localhost:8001/health",
+      },
+    ];
+  },
+};
+
+export default nextConfig;
+\end{verbatim}
+
+\paragraph{端口映射表}\label{para:port-mapping-table}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+源端 & 目标端口 & 协议 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{:3000} & \texttt{:8001} & HTTP & 前端 → 后端 API 请求 \\
+\texttt{:8001} & \texttt{:7687} & Bolt & 后端 → Neo4j 图数据库 \\
+\texttt{:8001} & \texttt{:9200} & HTTP & 后端 → OpenSearch 搜索引擎 \\
+\end{longtable}
+}

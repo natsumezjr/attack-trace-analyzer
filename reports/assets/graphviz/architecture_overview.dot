@@ -1,0 +1,78 @@
+digraph ArchitectureOverview {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.38",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="ATA End-to-End Architecture Overview"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  subgraph cluster_client {
+    label="Client Side";
+    color="#B0D7D0";
+    style="rounded";
+    falco [label="Falco\n(host behavior)"];
+    filebeat [label="Filebeat + Sigma\n(host logs)"];
+    suricata [label="Suricata\n(network traffic)"];
+    mq [label="RabbitMQ\n(data.* queues)"];
+    pull [label="Pull API (Go)\nGET /falco /filebeat /suricata"];
+
+    falco -> mq;
+    filebeat -> mq;
+    suricata -> mq;
+    mq -> pull;
+  }
+
+  subgraph cluster_center {
+    label="Center Side";
+    color="#B0D7D0";
+    style="rounded";
+    api [label="API Service\n(FastAPI)"];
+    poller [label="Client Poller\n(incremental pull)"];
+    os [label="OpenSearch\n(store / detect)"];
+    neo [label="Neo4j\n(entity graph)"];
+    analyze [label="Analysis\n(KillChain / TTP)"];
+
+    poller -> os [label="store-first"];
+    os -> neo [label="ECS→Graph"];
+    neo -> analyze [label="subgraph"];
+    analyze -> neo [label="writeback", dir=both];
+  }
+
+  subgraph cluster_ui {
+    label="Frontend";
+    color="#B0D7D0";
+    style="rounded";
+    ui [label="UI\n(graph / tasks / export)"];
+  }
+
+  ui -> api [label="HTTP"];
+  api -> os [label="query"];
+  api -> neo [label="graph query"];
+  api -> analyze [label="create tasks"];
+
+  poller -> pull [style=dashed, label="pull"];
+}
+

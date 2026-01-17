@@ -1,0 +1,18 @@
+digraph "CanonicalToAlarmEdge" {
+    rankdir=LR;
+    node [fontname="Arial", fontsize=11];
+    edge [fontname="Arial", fontsize=10];
+
+    // Nodes
+    Alert [label="Canonical Finding\n告警文档", shape=box, fillcolor="#ffcdd2", style=filled, color="#c62828", penwidth=2];
+    Analysis [label="溯源分析", shape=box, fillcolor="#fce4ec", style=filled, color="#880e4f", penwidth=2];
+    Path [label="关键路径", shape=box, fillcolor="#fce4ec", style=filled, color="#880e4f", penwidth=2];
+    Edges [label="边集合\nEdges", shape=box, fillcolor="#e3f2fd", style=filled, color="#1565c0", penwidth=2];
+    WriteBack [label="写回边属性\nanalysis.is_path_edge 为 true", shape=box, fillcolor="#e3f2fd", style=filled, color="#1565c0", penwidth=2];
+
+    // Flow
+    Alert -> Analysis;
+    Analysis -> Path;
+    Path -> Edges;
+    Edges -> WriteBack;
+}

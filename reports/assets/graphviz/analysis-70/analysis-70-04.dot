@@ -1,0 +1,23 @@
+digraph {
+    rankdir=LR;
+    node [style="filled,rounded", fontname="Arial"];
+    edge [fontname="Arial"];
+
+    Frontend [label="前端", shape=ellipse, fillcolor="#e8f5e9"];
+    API [label="中心机API", fillcolor="#e8f5e9"];
+    OS [label="OpenSearch\n任务索引", shape=folder, fillcolor="#e3f2fd"];
+    Neo4j [label="Neo4j\n图数据库", shape=cylinder, fillcolor="#e3f2fd"];
+    Query [label="图查询接口", fillcolor="#e8f5e9"];
+
+    Frontend -> API [label="请求查询", fontsize=10];
+    API -> OS [label="查询任务状态", fontsize=10];
+    API -> Neo4j [label="查询图数据", fontsize=10];
+
+    API -> Query [label="调用接口", fontsize=10];
+    Query -> Neo4j [label="执行查询", fontsize=10];
+    Neo4j -> Query [label="返回结果", style=dashed, fontsize=10];
+    Query -> Frontend [label="返回数据", style=dashed, fontsize=10];
+
+    {rank=same; Frontend API}
+    {rank=same; OS Neo4j Query}
+}

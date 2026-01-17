@@ -1,0 +1,202 @@
+% Manual polished content for: installation/build/run guide.
+% This is the "main narrative" used for the course deliverable.
+%
+% Sources (single source of truth):
+% - docs/README.md
+% - README.md
+% - docs/80-规范/*
+% - docs/90-运维与靶场/*
+%
+% Notes:
+% - Prefer placeholders over fixed IPs/ports in the main text.
+% - Keep raw lab parameters (if any) in appendices only.
+
+\section{文档说明与使用方式}
+
+\begin{SideBar}
+\textbf{目标：}本手册用于“从零开始把系统跑起来”，并能按固定步骤完成验收闭环（采集→入库→可视化→溯源）。\\
+\textbf{原则：}ATA系统代码不再变更，本文档只描述仓库中已存在的实现与脚本；不引入超出代码的功能口径。\\
+\textbf{证据形式：}本交付不提供录屏/截图；验收证据以\textbf{可复现命令输出（文本/JSON）}与\textbf{日志/导出文件}为准。
+\end{SideBar}
+
+\subsection{系统组成（你要启动哪些东西）}
+
+系统由三部分组成：
+\begin{itemize}
+  \item \textbf{中心机后端（FastAPI）}：提供 API、轮询拉取、入库/检测融合、入图、溯源任务执行；
+  \item \textbf{中心机前端（Next.js）}：可视化查询、图谱展示、溯源任务管理、报告导出；
+  \item \textbf{客户机采集栈（Linux）}：Falco（主机行为）/ Filebeat（主机日志）/ Suricata（网络流量）采集 + RabbitMQ 缓冲 + 拉取接口（Go）。
+\end{itemize}
+
+\begin{KeyBox}
+\textbf{重要限制（必须写清）：}
+\begin{itemize}
+  \item 客户机采集栈依赖特权能力（Falco/Suricata 抓包/内核事件），\Emph{仅建议在 Linux 靶场环境运行}；不建议在 macOS 上直接跑客户机。
+  \item macOS 环境主要用于“中心机本地开发/演示”（OpenSearch + Neo4j + 后端 + 前端）。
+\end{itemize}
+\end{KeyBox}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.98\textwidth]{figures/deployment_topology.pdf}
+  \caption{系统部署拓扑概览（中心机 + 可选 Linux 客户机，Graphviz 重绘）}
+  \label{fig:install-topology}
+\end{figure}
+
+\subsection{占位符与变量约定}
+
+为避免在正文中散落固定内网参数，本文统一采用占位符：
+
+{\def\LTcaptype{none}
+\begin{longtable}[]{@{}p{0.26\textwidth}p{0.64\textwidth}@{}}
+\toprule\noalign{}
+占位符 & 含义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{<CENTER\_IP>} & 中心机 IP / 主机名（本地开发可用 \texttt{localhost}） \\
+\texttt{<BACKEND\_PORT>} & 后端端口（默认 \texttt{8001}） \\
+\texttt{<FRONTEND\_PORT>} & 前端端口（默认 \texttt{3000}） \\
+\texttt{<OPENSEARCH\_PORT>} & OpenSearch HTTPS 端口（默认 \texttt{9200}） \\
+\texttt{<NEO4J\_HTTP\_PORT>} & Neo4j Browser HTTP 端口（默认 \texttt{7474}） \\
+\texttt{<NEO4J\_BOLT\_PORT>} & Neo4j Bolt 端口（默认 \texttt{7687}） \\
+\texttt{<C2\_DNS\_IP>} / \texttt{<C2\_HTTP\_IP>} & C2 组件 DNS/HTTP IP（靶场专用） \\
+\texttt{<C2\_DOMAIN>} & C2 域名（靶场专用） \\
+\texttt{<BASE\_DIR>} & 靶场运行目录根（同机多实例部署时用于隔离） \\
+\end{longtable}
+}
+
+\begin{SideBar}
+\textbf{环境变量：}配置项与默认值以 \texttt{docs/80-规范/89-环境变量与配置规范.md} 为准。\\
+\textbf{注意：}Docker Compose 的 \texttt{.env} 用于 compose 变量替换；后端进程不会自动加载 \texttt{backend/.env}。
+\end{SideBar}
+
+\section{路径 A：本地单机快速启动（中心机开发/演示）}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/startup_sequence.pdf}
+  \caption{推荐启动顺序（最小闭环：基础设施→后端→前端→验证，Graphviz）}
+  \label{fig:install-startup-seq}
+\end{figure}
+
+\subsection{先决条件}
+
+\begin{itemize}
+  \item Docker Desktop + Docker Compose v2（\texttt{docker compose}）
+  \item Python 3.12 + \texttt{uv}（后端）
+  \item Node.js（建议 20+ LTS）+ npm/pnpm（前端）
+\end{itemize}
+
+\subsection{启动 OpenSearch + Neo4j（基础设施）}
+
+\begin{verbatim}
+cd backend
+cp .env.example .env
+docker compose up -d
+\end{verbatim}
+
+健康检查（示例）：
+\begin{verbatim}
+# OpenSearch（开发环境自签名证书，可用 -k）
+curl -k -u admin:<OPENSEARCH_PASSWORD> https://localhost:<OPENSEARCH_PORT>/_cluster/health
+
+# Neo4j Browser
+open http://localhost:<NEO4J_HTTP_PORT>
+\end{verbatim}
+
+\subsection{启动后端（FastAPI）}
+
+\begin{verbatim}
+cd backend
+uv sync
+uv run uvicorn main:app --reload --host 0.0.0.0 --port <BACKEND_PORT>
+\end{verbatim}
+
+健康检查：
+\begin{verbatim}
+curl -sS http://localhost:<BACKEND_PORT>/health
+\end{verbatim}
+
+\subsection{启动前端（Next.js）}
+
+\begin{verbatim}
+cd frontend
+cp .env.example .env.local
+# 编辑 .env.local：设置 BACKEND_BASE_URL=http://<CENTER_IP>:<BACKEND_PORT>
+npm install
+npm run dev
+\end{verbatim}
+
+访问：
+\begin{verbatim}
+open http://localhost:<FRONTEND_PORT>
+\end{verbatim}
+
+\begin{KeyBox}
+\textbf{可选：离线 CTI（ATT\&CK）}
+
+若要启用 TTP 相似度分析，按仓库脚本下载离线 CTI：
+\begin{verbatim}
+cd backend
+./scripts/fetch_mitre_attack_cti.sh
+\end{verbatim}
+\end{KeyBox}
+
+\section{路径 B：Linux 靶场（≥5 节点闭环验收）}
+
+\begin{SideBar}
+靶场部署的“固定顺序”与“证据点”已经在 \texttt{docs/90-运维与靶场/} 固化。\\
+本节仅给出验收演示的最小操作闭环；完整脚本与细节见附录（自动导入的原始文档）。
+\end{SideBar}
+
+\subsection{固定启动顺序（务必按顺序执行）}
+
+\begin{enumerate}
+  \item 启动中心机依赖（OpenSearch、Neo4j）
+  \item 启动 C2（DNS+HTTP）
+  \item 启动客户机采集栈（client-01..04）
+  \item 启动中心机后端（FastAPI）
+  \item 启动中心机前端（Next.js）
+  \item 注册客户机到中心机
+  \item 执行证据动作并按验证清单验收
+\end{enumerate}
+
+\subsection{最小验收闭环（无截图/无录屏）}
+
+验收不依赖截图/录屏，统一以命令输出作为证据：
+\begin{itemize}
+  \item 后端：\texttt{GET /health} 返回 \texttt{\{\"status\":\"ok\"\}}
+  \item 客户机：\texttt{GET /filebeat} / \texttt{/falco} / \texttt{/suricata} 返回 JSON 且 \texttt{total>0}
+  \item C2：\texttt{dig @<C2\_DNS\_IP> <C2\_DOMAIN>} 与 \texttt{curl http://<C2\_HTTP\_IP>/health} 可验证连通
+\end{itemize}
+
+\begin{KeyBox}
+\textbf{权威验收标准：}
+\begin{itemize}
+  \item 验证清单：\texttt{docs/90-运维与靶场/94-验证清单.md}
+  \item 攻击复现剧本：\texttt{docs/20-需求与验收/22-攻击场景与复现剧本.md}
+  \item 验收标准与用例：\texttt{docs/20-需求与验收/21-验收标准与验收用例.md}
+\end{itemize}
+\end{KeyBox}
+
+\section{停机、重置与排障（现场稳定性保障）}
+
+\subsection{停机与重置}
+
+停机与清理由 \texttt{docs/90-运维与靶场/95-重置复现与排障.md} 固定定义；现场演示前建议进行一次“重置→自检”，确保结果可复现。
+
+\subsection{常见问题（按优先级排障）}
+
+\begin{enumerate}
+  \item \textbf{后端不可用}：先查 \texttt{/health}，再查后端日志与环境变量；
+  \item \textbf{OpenSearch 连接失败}：注意 HTTPS 自签名证书（\texttt{curl -k}），以及 Docker 内存不足导致启动慢/失败；
+  \item \textbf{Neo4j 不可用}：检查 bolt/http 端口与密码配置；
+  \item \textbf{客户机 total=0}：检查 Falco/Suricata 特权与网卡配置，RabbitMQ 队列是否堆积；
+  \item \textbf{C2 不可用}：先验证 DNS/HTTP 的网络与路由，再看容器是否启动。
+\end{enumerate}
+
+\begin{Takeaway}
+正文到此结束。后续附录为"仓库原始运维与靶场文档"，用于追溯细节与固定口径。
+\end{Takeaway}

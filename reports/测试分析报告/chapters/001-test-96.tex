@@ -1,0 +1,249 @@
+\section{测试分析报告}\label{test-analysis-report}
+
+\subsection{文档目的}\label{doc-purpose}
+
+本文件记录ATA系统测试环境、测试策略、用例覆盖、测试结果与缺陷修复情况，作为交付的测试分析报告。
+
+\subsection{读者对象}\label{target-audience}
+
+\begin{itemize}
+\tightlist
+\item
+  团队内部测试负责人
+\end{itemize}
+
+\subsection{引用关系}\label{references}
+
+\begin{itemize}
+\tightlist
+\item
+  验收用例：\texttt{../20-需求与验收/21-验收标准与验收用例.md}
+\item
+  测试用例明细：\texttt{97-测试用例与结果明细.md}
+\end{itemize}
+
+\subsection{测试环境}\label{test-environment}
+
+\subsubsection{硬件与系统}\label{hardware-system}
+
+\begin{itemize}
+\tightlist
+\item
+  设备：MacBook Air（Apple M4，32 GB 内存）
+\item
+  系统：macOS 26.1（Build 25B78），架构 arm64
+\item
+  时间基准：中心机入库与索引按 UTC 天滚动，前端展示按本地时区渲染
+\end{itemize}
+
+\subsubsection{依赖与基础软件版本}\label{software-versions}
+
+\begin{itemize}
+\tightlist
+\item
+  Docker：28.3.3
+\item
+  Docker Compose：v2.39.2
+\item
+  后端运行时：Python 3.12.12（uv 环境），uv 0.9.18
+\item
+  前端运行时：Node.js v25.2.1，pnpm 10.18.2
+\item
+  OpenSearch：3.0.0（\texttt{https://localhost:9200}）
+\item
+  Neo4j：5.15.0（\texttt{http://localhost:7474}，\texttt{bolt://localhost:7687}）
+\end{itemize}
+
+\subsubsection{测试入口与环境开关}\label{test-entry-and-switches}
+
+\begin{itemize}
+\tightlist
+\item
+  自动化测试入口固定为：在 \texttt{backend/} 目录执行 \texttt{uv\ run\ pytest}
+\item
+  环境开关固定为：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \texttt{RUN\_OPENSEARCH\_TESTS=1}：启用 OpenSearch 相关用例
+  \item
+    \texttt{RUN\_NEO4J\_TESTS=0}：跳过 Neo4j 相关用例
+  \item
+    \texttt{KEEP\_NEO4J\_TEST\_DATA=0}：测试结束清理 Neo4j 测试数据
+  \end{itemize}
+\end{itemize}
+
+\subsubsection{本次测试执行时间}\label{test-execution-time}
+
+本报告记录的自动化测试结果执行时间固定为：
+
+\begin{itemize}
+\tightlist
+\item
+  2026-01-15T07:25:57+08:00（UTC+08:00）
+\end{itemize}
+
+\subsection{测试策略}\label{test-strategy}
+
+\subsubsection{分层策略}\label{layered-strategy}
+
+ATA系统测试按``自底向上''的分层策略组织，覆盖从数据入库到告警融合、再到图谱入库与溯源分析的关键链路：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  单元测试（unit）：验证核心函数与模块边界，保证算法与数据口径稳定
+\item
+  集成测试（integration）：验证 OpenSearch 与 Neo4j 交互，保证存储、查询与去重流程可运行
+\item
+  系统测试（system）：按业务闭环验证端到端流程，保证``入库→融合→查询''可复现
+\item
+  验收测试（acceptance）：严格按 \texttt{../20-需求与验收/21-验收标准与验收用例.md} 与 \texttt{../20-需求与验收/22-攻击场景与复现剧本.md} 执行，证据点与截图规则按 \texttt{../10-交付与验收/14-录像与截图清单.md} 固化
+\end{enumerate}
+
+\subsubsection{测试数据策略}\label{test-data-strategy}
+
+测试数据分为两类：
+
+\begin{itemize}
+\tightlist
+\item
+  自动化测试数据：由 \texttt{backend/tests/opensearch/test\_utils.py} 构造固定结构事件与告警，确保字段口径与边界条件覆盖
+\item
+  验收复现数据：由 \texttt{../20-需求与验收/22-攻击场景与复现剧本.md} 产出多源证据，确保现场演示稳定输出
+\end{itemize}
+
+\subsubsection{隔离与可复现策略}\label{isolation-reproducibility}
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch：每条用例开始前清理近 7 日索引（见 \texttt{backend/tests/opensearch/conftest.py}），保证跨次运行无污染
+\item
+  Neo4j：当 \texttt{KEEP\_NEO4J\_TEST\_DATA=0} 时，测试用例结束后清理写入的测试节点与边
+\item
+  时间口径：测试用例与索引日期统一使用 UTC，避免跨时区导致的索引名漂移
+\end{itemize}
+
+\subsection{覆盖范围}\label{coverage-scope}
+
+\subsubsection{自动化测试覆盖模块}\label{automated-test-coverage}
+
+自动化测试集中覆盖中心机后端核心模块：
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch：索引管理、入库去重、告警融合、增量处理（\texttt{backend/tests/opensearch/}）
+\item
+  Neo4j 图谱：ECS→Graph 入库、节点与边模型、图查询工具（\texttt{backend/tests/graph/}）
+\item
+  溯源分析：FSA 构建、候选子图与 LLM 选择回退路径（\texttt{backend/tests/services/analyze/}）
+\end{itemize}
+
+\subsubsection{与验收需求的对应关系}\label{acceptance-mapping}
+
+自动化测试与验收用例的对应关系以``闭环能力''为主：
+
+\begin{itemize}
+\tightlist
+\item
+  覆盖 AC-02、AC-03（OpenSearch 入库与告警融合）
+\item
+  覆盖 AC-04（图谱查询结果可生成）
+\item
+  覆盖 AC-05、AC-06、AC-07 的后端关键组件（任务状态机、结果结构与写回字段口径）
+\end{itemize}
+
+多节点轮询、前端交互与导出材料的完整展示在验收用例中按固定步骤执行，并以截图与录像作为证据。
+
+\subsection{测试结果}\label{test-results}
+
+\subsubsection{自动化测试结果汇总}\label{automated-test-summary}
+
+{\small
+\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}p{0.20\textwidth}p{0.45\textwidth}p{0.15\textwidth}p{0.10\textwidth}@{}}
+\toprule\noalign{}
+测试集 & 运行命令 & 结果 & 用时 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+后端快速回归（跳过 Neo4j） & {\tiny\texttt{cd\ backend\ \&\&\ RUN\_NEO4J\_TESTS=0\ uv\ run\ pytest\ -q}} & 121 passed，62 skipped & 0.20s \\
+后端全量测试（OpenSearch + Neo4j） & {\tiny\texttt{cd\ backend\ \&\&\ RUN\_OPENSEARCH\_TESTS=1\ RUN\_NEO4J\_TESTS=1\ KEEP\_NEO4J\_TEST\_DATA=0\ uv\ run\ pytest\ -q}} & 182 passed，1 skipped & 196.58s \\
+\end{longtable}
+}
+
+跳过用例明细：
+
+{\small
+\begin{itemize}
+\tightlist
+\item
+  \texttt{tests/opensearch/test\_system\_opensearch.py:362}：需要 mock OpenSearch 连接（用例用于断连场景验证，当前以跳过方式记录）
+\end{itemize}
+}
+
+\subsubsection{重要结论}\label{key-conclusions}
+
+\begin{itemize}
+\tightlist
+\item
+  OpenSearch、Neo4j 相关测试全量通过，核心闭环链路可复现
+\item
+  回退路径与异常分支通过单元测试覆盖，保证在 LLM 不可用或输出不合规时仍能产出结果
+\end{itemize}
+
+\subsection{缺陷与修复记录}\label{defect-fixes}
+
+本节记录本次文档体系重构期间，测试暴露出的关键问题与对应修复：
+
+\subsubsection{缺陷-001 OpenSearch 索引日期口径不一致导致测试污染}\label{defect-001-opensearch-index-date}
+
+\begin{itemize}
+\tightlist
+\item
+  现象：同一套用例在 UTC 与本地时区交界时生成不同日期索引，导致索引清理失效与跨次污染
+\item
+  修复：统一测试与索引命名使用 UTC，并在每条用例开始前清理近 7 日索引
+\item
+  影响：OpenSearch 相关用例稳定通过，跨次运行结果一致
+\end{itemize}
+
+\subsubsection{缺陷-002 增量状态字段缺少明确映射导致 term 查询失效}\label{defect-002-incremental-state-mapping}
+
+\begin{itemize}
+\tightlist
+\item
+  现象：\texttt{custom.finding.detector\_id} 未在 mapping 中显式声明，term 查询无法稳定命中
+\item
+  修复：在 OpenSearch mapping 中补齐 \texttt{custom.finding.detector\_id} 为 \texttt{keyword}
+\item
+  影响：增量处理相关辅助函数可正确返回上次处理时间戳
+\end{itemize}
+
+\subsubsection{缺陷-003 OpenSearch 增量测试用例误用 fixture 参数}\label{defect-003-fixture-misuse}
+
+\begin{itemize}
+\tightlist
+\item
+  现象：测试用例把 \texttt{initialized\_indices} 当作 client 传入，导致 \texttt{\_get\_last\_processed\_timestamp} 永远返回空
+\item
+  修复：统一使用 \texttt{opensearch\_client} 作为调用参数，并保留 \texttt{initialized\_indices} 负责索引初始化
+\item
+  影响：增量相关用例稳定通过
+\end{itemize}
+
+\subsection{结论}\label{conclusion}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  自动化测试全量通过，OpenSearch 与 Neo4j 的核心链路具备可复现性与稳定性
+\item
+  验收测试按固定剧本与验收用例执行，证据点口径在文档中固化，满足交付对``可演示、可解释、可复现''的要求
+\end{enumerate}

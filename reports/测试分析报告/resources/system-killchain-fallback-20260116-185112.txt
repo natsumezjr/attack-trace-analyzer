@@ -1,0 +1,113 @@
+============================================================
+KillChain 测试（不含 LLM）
+============================================================
+
+[1/5] 初始化 Neo4j schema...
+✓ Schema 初始化完成
+
+[2/5] 加载测试数据...
+正在读取测试数据: /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/fixtures/graph/testFSA.json
+成功加载 14 条事件
+
+[3/5] 清理旧测试数据...
+[清理] 删除了 14 条边（通过 event.id）
+[清理] 删除了 1 个 User 节点
+[清理] 删除了 2 个主机的相关节点
+✓ 清理完成
+
+[4/5] 导入数据到 Neo4j...
+✓ 导入完成: 49 个节点, 32 条边
+
+[5/5] 运行 KillChain 流水线（llm_client=None，使用 fallback）...
+KillChain UUID: af67e4af-f8aa-4e62-a328-c85a2a42e71e
+[DEBUG] run_killchain_pipeline: 查询到 46 条告警边
+[DEBUG] 第一条告警边示例:
+  - src_uid: Host:host.id=h-b9e0fa2ff4ec465f
+  - dst_uid: IP:ip=10.0.0.13
+  - rtype: RelType.HAS_IP
+  - is_alarm: True
+  - threat.tactic.name: Discovery
+  - attack_tag: Discovery
+[INFO] behavior_state_machine: 生成了 1 个 FSA 图
+[INFO] FSA[0]: 包含 6 个段，状态序列: Initial Access -> Execution -> Privilege Escalation -> Lateral Movement -> Command and Control -> Impact
+[DEBUG] run_killchain_pipeline: Phase A 生成了 1 个 FSA 图
+[WARN] 默认锚点连接失败，尝试使用语义锚点: Lateral Movement -> Command and Control
+[WARN] 默认锚点连接失败，尝试使用语义锚点: Command and Control -> Impact
+[INFO] candidates count: 1
+[INFO] select_killchain_with_llm: 1/1
+
+============================================================
+KillChain 分析结果
+============================================================
+✓ 生成了 1 个 KillChain
+
+--- KillChain #1 ---
+UUID: af67e4af-f8aa-4e62-a328-c85a2a42e71e
+FSA 节点数: 18
+状态段数: 6
+选中路径数: 5
+可信度: 0.50
+解释: 由于大语言模型不可用或调用失败，系统使用回退策略为每个锚点对选择了跳数最短的路径。回退策略基于最短路径启发式算法，优先选择连接段对之间跳数最少的路径，以确保攻击链的基本连通性和时间一致性。虽然这种方法...
+状态序列: Initial Access -> Execution -> Privilege Escalation -> Lateral Movement -> Command and Control -> Impact
+
+选中的路径:
+  Path #1: p-b9eee6cd7f93cc9c
+    - 源锚点: IP:ip=10.92.35.11
+    - 目标锚点: Process:process.entity_id=p-fsa-app-001
+    - 边数: 2
+    - 步骤数: 2
+  Path #2: p-42f1f61b61a83cc1
+    - 源锚点: IP:ip=10.92.35.11
+    - 目标锚点: Process:process.entity_id=p-fsa-privilege-001
+    - 边数: 2
+    - 步骤数: 2
+  Path #3: p-76efe784caa59731
+    - 源锚点: IP:ip=10.92.35.11
+    - 目标锚点: Host:host.id=h-8a8b8c8d8e8f9010
+    - 边数: 1
+    - 步骤数: 1
+  Path #4: p-a85f2b026e25877c
+    - 源锚点: IP:ip=10.92.35.12
+    - 目标锚点: Process:process.entity_id=p-fsa-service-001
+    - 边数: 2
+    - 步骤数: 2
+  Path #5: p-617ff7b12d6e3d8b
+    - 源锚点: Domain:domain.name=c2.lab.local
+    - 目标锚点: Process:process.entity_id=p-fsa-service-001
+    - 边数: 1
+    - 步骤数: 1
+
+
+============================================================
+KillChain 结果验证
+============================================================
+✅ KillChain #1: 包含所有期望的状态
+✅ KillChain #1: 有 5 条选中的路径
+
+✅ 测试通过：KillChain 流水线正确构建了攻击链
+
+============================================================
+Neo4j 浏览器查询示例
+============================================================
+
+访问 Neo4j 浏览器: http://localhost:7474
+
+查询 KillChain (UUID: af67e4af-f8aa-4e62-a328-c85a2a42e71e):
+------------------------------------------------------------
+MATCH (n)-[r]->(m)
+WHERE n.`analysis.task_id` = 'af67e4af-f8aa-4e62-a328-c85a2a42e71e'
+   OR r.`analysis.task_id` = 'af67e4af-f8aa-4e62-a328-c85a2a42e71e'
+   OR m.`analysis.task_id` = 'af67e4af-f8aa-4e62-a328-c85a2a42e71e'
+RETURN n, r, m
+LIMIT 100
+
+============================================================
+测试完成！
+============================================================
+
+统计信息:
+  - 事件数: 14
+  - 节点数: 49
+  - 边数: 32
+  - KillChain 数: 1
+  - 最高可信度: 0.50

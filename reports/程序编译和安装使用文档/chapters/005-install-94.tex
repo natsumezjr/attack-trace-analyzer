@@ -1,0 +1,208 @@
+\section{验证清单}\label{verification-checklist}
+
+本文件把靶场验收拆成 4 个必须通过的检查段落：网络、采集、中心机入库、证据点。每一项都给出固定命令与固定通过标准。
+
+\subsection{固定变量}\label{fixed-vars-94}
+
+本文件命令默认在靶场宿主机执行，并使用以下固定变量：
+
+\begin{verbatim}
+export BASE=/home/ubuntu/attack-trace-analyzer
+export REPO="$BASE"/repo/attack-trace-analyzer
+\end{verbatim}
+
+\subsection{网络连通性（必须）}\label{network-connectivity}
+
+\subsubsection{中心机端口（center-01）}\label{center-ports-check}
+
+在宿主机执行：
+
+\begin{verbatim}
+ss -lntup | egrep ':(9200|9600|7474|7687|8001|3000)\\b' || true
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  端口 \texttt{9200}、\texttt{9600}、\texttt{7474}、\texttt{7687}、\texttt{8001}、\texttt{3000} 均处于监听状态。
+\end{itemize}
+
+\subsubsection{客户机端口（client-01..04）}\label{client-ports-check}
+
+在宿主机执行：
+
+\begin{verbatim}
+ss -lntup | egrep ':(18881|18882|18883|18884)\\b' || true
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  端口 \texttt{18881}、\texttt{18882}、\texttt{18883}、\texttt{18884} 均处于监听状态。
+\end{itemize}
+
+\subsubsection{后端健康检查}\label{backend-health-check}
+
+\begin{verbatim}
+curl -sS http://localhost:8001/health
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{verbatim}
+{"status":"ok"}
+\end{verbatim}
+
+\subsubsection{OpenSearch 健康检查}\label{opensearch-health-check}
+
+\begin{verbatim}
+curl -k -sS -u admin:OpenSearch@2024!Dev https://localhost:9200/_cluster/health
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  输出包含字段 \texttt{status}，其值为 \texttt{yellow} 或 \texttt{green}。
+\end{itemize}
+
+\subsubsection{C2 健康检查}\label{c2-health-check}
+
+按 \texttt{93-C2部署与证据点.md} 的第 7 节执行 DNS、HTTP 与抓包验证，通过即为 C2 可用。
+
+\subsection{采集链路（必须）}\label{collection-chain}
+
+\subsubsection{客户机拉取接口（四实例）}\label{client-api-check}
+
+在宿主机执行：
+
+\begin{verbatim}
+for p in 18881 18882 18883 18884; do
+  echo "== client api :$p =="
+  curl -s "http://<CENTER_IP>:$p/filebeat" | python3 -c "import sys,json; print('filebeat total=', json.load(sys.stdin).get('total'))"
+  curl -s "http://<CENTER_IP>:$p/falco"    | python3 -c "import sys,json; print('falco total=',   json.load(sys.stdin).get('total'))"
+  curl -s "http://<CENTER_IP>:$p/suricata" | python3 -c "import sys,json; print('suricata total=',json.load(sys.stdin).get('total'))"
+done
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  对 4 个实例的 3 个接口均返回 JSON；
+\item
+  每个返回体包含 \texttt{total} 字段；
+\item
+  执行一次证据动作后，至少一个实例的 \texttt{suricata\ total} 大于 0。
+\end{itemize}
+
+\subsection{中心机入库与查询（必须）}\label{data-ingestion-query}
+
+\subsubsection{客户机注册表可见}\label{client-registration-check}
+
+\begin{verbatim}
+curl -sS http://localhost:8001/api/v1/clients | grep -n 'client-0' || true
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  返回 \texttt{status="ok"}；
+\item
+  返回结果中包含 \texttt{client-01}、\texttt{client-02}、\texttt{client-03}、\texttt{client-04}；
+\item
+  对每个客户端，\texttt{poll.status} 最终变为 \texttt{ok} 或 \texttt{partial}。
+\end{itemize}
+
+\subsubsection{Telemetry 入库可查询}\label{telemetry-query-check}
+
+执行一次证据动作（见第 4 节）后等待 10 秒，再执行：
+
+\begin{verbatim}
+curl -sS -X POST http://localhost:8001/api/v1/events/search \
+  -H "Content-Type: application/json" \
+  -d '{"size": 10, "offset": 0, "sort_order": "desc"}' | grep -n '\"total\"'
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  返回 \texttt{status="ok"}；
+\item
+  \texttt{total} 大于 0。
+\end{itemize}
+
+\subsubsection{Findings 入库可查询}\label{findings-query-check}
+
+\begin{verbatim}
+curl -sS -X POST http://localhost:8001/api/v1/findings/search \
+  -H "Content-Type: application/json" \
+  -d '{"stage":"raw","size": 10, "offset": 0, "sort_order": "desc"}' | grep -n '\"total\"'
+\end{verbatim}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  返回 \texttt{status="ok"}；
+\item
+  \texttt{total} 大于 0。
+\end{itemize}
+
+\subsection{证据点（必须）}\label{evidence-verification}
+
+证据点固定由两条命令产生（见 \texttt{93-C2部署与证据点.md}）：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  DNS：\texttt{dig\ @\textless{}C2\_DNS\_IP\textgreater{}\ \textless{}C2\_DOMAIN\textgreater{}\ +short}
+\item
+  HTTP：\texttt{curl\ -s\ http://\textless{}C2\_HTTP\_IP\textgreater{}/health\ \&\&\ echo}
+\end{enumerate}
+
+通过标准（固定）：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{"\$BASE/run/client-01/data/eve.json"} 文件存在且文件大小大于 0；
+\item
+  \texttt{http://\textless{}CENTER\_IP\textgreater{}:18881/suricata} 返回 \texttt{total\textgreater{}0}；
+\item
+  中心机入库后，\texttt{/api/v1/events/search} 的 \texttt{total} 增加。
+\end{itemize}
+
+\subsection{截图与录像证据（必须）}\label{screenshot-recording-evidence}
+
+ATA系统固定产出以下截图/输出，用于 PPT 与录像：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ss\ -lntup} 的端口监听输出
+\item
+  DNS 解析输出：\texttt{\textless{}C2\_DOMAIN\textgreater{}\ -\textgreater{}\ \textless{}C2\_HTTP\_IP\textgreater{}}
+\item
+  HTTP 访问输出：\texttt{/health\ -\textgreater{}\ ok}
+\item
+  \texttt{GET\ /suricata} 的 \texttt{total\textgreater{}0}
+\item
+  \texttt{POST\ /api/v1/events/search} 返回 \texttt{status="ok"} 且 \texttt{total\textgreater{}0}
+\end{itemize}
+
+\begin{quote}
+\textbf{注意}：后端端口固定为 \texttt{8001}，避免与服务器上其他服务（如Django）的 \texttt{8000} 端口冲突。
+\end{quote}

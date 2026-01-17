@@ -16,11 +16,11 @@
 
 ## 1. 输入裁剪规则
 
-LLM 选择器的输入由 `killchain.py` 生成，再由 `killchain_llm.py` 做二次裁剪，保证：
+LLM 选择器的输入由 `killchain.py` 生成，再由 `killchain_llm.py` 做二次裁剪。裁剪规则保证以下三点：
 
-1. 输入体积受控（字段与文本长度受控）；
-2. 输入仍可回溯到图中的边与路径（保留 `path_id` 与关键步骤）；
-3. 输入在回退模式下完全可复现（不依赖外部服务）。
+1. **输入体积受控**：字段与文本长度受控；
+2. **可回溯性**：输入仍可回溯到图中的边与路径（保留 `path_id` 与关键步骤）；
+3. **可复现性**：输入在回退模式下完全可复现（不依赖外部服务）。
 
 实现绑定点（以代码为准）：
 
@@ -43,10 +43,10 @@ LLM 选择器的输入由 `killchain.py` 生成，再由 `killchain_llm.py` 做�
 
 ### 1.2 二次裁剪（PayloadReducer，固定参数）
 
-二次裁剪将大 payload 压缩为 reduced payload，压缩规则与参数固定：
+二次裁剪将大 payload 压缩为 reduced payload。压缩规则与参数固定：
 
-1. 文本截断长度：`max_str_len 为 200`；
-2. 每条路径最多保留步骤数：`max_steps_per_path 为 10`；
+1. 文本截断长度：`max_str_len = 200`；
+2. 每条路径最多保留步骤数：`max_steps_per_path = 10`；
 3. 每个 step 的 `key_props` 只保留固定字段集合（见下表）。
 
 实现绑定点：`backend/app/services/analyze/killchain_llm.py:LLMChooseConfig` 与 `DEFAULT_EDGE_KEYS_KEEP`。
@@ -117,11 +117,11 @@ flowchart LR
 
 在 reduced payload 的基础上，系统执行启发式预筛选，进一步裁剪每个段对的候选路径数量。
 
-固定参数：
+**固定参数**
 
-- 每个段对最多保留候选数：`per_pair_keep 为 8`
+- 每个段对最多保留候选数：`per_pair_keep = 8`
 
-启发式评分规则固定为：
+**启发式评分规则**
 
 1. 以 `hop=len(steps)` 表示路径跳数；
 2. 基础分：`base = 10.0 / (1.0 + hop)`；
@@ -222,7 +222,7 @@ LLM chooser 对外输出为 JSON 对象（Python dict），字段集合与校验
 2. `len(chosen_path_ids) == len(pairs)`；
 3. 对每个 `i`，`chosen_path_ids[i]` 必须属于 `pairs[i].candidates[].path_id` 集合。
 
-`confidence` 的处理规则固定：
+**confidence 的处理规则**
 
 - 当 LLM 输出 `confidence` 为数值时，系统将其裁剪到 `0.0..1.0`；
 - 当 LLM 未输出 `confidence` 或类型不正确时，系统固定写入 `0.5`。
@@ -425,10 +425,10 @@ flowchart TB
 2. 将该候选的 `path_id` 写入 `chosen_path_ids`；
 3. 当某个段对候选为空时，该段对输出空字符串 `""`。
 
-回退输出字段固定：
+**回退输出字段**
 
-- `confidence 为 0.5`
-- `pair_explanations=[]`
+- `confidence = 0.5`
+- `pair_explanations = []`
 - `explanation` 为 `fallback_choose()` 内置解释文本（不依赖外部输入）。
 
 ### 4.2 killchain.py 内置回退（固定）
@@ -504,6 +504,6 @@ export DEEPSEEK_API_KEY=""
 1. reduced payload 的裁剪参数固定（1.2 与 1.3）；
 2. 回退算法只依赖 reduced payload 且不使用随机数；
 3. 在候选路径 `steps` 数相同的情况下，Python 的稳定排序会保留原始候选顺序，因此回退结果对同一输入保持一致；
-4. DeepSeek 调用固定使用 `temperature 为 0.3` 且在支持时启用 `response_format={"type":"json_object"}`，并通过严格校验将异常输出统一收敛到回退模式。
+4. DeepSeek 调用固定使用 `temperature = 0.3` 且在支持时启用 `response_format={"type":"json_object"}`，并通过严格校验将异常输出统一收敛到回退模式。
 
 DeepSeek 适配实现绑定点：`backend/app/services/analyze/killchain_llm.py:_create_llm_chat_complete()`。

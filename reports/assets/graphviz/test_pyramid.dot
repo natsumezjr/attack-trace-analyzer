@@ -1,0 +1,43 @@
+digraph TestPyramid {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.35",
+    ranksep="0.55",
+    fontname="Helvetica",
+    fontsize=12,
+    labelloc="t",
+    label="Backend Test Layers (pytest)"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#2A7F6F",
+    fillcolor="#E8F4F1",
+    penwidth=1.2
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#2A7F6F",
+    arrowsize=0.8,
+    penwidth=1.1
+  ];
+
+  system [label="System / E2E\n- black-box workflows\n- depends on OpenSearch/Neo4j\npytest tests/e2e"];
+  integration [label="Integration\n- real OpenSearch/Neo4j\npytest tests/integration\nRUN_OPENSEARCH_TESTS=1"];
+  unit [label="Unit\n- no external services\npytest -m unit"];
+
+  flags [shape=note, style="filled", color="#2B44C6", fillcolor="#EBF5FF",
+         label="Gates:\nRUN_OPENSEARCH_TESTS=1\nRUN_NEO4J_TESTS=0 to skip\nRUN_LLM_TESTS=1"];
+
+  system -> integration -> unit [dir=back];
+  flags -> integration [style=dashed];
+  flags -> system [style=dashed];
+}
+

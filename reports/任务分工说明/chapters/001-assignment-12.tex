@@ -1,0 +1,121 @@
+\section{任务分工说明}\label{assignment-description}
+
+\subsection{文档目的}\label{document-purpose}
+
+本文件用于记录团队成员信息、任务分解、责任人、工作量占比与产出物映射。
+
+\subsection{读者对象}\label{target-audience}
+
+\begin{itemize}
+\tightlist
+\item
+  老师与助教（用于评估分工合理性与工作量）
+\item
+  团队内部成员（用于对齐责任边界）
+\end{itemize}
+
+\subsection{引用关系}\label{references}
+
+\begin{itemize}
+\tightlist
+\item
+  交付物打包结构：\texttt{11-交付物清单与打包结构.md}
+\end{itemize}
+
+\subsection{团队与角色}\label{team-and-roles}
+
+{\footnotesize
+\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}p{0.15\textwidth}p{0.25\textwidth}p{0.60\textwidth}@{}}
+\toprule\noalign{}
+姓名 & 角色 & 负责模块 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+董容嘉 & 数据获取（主机行为） & \texttt{client/sensor/falco/}（Falco 采集与 ECS 转换） \\
+马民泽 & 数据获取（网络流量） & \texttt{client/sensor/suricata/}（Suricata 采集与 ECS 转换） \\
+姜乐 & 数据获取（主机日志） & \texttt{client/sensor/filebeat/}（Filebeat + Sigma 规则） \\
+田炎烁 & 数据湖构建 & \texttt{backend/app/services/opensearch/}（Security Analytics） \\
+吕梓杰 & 图谱构建 & \texttt{backend/app/services/neo4j/}（OpenSearch → Neo4j 入图） \\
+伍万圣 & 客户机/中心机全栈 & \texttt{client/} \texttt{backend/app/api/} \texttt{frontend/}（接口联调与前端展示） \\
+范玉彬 & 关联溯源算法 & \texttt{backend/app/services/analyze/}（KillChain/FSA/候选路径） \\
+曾靖然 & 关联溯源算法 & \texttt{backend/app/services/analyze/}（LLM 选择器/TTP 相似度） \\
+王一安 & 靶场环境 & \texttt{docs/90-运维与靶场/} \texttt{scripts/靶场编排/} \\
+张天华 & 项目架构师 & 系统架构设计、后端核心模块开发与技术难点攻关 \\
+\end{longtable}
+}
+
+\begin{quote}
+说明：主机日志采集在实现中采用 \texttt{Filebeat\ +\ Sigma}（见 \texttt{client/sensor/filebeat/}），与``Wazuh 能力''对应；如需对外说明为 Wazuh，请在报告中说明替代关系。
+\end{quote}
+
+\subsection{任务分解与责任人}\label{task-breakdown}
+
+{\tiny
+\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}p{0.08\textwidth}p{0.18\textwidth}p{0.22\textwidth}p{0.10\textwidth}p{0.32\textwidth}@{}}
+\toprule\noalign{}
+任务编号 & 任务名称 & 任务说明 & 责任人 & 产出物 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+T-001 & Falco 采集与 ECS 转换 & 主机行为采集、ECS 字段归一与队列投递 & 董容嘉 & \texttt{client/sensor/falco/} \texttt{docs/50-详细设计/客户机/51-Falco采集与ECS转换.md} \\
+T-002 & Suricata 采集与 ECS 转换 & 网络流量/IDS 输出、ECS 归一与队列投递 & 马民泽 & \texttt{client/sensor/suricata/} \texttt{docs/50-详细设计/客户机/52-Suricata采集与ECS转换.md} \\
+T-003 & 主机日志采集与检测 & Filebeat 采集 + Sigma 检测、ECS 归一与队列投递 & 姜乐 & \texttt{client/sensor/filebeat/} \texttt{docs/50-详细设计/客户机/53-Filebeat采集与ECS转换.md} \\
+T-004 & OpenSearch 数据湖与检测融合 & 索引治理、事件入库、Security Analytics 检测/融合 & 田炎烁 & \texttt{backend/app/services/opensearch/} \texttt{docs/50-详细设计/中心机/62-OpenSearch存储与索引治理.md} \texttt{docs/50-详细设计/中心机/63-检测与告警融合.md} \\
+T-005 & OpenSearch → Neo4j 入图 & ECS 事件入图、实体/边建模、图查询与回标 & 吕梓杰 & \texttt{backend/app/services/neo4j/} \texttt{docs/50-详细设计/中心机/64-Neo4j入图与图查询.md} \texttt{docs/50-详细设计/中心机/65-图谱回标与边属性.md} \\
+T-006 & 全栈集成与前端展示 & 客户机拉取接口联调、中心机 API、前端可视化 & 伍万圣 & \texttt{client/backend/} \texttt{backend/app/api/} \texttt{frontend/} \texttt{docs/50-详细设计/前端/} \\
+T-007 & KillChain/FSA 关联溯源 & 状态机分段、候选路径构造与评分 & 范玉彬 & \texttt{backend/app/services/analyze/killchain.py} \texttt{backend/app/services/analyze/attack\_fsa.py} \texttt{docs/50-详细设计/分析/69-KillChain概览设计.md} \texttt{docs/50-详细设计/分析/70-任务模型与状态机.md} \texttt{docs/50-详细设计/分析/71-候选路径构造与评分.md} \\
+T-008 & LLM 选择器与 TTP 相似度 & LLM 选择器与回退、TTP 相似度匹配与结果写回 & 曾靖然 & \texttt{backend/app/services/analyze/killchain\_llm.py} \texttt{backend/app/services/analyze/ttp\_similarity/} \texttt{docs/50-详细设计/分析/72-LLM选择器与回退机制.md} \texttt{docs/50-详细设计/分析/73-TTP相似度匹配.md} \\
+T-009 & 靶场部署与复现 & 靶场编排、C2/攻击脚本、验证与排障 & 王一安 & \texttt{docs/90-运维与靶场/} \texttt{scripts/靶场编排/} \\
+T-010 & 系统架构与核心模块 & ATA系统总体架构设计、后端异步任务模型、客户机轮询机制、技术难点攻关与集成排障 & 张天华 & \texttt{backend/app/services/client\_poller.py} \texttt{backend/app/models/} \texttt{docs/40-概要设计/} \texttt{docs/50-详细设计/} \\
+\end{longtable}
+}
+
+\subsection{工作量占比与依据}\label{workload-distribution}
+
+{\small
+\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}p{0.12\textwidth}p{0.15\textwidth}p{0.63\textwidth}@{}}
+\toprule\noalign{}
+姓名 & 工作量占比 & 依据说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+董容嘉 & 10\% & Falco 采集链路开发与联调 \\
+马民泽 & 10\% & Suricata 采集链路开发与联调 \\
+姜乐 & 10\% & Filebeat + Sigma 规则检测与联调 \\
+田炎烁 & 10\% & OpenSearch 索引治理与检测融合 \\
+吕梓杰 & 10\% & OpenSearch → Neo4j 入图与图查询 \\
+伍万圣 & 10\% & 客户机/中心机联调与前端展示 \\
+范玉彬 & 10\% & KillChain/FSA 关联溯源 \\
+曾靖然 & 10\% & LLM 选择器与 TTP 相似度 \\
+王一安 & 10\% & 靶场部署、复现与排障 \\
+张天华 & 10\% & 系统架构设计、后端异步任务模型开发（client\_poller、Trace Task）、客户机轮询机制、集成排障与技术难点攻关 \\
+\end{longtable}
+}
+
+\subsection{产出物映射}\label{deliverable-mapping}
+
+ATA系统文档与代码的主要产出物路径如下：
+
+\begin{itemize}
+\tightlist
+\item
+  文档：\texttt{docs/}（详细设计、规范、运维、测试）
+\item
+  后端：\texttt{backend/}（中心机服务与分析）
+\item
+  客户机：\texttt{client/}（采集、转换、队列与拉取接口）
+\item
+  前端：\texttt{frontend/}（图谱可视化与任务管理）
+\item
+  部署与靶场：\texttt{scripts/靶场编排/}
+\item
+  测试与脚本：\texttt{backend/tests/} \texttt{tests/e2e/} \texttt{backend/scripts/}
+\item
+  交付材料：\texttt{report/}
+\end{itemize}

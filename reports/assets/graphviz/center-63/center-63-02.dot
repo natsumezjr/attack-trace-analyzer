@@ -1,0 +1,42 @@
+digraph "RawToCanonicalMapping" {
+    rankdir=LR;
+    node [shape=box, style=filled, fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9];
+
+    // Raw Finding Nodes
+    RF1 [label="event.dataset\nfinding.raw.*", fillcolor="#fff9c4", fontcolor="#333"];
+    RF2 [label="rule.id / rule.name", fillcolor="#fff9c4", fontcolor="#333"];
+    RF3 [label="source.ip / source.port", fillcolor="#fff9c4", fontcolor="#333"];
+    RF4 [label="destination.ip /\ndestination.port", fillcolor="#fff9c4", fontcolor="#333"];
+    RF5 [label="threat.technique.id", fillcolor="#fff9c4", fontcolor="#333"];
+    RF6 [label="host.name / host.id", fillcolor="#fff9c4", fontcolor="#333"];
+    RF7 [label="provider / detector", fillcolor="#fff9c4", fontcolor="#333"];
+
+    // Canonical Finding Nodes
+    CF1 [label="event.dataset\nfinding.canonical", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF2 [label="rule.id / rule.name\n(保留优先级最高的)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF3 [label="source.ip / source.port\n(首次出现的)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF4 [label="destination.ip / destination.port\n(首次出现的)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF5 [label="threat.technique.id\n(融合后的)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF6 [label="host.name / host.id\n(统一主机标识)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF7 [label="provider.*\n(来源列表)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF8 [label="finding.fingerprint\n(融合指纹)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF9 [label="custom.evidence.event_ids\n(证据引用)", fillcolor="#c8e6c9", fontcolor="#333"];
+    CF10 [label="finding.dedup_count\n(去重计数)", fillcolor="#c8e6c9", fontcolor="#333"];
+
+    // Edges with labels
+    RF1 -> CF1 [label="dataset 转换", style=dashed, color="#ef6c00"];
+    RF2 -> CF2 [label="保留首次或高优先级", style=dashed, color="#ef6c00"];
+    RF3 -> CF3 [label="保留首次", style=dashed, color="#ef6c00"];
+    RF4 -> CF4 [label="保留首次", style=dashed, color="#ef6c00"];
+    RF5 -> CF5 [label="聚合唯一值", style=dashed, color="#ef6c00"];
+    RF6 -> CF6 [label="保留首次", style=dashed, color="#ef6c00"];
+    RF7 -> CF7 [label="扩展为数组", style=dashed, color="#ef6c00"];
+    RF5 -> CF8 [label="生成唯一指纹", style=dashed, color="#ef6c00"];
+    RF1 -> CF9 [label="收集所有来源", style=dashed, color="#ef6c00"];
+    RF1 -> CF10 [label="计数", style=dashed, color="#ef6c00"];
+
+    // Rank constraints
+    {rank=same; RF1; RF2; RF3; RF4; RF5; RF6; RF7;}
+    {rank=same; CF1; CF2; CF3; CF4; CF5; CF6; CF7; CF8; CF9; CF10;}
+}

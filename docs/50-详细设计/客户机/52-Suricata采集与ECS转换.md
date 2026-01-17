@@ -1,13 +1,13 @@
-# Suricata采集与ECS转换
+# Suricata 采集与 ECS 转换
 
 ## 文档目的
 
-本文件定义客户机侧 Suricata 的采集方式、EVE 日志处理、以及转换为 ECS 子集字段并投递到 RabbitMQ 队列的固定规则。
+本文档定义客户机侧 Suricata 的采集方式、EVE 日志处理流程、ECS 子集字段转换规则以及投递到 RabbitMQ 队列的固定流程。
 
 ## 读者对象
 
-- 负责客户机实现与部署的同学
-- 负责网络证据与验证的同学
+- 客户机实现与部署人员
+- 网络证据与验证人员
 
 ## 引用关系
 
@@ -19,13 +19,11 @@
 
 ### 1.1 Suricata 引擎
 
-Suricata 引擎由容器 `suricata` 运行，启动脚本为：
+Suricata 引擎由容器 `suricata` 运行，启动脚本为：`client/sensor/suricata/engine/run-suricata.sh`
 
-- `client/sensor/suricata/engine/run-suricata.sh`
+Suricata 输出 EVE 日志文件供导出器消费：
 
-Suricata 输出 EVE 日志文件，供导出器消费：
-
-- 默认路径：`/data/eve.json`
+- **默认路径**：`/data/eve.json`
 
 ### 1.2 关键运行参数
 
@@ -67,9 +65,7 @@ Suricata 运行参数由环境变量确定：
 
 ### 2.1 导出器位置
 
-Suricata EVE 导出器位于：
-
-- `client/sensor/suricata/exporter/app.py`
+Suricata EVE 导出器位于：`client/sensor/suricata/exporter/app.py`
 
 导出器持续读取 EVE 文件新增内容，解析为 ECS 子集并发布到 RabbitMQ 队列。
 
@@ -94,9 +90,7 @@ Suricata 导出器根据 `event_type` 映射 dataset，取值固定在以下集�
 - `netflow.tls`
 - `netflow.icmp`
 
-此外，Suricata 的 IDS 告警会以 `event.kind="alert"` 输出（导出器侧使用 `event.dataset="netflow.alert"` 表示来源），中心机入库时会规范化为 Raw Finding：
-
-- `finding.raw.suricata`
+此外，Suricata 的 IDS 告警会以 `event.kind="alert"` 输出（导出器侧使用 `event.dataset="netflow.alert"` 表示来源），中心机入库时会规范化为 Raw Finding：`finding.raw.suricata`
 
 ### 2.4 event_type 与 dataset 映射表
 
@@ -153,7 +147,7 @@ Suricata 导出器按以下规则写入网络相关字段：
   - `dns.question.name`
   - `dns.answers[]`（用于 `Domain → IP` 的 `RESOLVES_TO` 边）
 
-字段口径见 `../../80-规范/81-ECS字段规范.md`。
+字段口径见 `../../80-规范/81-ECS字段规范.md`
 
 ## 4. 队列投递
 
@@ -162,10 +156,10 @@ Suricata 导出器投递到 RabbitMQ：
 - 队列：`data.suricata`
 - `RABBITMQ_URL`、`RABBITMQ_QUEUE` 由容器环境变量指定
 
-拉取接口返回前会补齐稳定 `event.id`，规则见 `../../80-规范/87-客户机与中心机接口.md`。
+拉取接口返回前会补齐稳定 `event.id`，规则见 `../../80-规范/87-客户机与中心机接口.md`
 
 ## 5. 故障处理
 
-1. EVE 文件不存在时，导出器会创建必要目录并持续等待。
-2. RabbitMQ 发布失败时，导出器会重连后重试发布。
-3. 任意单条 EVE 行解析失败时，导出器跳过该行并继续处理后续行。
+1. EVE 文件不存在时，导出器会创建必要目录并持续等待
+2. RabbitMQ 发布失败时，导出器会重连后重试发布
+3. 任意单条 EVE 行解析失败时，导出器跳过该行并继续处理后续行

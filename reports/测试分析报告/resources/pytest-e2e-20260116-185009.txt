@@ -1,0 +1,135 @@
+EEEEEEEEEEEs/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/.venv/lib/python3.12/site-packages/coverage/control.py:958: CoverageWarning: No data was collected. (no-data-collected); see https://coverage.readthedocs.io/en/7.13.1/messages.html#warning-no-data-collected
+  self._warn("No data was collected.", slug="no-data-collected")
+                                                             [100%]
+==================================== ERRORS ====================================
+_____ ERROR at setup of TestEndToEndWorkflow.test_complete_event_lifecycle _____
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 34
+      def test_complete_event_lifecycle(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:34
+_ ERROR at setup of TestEndToEndWorkflow.test_complete_finding_deduplication_workflow _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 65
+      def test_complete_finding_deduplication_workflow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:65
+______ ERROR at setup of TestEndToEndWorkflow.test_multi_index_data_flow _______
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 112
+      def test_multi_index_data_flow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:112
+_ ERROR at setup of TestEndToEndWorkflow.test_data_analysis_complete_workflow __
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 149
+      def test_data_analysis_complete_workflow(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:149
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_multiple_attack_techniques _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 185
+      def test_scenario_multiple_attack_techniques(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:185
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_same_attack_multiple_hosts _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 215
+      def test_scenario_same_attack_multiple_hosts(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:215
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_time_window_deduplication _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 246
+      def test_scenario_time_window_deduplication(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:246
+_ ERROR at setup of TestRealWorldScenarios.test_scenario_fingerprint_variations _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 286
+      def test_scenario_fingerprint_variations(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:286
+_ ERROR at setup of TestPerformanceAndScalability.test_bulk_store_large_dataset _
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 312
+      def test_bulk_store_large_dataset(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:312
+_ ERROR at setup of TestPerformanceAndScalability.test_search_with_pagination __
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 325
+      def test_search_with_pagination(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:325
+___ ERROR at setup of TestErrorHandling.test_handle_invalid_event_structure ____
+file /Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py, line 347
+      def test_handle_invalid_event_structure(self, initialized_indices):
+E       fixture 'initialized_indices' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, full_test_environment, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_data_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/zhangtianhua/conductor/workspaces/attack-trace-analyzer/irvine/backend/tests/e2e/test_opensearch_system.py:347
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.12.12-final-0 _______________
+
+Name                               Stmts   Miss   Cover   Missing
+-----------------------------------------------------------------
+app/__init__.py                        0      0 100.00%
+app/api/__init__.py                    0      0 100.00%
+app/api/router.py                     13     13   0.00%   1-15
+app/api/routes/__init__.py             0      0 100.00%
+app/api/routes/analysis_tasks.py     121    121   0.00%   1-269
+app/api/routes/clients.py             69     69   0.00%   1-143
+app/api/routes/events.py              65     65   0.00%   1-109
+app/api/routes/findings.py            68     68   0.00%   1-112
+app/api/routes/graph.py               88     88   0.00%   1-183
+app/api/routes/health.py               5      5   0.00%   1-8
+app/api/routes/root.py                 5      5   0.00%   1-8
+app/api/routes/targets.py             61     61   0.00%   1-110
+app/api/utils.py                      11     11   0.00%   1-22
+app/core/__init__.py                   1      1   0.00%   1
+app/core/config.py                    36     36   0.00%   1-46
+app/core/deps.py                       3      3   0.00%   1-5
+app/core/logging.py                    3      3   0.00%   1-5
+app/core/time.py                      47     47   0.00%   1-67
+app/dto/__init__.py                    2      2   0.00%   1-3
+app/dto/targets.py                     3      3   0.00%   1-5
+app/schemas/__init__.py                0      0 100.00%
+app/schemas/common.py                  9      9   0.00%   1-15
+-----------------------------------------------------------------
+TOTAL                                610    610   0.00%
+Coverage HTML written to dir htmlcov
+=========================== short test summary info ============================
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_complete_event_lifecycle
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_complete_finding_deduplication_workflow
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_multi_index_data_flow
+ERROR tests/e2e/test_opensearch_system.py::TestEndToEndWorkflow::test_data_analysis_complete_workflow
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_multiple_attack_techniques
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_same_attack_multiple_hosts
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_time_window_deduplication
+ERROR tests/e2e/test_opensearch_system.py::TestRealWorldScenarios::test_scenario_fingerprint_variations
+ERROR tests/e2e/test_opensearch_system.py::TestPerformanceAndScalability::test_bulk_store_large_dataset
+ERROR tests/e2e/test_opensearch_system.py::TestPerformanceAndScalability::test_search_with_pagination
+ERROR tests/e2e/test_opensearch_system.py::TestErrorHandling::test_handle_invalid_event_structure
+1 skipped, 11 errors in 0.43s
